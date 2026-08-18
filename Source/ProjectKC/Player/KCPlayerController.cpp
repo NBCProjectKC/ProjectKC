@@ -6,47 +6,11 @@
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
 #include "Player/KCPlayerCharacter.h"
-#include "UObject/ConstructorHelpers.h"
 
 AKCPlayerController::AKCPlayerController()
 {
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::Crosshairs;
-
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> DefaultMappingContext(
-		TEXT("/Game/Input/IMC_Default.IMC_Default"));
-	if (DefaultMappingContext.Succeeded())
-	{
-		PlayerMappingContext = DefaultMappingContext.Object;
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> DefaultMoveAction(
-		TEXT("/Game/Input/Actions/IA_Move.IA_Move"));
-	if (DefaultMoveAction.Succeeded())
-	{
-		MoveAction = DefaultMoveAction.Object;
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> DefaultAttackAction(
-		TEXT("/Game/Input/Actions/IA_Attack.IA_Attack"));
-	if (DefaultAttackAction.Succeeded())
-	{
-		AttackAction = DefaultAttackAction.Object;
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> DefaultInteractAction(
-		TEXT("/Game/Input/Actions/IA_Interact.IA_Interact"));
-	if (DefaultInteractAction.Succeeded())
-	{
-		InteractAction = DefaultInteractAction.Object;
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> DefaultDropHeldItemAction(
-		TEXT("/Game/Input/Actions/IA_DropHeldItem.IA_DropHeldItem"));
-	if (DefaultDropHeldItemAction.Succeeded())
-	{
-		DropHeldItemAction = DefaultDropHeldItemAction.Object;
-	}
 }
 
 void AKCPlayerController::BeginPlay()

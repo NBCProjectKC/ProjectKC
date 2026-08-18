@@ -6,6 +6,7 @@
 
 class UCameraComponent;
 class UKCPlayerCombatComponent;
+class UKCPlayerInteractionComponent;
 class USpringArmComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FKCPlayerInputRequestedSignature);
@@ -39,6 +40,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	UKCPlayerCombatComponent* GetCombatComponent() const;
 
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	UKCPlayerInteractionComponent* GetInteractionComponent() const;
+
 private:
 	void ApplyFacingYaw(float FacingYaw);
 
@@ -54,6 +58,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerCombatComponent> CombatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerInteractionComponent> InteractionComponent;
 
 	float FacingReplicationElapsed = 0.0f;
 	float LastSentFacingYaw = 0.0f;

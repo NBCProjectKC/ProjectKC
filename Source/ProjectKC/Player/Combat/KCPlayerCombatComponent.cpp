@@ -11,25 +11,10 @@
 #include "Net/UnrealNetwork.h"
 #include "Player/KCPlayerCharacter.h"
 #include "TimerManager.h"
-#include "UObject/ConstructorHelpers.h"
 
 UKCPlayerCombatComponent::UKCPlayerCombatComponent()
 {
 	SetIsReplicatedByDefault(true);
-
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> DefaultAttackAnimation(
-		TEXT("/Game/Assets/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01"));
-	if (DefaultAttackAnimation.Succeeded())
-	{
-		AttackAnimation = DefaultAttackAnimation.Object;
-	}
-
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> DefaultHitAnimation(
-		TEXT("/Game/Assets/Characters/Mannequins/Anims/Death/MM_Death_Front_01.MM_Death_Front_01"));
-	if (DefaultHitAnimation.Succeeded())
-	{
-		HitAnimation = DefaultHitAnimation.Object;
-	}
 }
 
 void UKCPlayerCombatComponent::GetLifetimeReplicatedProps(

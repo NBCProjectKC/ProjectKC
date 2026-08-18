@@ -1,14 +1,12 @@
 #include "Player/KCPlayerCharacter.h"
 
-#include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Player/Combat/KCPlayerCombatComponent.h"
-#include "UObject/ConstructorHelpers.h"
+#include "Player/Interaction/KCPlayerInteractionComponent.h"
 
 namespace
 {
@@ -27,23 +25,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
 	GetMesh()->VisibilityBasedAnimTickOption =
 		EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
-
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> PlayerSkeletalMesh(
-		TEXT("/Game/Assets/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
-	if (PlayerSkeletalMesh.Succeeded())
-	{
-		GetMesh()->SetSkeletalMeshAsset(PlayerSkeletalMesh.Object);
-		GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
-		GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
-	}
-
-	static ConstructorHelpers::FClassFinder<UAnimInstance> PlayerAnimationBlueprint(
-		TEXT("/Game/Assets/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"));
-	if (PlayerAnimationBlueprint.Succeeded())
-	{
-		GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
-		GetMesh()->SetAnimInstanceClass(PlayerAnimationBlueprint.Class);
-	}
+	GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
+	GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
 
 	UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement();
 	CharacterMovementComponent->bOrientRotationToMovement = false;
@@ -63,6 +46,9 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	TopDownCameraComponent->bUsePawnControlRotation = false;
 
 	CombatComponent = CreateDefaultSubobject<UKCPlayerCombatComponent>(TEXT("CombatComponent"));
+	InteractionComponent = CreateDefaultSubobject<UKCPlayerInteractionComponent>(
+		TEXT("InteractionComponent"));
+	InteractionComponent->SetupAttachment(RootComponent);
 }
 
 void AKCPlayerCharacter::TryAttack()
@@ -77,6 +63,11 @@ void AKCPlayerCharacter::RequestInteract()
 {
 	if (IsLocallyControlled())
 	{
+		if (InteractionComponent)
+		{
+			InteractionComponent->TryInteract();
+		}
+
 		OnInteractInputRequested.Broadcast();
 	}
 }
@@ -106,6 +97,11 @@ float AKCPlayerCharacter::TakeDamage(
 UKCPlayerCombatComponent* AKCPlayerCharacter::GetCombatComponent() const
 {
 	return CombatComponent;
+}
+
+UKCPlayerInteractionComponent* AKCPlayerCharacter::GetInteractionComponent() const
+{
+	return InteractionComponent;
 }
 
 void AKCPlayerCharacter::MoveInWorldDirection(const FVector& WorldDirection, const float ScaleValue)
