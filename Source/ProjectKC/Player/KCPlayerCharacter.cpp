@@ -67,8 +67,6 @@ void AKCPlayerCharacter::RequestInteract()
 		{
 			InteractionComponent->TryInteract();
 		}
-
-		OnInteractInputRequested.Broadcast();
 	}
 }
 

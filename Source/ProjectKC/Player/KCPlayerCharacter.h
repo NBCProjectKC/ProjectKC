@@ -26,9 +26,6 @@ public:
 	void RequestDropHeldItem();
 
 	UPROPERTY(BlueprintAssignable, Category = "Input|Interaction")
-	FKCPlayerInputRequestedSignature OnInteractInputRequested;
-
-	UPROPERTY(BlueprintAssignable, Category = "Input|Interaction")
 	FKCPlayerInputRequestedSignature OnDropHeldItemInputRequested;
 
 	virtual float TakeDamage(

@@ -1,5 +1,6 @@
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 
+#include "Components/PrimitiveComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Interaction/Interface/KCInteractableInterface.h"
@@ -36,20 +37,21 @@ AActor* UKCPlayerInteractionComponent::GetBestInteractable() const
 		return nullptr;
 	}
 
-	TArray<AActor*> OverlappingActors;
-	GetOverlappingActors(OverlappingActors);
+	TArray<UPrimitiveComponent*> OverlappingTargetComponents;
+	GetOverlappingComponents(OverlappingTargetComponents);
 	AActor* BestTargetActor = nullptr;
 	float BestDistanceSquared = TNumericLimits<float>::Max();
 
-	for (AActor* CandidateActor : OverlappingActors)
+	for (UPrimitiveComponent* CandidateComponent : OverlappingTargetComponents)
 	{
-		if (!IsValidInteractionTarget(CandidateActor, bRequireLineOfSight))
+		if (!IsValidInteractionComponent(CandidateComponent, bRequireLineOfSight))
 		{
 			continue;
 		}
 
+		AActor* CandidateActor = CandidateComponent->GetOwner();
 		const float DistanceSquared = FVector::DistSquared2D(
-			OwnerActor->GetActorLocation(), CandidateActor->GetActorLocation());
+			OwnerActor->GetActorLocation(), CandidateComponent->Bounds.Origin);
 		if (DistanceSquared < BestDistanceSquared)
 		{
 			BestDistanceSquared = DistanceSquared;
@@ -62,7 +64,7 @@ AActor* UKCPlayerInteractionComponent::GetBestInteractable() const
 
 void UKCPlayerInteractionComponent::ServerTryInteract_Implementation(AActor* TargetActor)
 {
-	if (!IsValidInteractionTarget(TargetActor, bRequireLineOfSight))
+	if (!FindInteractionComponent(TargetActor, bRequireLineOfSight))
 	{
 		return;
 	}
@@ -70,19 +72,56 @@ void UKCPlayerInteractionComponent::ServerTryInteract_Implementation(AActor* Tar
 	IKCInteractableInterface::Execute_Interact(TargetActor, GetOwner());
 }
 
-bool UKCPlayerInteractionComponent::IsValidInteractionTarget(
+UPrimitiveComponent* UKCPlayerInteractionComponent::FindInteractionComponent(
 	AActor* TargetActor,
 	const bool bCheckLineOfSight) const
 {
+	if (!IsValid(TargetActor))
+	{
+		return nullptr;
+	}
+
+	TArray<UPrimitiveComponent*> OverlappingTargetComponents;
+	GetOverlappingComponents(OverlappingTargetComponents);
+	UPrimitiveComponent* BestTargetComponent = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+
+	for (UPrimitiveComponent* CandidateComponent : OverlappingTargetComponents)
+	{
+		if (!CandidateComponent || CandidateComponent->GetOwner() != TargetActor
+			|| !IsValidInteractionComponent(CandidateComponent, bCheckLineOfSight))
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared2D(
+			GetOwner()->GetActorLocation(), CandidateComponent->Bounds.Origin);
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestTargetComponent = CandidateComponent;
+		}
+	}
+
+	return BestTargetComponent;
+}
+
+bool UKCPlayerInteractionComponent::IsValidInteractionComponent(
+	UPrimitiveComponent* TargetComponent,
+	const bool bCheckLineOfSight) const
+{
 	const AActor* OwnerActor = GetOwner();
-	if (!OwnerActor || !IsValid(TargetActor) || TargetActor == OwnerActor
+	AActor* TargetActor = TargetComponent ? TargetComponent->GetOwner() : nullptr;
+	if (!OwnerActor || !IsValid(TargetComponent) || !IsValid(TargetActor)
+		|| TargetActor == OwnerActor
+		|| !TargetComponent->ComponentHasTag(InteractableComponentTag)
 		|| !TargetActor->GetClass()->ImplementsInterface(UKCInteractableInterface::StaticClass()))
 	{
 		return false;
 	}
 
 	const FVector OwnerLocation = OwnerActor->GetActorLocation();
-	const FVector TargetLocation = TargetActor->GetActorLocation();
+	const FVector TargetLocation = TargetComponent->Bounds.Origin;
 	const FVector ToTarget = (TargetLocation - OwnerLocation).GetSafeNormal2D();
 	if (ToTarget.IsNearlyZero())
 	{
@@ -101,19 +140,16 @@ bool UKCPlayerInteractionComponent::IsValidInteractionTarget(
 		return false;
 	}
 
-	if (!IKCInteractableInterface::Execute_CanInteract(TargetActor, GetOwner()))
-	{
-		return false;
-	}
-
-	return !bCheckLineOfSight || HasLineOfSightTo(TargetActor);
+	return !bCheckLineOfSight || HasLineOfSightTo(TargetComponent);
 }
 
-bool UKCPlayerInteractionComponent::HasLineOfSightTo(const AActor* TargetActor) const
+bool UKCPlayerInteractionComponent::HasLineOfSightTo(
+	const UPrimitiveComponent* TargetComponent) const
 {
 	const AActor* OwnerActor = GetOwner();
+	const AActor* TargetActor = TargetComponent ? TargetComponent->GetOwner() : nullptr;
 	UWorld* World = GetWorld();
-	if (!OwnerActor || !TargetActor || !World)
+	if (!OwnerActor || !TargetComponent || !TargetActor || !World)
 	{
 		return false;
 	}
@@ -123,7 +159,7 @@ bool UKCPlayerInteractionComponent::HasLineOfSightTo(const AActor* TargetActor) 
 	const bool bBlockingHit = World->LineTraceSingleByChannel(
 		HitResult,
 		OwnerActor->GetActorLocation(),
-		TargetActor->GetActorLocation(),
+		TargetComponent->Bounds.Origin,
 		InteractionTraceChannel,
 		QueryParams);
 
