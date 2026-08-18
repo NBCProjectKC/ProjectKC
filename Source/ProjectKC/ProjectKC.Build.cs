@@ -9,7 +9,17 @@ public class ProjectKC : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PrivateIncludePaths.Add(ModuleDirectory);
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput","GameplayTags","GameplayMessageRuntime" });
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			
+			// GMS (Gameplay Message Subsystem)
+			"GameplayTags", "GameplayMessageRuntime",
+			
+			// Online & Steam Sessions
+			"OnlineSubsystem", "OnlineSubsystemSteam",
+			"AdvancedSessions", "AdvancedSteamSessions"
+		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
