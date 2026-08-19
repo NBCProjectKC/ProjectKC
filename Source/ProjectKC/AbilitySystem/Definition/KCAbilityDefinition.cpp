@@ -37,6 +37,15 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		return false;
 	}
 
+	FString MontageError;
+	if (!ActionMontage.Validate(MontageError))
+	{
+		OutError = FString::Printf(
+			TEXT("ActionMontage가 유효하지 않습니다: %s"),
+			*MontageError);
+		return false;
+	}
+
 	if (ActionConfig)
 	{
 		FString ConfigError;

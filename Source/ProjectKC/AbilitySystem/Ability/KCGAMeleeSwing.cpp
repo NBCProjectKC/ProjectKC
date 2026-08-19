@@ -52,32 +52,22 @@ UKCGAMeleeSwing::UKCGAMeleeSwing()
 	AddRequiredActionHook(TAG_KC_ActionHook_Target_OnHit);
 }
 
-void UKCGAMeleeSwing::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
+bool UKCGAMeleeSwing::PrepareUseAction(
 	const FGameplayEventData* TriggerEventData)
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
-	{
-		return;
-	}
+	const AActor* SourceActor = GetAvatarActorFromActorInfo();
+	return SourceActor && SourceActor->HasAuthority() &&
+		Cast<UKCMeleeActionConfig>(GetActiveActionConfig()) != nullptr;
+}
 
+bool UKCGAMeleeSwing::ExecuteUseAction()
+{
 	AActor* SourceActor = GetAvatarActorFromActorInfo();
 	const UKCMeleeActionConfig* Config =
 		Cast<UKCMeleeActionConfig>(GetActiveActionConfig());
 	if (!SourceActor || !SourceActor->HasAuthority() || !Config)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	// 공격 시도 자체에 Cost/Cooldown이 소모되어야 하므로 명중 판정보다 먼저 확정한다.
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return false;
 	}
 
 	TArray<FHitResult> HitResults;
@@ -122,7 +112,7 @@ void UKCGAMeleeSwing::ActivateAbility(
 	}
 
 	// 빗나간 공격도 정상적으로 실행된 한 번의 공격이다.
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+	return true;
 }
 
 void UKCGAMeleeSwing::GatherHitResults(

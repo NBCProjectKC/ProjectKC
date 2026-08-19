@@ -1,10 +1,7 @@
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 
-#include "CollisionQueryParams.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Engine/OverlapResult.h"
-#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
@@ -33,24 +30,6 @@ bool UKCHeldItemComponent::ConfigureAttachment(
 	return true;
 }
 
-void UKCHeldItemComponent::TryInteract()
-{
-	AActor* Holder = GetOwner();
-	if (!Holder)
-	{
-		return;
-	}
-
-	if (Holder->HasAuthority())
-	{
-		TryInteractAuthority();
-	}
-	else
-	{
-		ServerTryInteract();
-	}
-}
-
 void UKCHeldItemComponent::TryDropHeldItem()
 {
 	AActor* Holder = GetOwner();
@@ -74,9 +53,9 @@ bool UKCHeldItemComponent::TryPickUp(AKCWorldItemActor* Item)
 	AActor* Holder = GetOwner();
 	if (!Holder || !Holder->HasAuthority() || IsValid(HeldItem) ||
 		!IsValid(Item) || !Item->CanBePickedUp() ||
-		InteractionRadius <= 0.0f ||
+		MaxPickupDistance <= 0.0f ||
 		FVector::DistSquared(Holder->GetActorLocation(), Item->GetActorLocation()) >
-			FMath::Square(InteractionRadius))
+			FMath::Square(MaxPickupDistance))
 	{
 		return false;
 	}
@@ -200,11 +179,6 @@ void UKCHeldItemComponent::OnRep_HeldItem()
 	BroadcastHeldItemChanged();
 }
 
-void UKCHeldItemComponent::ServerTryInteract_Implementation()
-{
-	TryInteractAuthority();
-}
-
 void UKCHeldItemComponent::ServerDropHeldItem_Implementation()
 {
 	DropHeldItemAuthority();
@@ -258,19 +232,6 @@ USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
 	return nullptr;
 }
 
-void UKCHeldItemComponent::TryInteractAuthority()
-{
-	if (!GetOwner() || !GetOwner()->HasAuthority() || HasHeldItem())
-	{
-		return;
-	}
-
-	if (AKCWorldItemActor* Candidate = FindBestPickupCandidate())
-	{
-		TryPickUp(Candidate);
-	}
-}
-
 void UKCHeldItemComponent::DropHeldItemAuthority()
 {
 	AActor* Holder = GetOwner();
@@ -282,55 +243,6 @@ void UKCHeldItemComponent::DropHeldItemAuthority()
 	DropHeldItem(
 		MakeHeldItemDropTransform(),
 		Holder->GetActorForwardVector() * DropForwardImpulse);
-}
-
-AKCWorldItemActor* UKCHeldItemComponent::FindBestPickupCandidate() const
-{
-	const AActor* Holder = GetOwner();
-	UWorld* World = GetWorld();
-	if (!Holder || !World || InteractionRadius <= 0.0f)
-	{
-		return nullptr;
-	}
-
-	FCollisionObjectQueryParams ObjectQuery;
-	ObjectQuery.AddObjectTypesToQuery(ECC_WorldDynamic);
-	ObjectQuery.AddObjectTypesToQuery(ECC_PhysicsBody);
-
-	FCollisionQueryParams QueryParams(
-		SCENE_QUERY_STAT(KCItemPickup),
-		false,
-		Holder);
-	TArray<FOverlapResult> Overlaps;
-	World->OverlapMultiByObjectType(
-		Overlaps,
-		Holder->GetActorLocation(),
-		FQuat::Identity,
-		ObjectQuery,
-		FCollisionShape::MakeSphere(InteractionRadius),
-		QueryParams);
-
-	AKCWorldItemActor* BestItem = nullptr;
-	float BestDistanceSquared = TNumericLimits<float>::Max();
-	for (const FOverlapResult& Overlap : Overlaps)
-	{
-		AKCWorldItemActor* Item = Cast<AKCWorldItemActor>(Overlap.GetActor());
-		if (!Item || !Item->CanBePickedUp())
-		{
-			continue;
-		}
-
-		const float DistanceSquared = FVector::DistSquared(
-			Holder->GetActorLocation(),
-			Item->GetActorLocation());
-		if (DistanceSquared < BestDistanceSquared)
-		{
-			BestDistanceSquared = DistanceSquared;
-			BestItem = Item;
-		}
-	}
-
-	return BestItem;
 }
 
 FTransform UKCHeldItemComponent::MakeHeldItemDropTransform() const

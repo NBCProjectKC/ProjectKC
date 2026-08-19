@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "ProjectKC/Interaction/Interface/KCInteractableInterface.h"
 #include "KCWorldItemActor.generated.h"
 
 class AActor;
@@ -43,7 +44,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
  * 플레이어 입력을 소유하지 않으며 Pickup/Drop/Use 계약만 제공한다.
  */
 UCLASS(Blueprintable)
-class PROJECTKC_API AKCWorldItemActor : public AActor
+class PROJECTKC_API AKCWorldItemActor
+	: public AActor
+	, public IKCInteractableInterface
 {
 	GENERATED_BODY()
 
@@ -51,6 +54,7 @@ public:
 	AKCWorldItemActor();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void Interact_Implementation(AActor* Interactor) override;
 
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(

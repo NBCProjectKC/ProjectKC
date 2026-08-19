@@ -27,10 +27,6 @@ public:
 		USceneComponent* NewAttachmentComponent,
 		FName NewHandSocketName);
 
-	/** 입력 계층에서 호출한다. 서버가 현재 위치에서 가장 가까운 아이템을 찾는다. */
-	UFUNCTION(BlueprintCallable, Category = "KC|Item")
-	void TryInteract();
-
 	/** 입력 계층에서 호출한다. 서버가 컴포넌트 설정으로 Drop Transform을 계산한다. */
 	UFUNCTION(BlueprintCallable, Category = "KC|Item")
 	void TryDropHeldItem();
@@ -72,9 +68,6 @@ protected:
 		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(Server, Reliable)
-	void ServerTryInteract();
-
-	UFUNCTION(Server, Reliable)
 	void ServerDropHeldItem();
 
 	UFUNCTION()
@@ -93,9 +86,9 @@ protected:
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
-		Category = "KC|Item|Interaction",
+		Category = "KC|Item|Pickup",
 		meta = (ClampMin = "0.0"))
-	float InteractionRadius = 180.0f;
+	float MaxPickupDistance = 250.0f;
 
 	UPROPERTY(
 		EditAnywhere,
@@ -118,9 +111,7 @@ private:
 	friend class AKCWorldItemActor;
 
 	USceneComponent* ResolveAttachmentComponent() const;
-	void TryInteractAuthority();
 	void DropHeldItemAuthority();
-	AKCWorldItemActor* FindBestPickupCandidate() const;
 	FTransform MakeHeldItemDropTransform() const;
 	void BroadcastHeldItemChanged();
 

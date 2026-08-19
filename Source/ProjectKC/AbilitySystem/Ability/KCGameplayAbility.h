@@ -58,6 +58,9 @@ protected:
 		TSubclassOf<UKCActionConfig> ConfigClass,
 		bool bRequired = true);
 
+	/** Action Montage 수명주기를 실행할 수 있는 GA만 true로 선언한다. */
+	void SetSupportsActionMontage(bool bSupported);
+
 	bool SetRuntimeMagnitude(FGameplayTag DataTag, float Magnitude);
 
 	bool ExecuteActionHook(
@@ -94,4 +97,5 @@ private:
 	FGameplayTagContainer RequiredActionHooks;
 	TSubclassOf<UKCActionConfig> SupportedActionConfigClass;
 	bool bActionConfigRequired = false;
+	bool bSupportsActionMontage = false;
 };

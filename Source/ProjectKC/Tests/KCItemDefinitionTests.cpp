@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Animation/AnimMontage.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "GameplayEffect.h"
@@ -31,6 +32,7 @@ namespace KCItemDefinitionTests
 		UKCAbilityDefinition* Definition =
 			NewObject<UKCAbilityDefinition>(Outer);
 		Definition->ActionClass = UKCGAInstantSelfAction::StaticClass();
+		Definition->ActionMontage.Montage = NewObject<UAnimMontage>(Definition);
 
 		FKCActionHookStruct Hook;
 		Hook.HookTag = TAG_KC_ActionHook_Self_OnActivate;
@@ -101,6 +103,18 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("잘못된 사용 Ability를 가진 아이템 Definition은 거부한다."),
 		InvalidUseItem->Validate(Error));
+
+	UKCItemDefinition* MissingMontageItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	MissingMontageItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(MissingMontageItem);
+	MissingMontageItem->UseAction->ActionMontage.Montage = nullptr;
+	TestTrue(
+		TEXT("Montage가 없어도 사용 Ability 자체의 계약은 여전히 유효하다."),
+		MissingMontageItem->UseAction->ValidateWithActionContract(Error));
+	TestFalse(
+		TEXT("사용 가능한 아이템은 고유 사용 Montage가 없으면 거부한다."),
+		MissingMontageItem->Validate(Error));
 
 	UKCItemDefinition* MissingMeshItem = NewObject<UKCItemDefinition>();
 	MissingMeshItem->DisplayName = FText::FromString(TEXT("No Mesh"));

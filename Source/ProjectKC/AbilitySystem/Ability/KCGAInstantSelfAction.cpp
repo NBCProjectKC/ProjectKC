@@ -9,25 +9,18 @@ UKCGAInstantSelfAction::UKCGAInstantSelfAction()
 	AddRequiredActionHook(TAG_KC_ActionHook_Self_OnActivate);
 }
 
-void UKCGAInstantSelfAction::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
+bool UKCGAInstantSelfAction::PrepareUseAction(
 	const FGameplayEventData* TriggerEventData)
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
-	{
-		return;
-	}
+	return GetAbilitySystemComponentFromActorInfo() != nullptr;
+}
 
+bool UKCGAInstantSelfAction::ExecuteUseAction()
+{
 	UAbilitySystemComponent* AbilitySystem =
 		GetAbilitySystemComponentFromActorInfo();
-	const bool bCommitted = CommitAbility(Handle, ActorInfo, ActivationInfo);
-	const bool bExecuted = bCommitted && AbilitySystem &&
-		ExecuteActionHook(
-			TAG_KC_ActionHook_Self_OnActivate,
-			AbilitySystem,
-			GetAvatarActorFromActorInfo());
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, !bExecuted);
+	return AbilitySystem && ExecuteActionHook(
+		TAG_KC_ActionHook_Self_OnActivate,
+		AbilitySystem,
+		GetAvatarActorFromActorInfo());
 }

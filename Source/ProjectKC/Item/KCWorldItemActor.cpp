@@ -20,10 +20,26 @@ AKCWorldItemActor::AKCWorldItemActor()
 	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
 	SetRootComponent(ItemMesh);
 	ItemMesh->SetCollisionProfileName(TEXT("PhysicsActor"));
+	ItemMesh->SetGenerateOverlapEvents(true);
 	ItemMesh->SetSimulatePhysics(false);
+	ItemMesh->ComponentTags.AddUnique(TEXT("Interactable"));
 
 	AbilitySourceComponent =
 		CreateDefaultSubobject<UKCAbilitySourceComponent>(TEXT("AbilitySource"));
+}
+
+void AKCWorldItemActor::Interact_Implementation(AActor* Interactor)
+{
+	if (!HasAuthority() || !IsValid(Interactor) || !CanBePickedUp())
+	{
+		return;
+	}
+
+	if (UKCHeldItemComponent* HolderItemComponent =
+		Interactor->FindComponentByClass<UKCHeldItemComponent>())
+	{
+		HolderItemComponent->TryPickUp(this);
+	}
 }
 
 void AKCWorldItemActor::OnConstruction(const FTransform& Transform)

@@ -1,6 +1,8 @@
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 
 #include "Abilities/GameplayAbility.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
@@ -185,4 +187,71 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::FindGrantedAbilityBySource
 	}
 
 	return FGameplayAbilitySpecHandle();
+}
+
+void UKCAbilitySystemComponent::PlayActionMontageForRemoteOwner(
+	UAnimMontage* Montage,
+	float PlayRate,
+	FName StartSection)
+{
+	if (!IsValid(Montage) || !IsRemoteOwnerMontageTarget())
+	{
+		return;
+	}
+
+	ClientPlayActionMontage(Montage, PlayRate, StartSection);
+}
+
+void UKCAbilitySystemComponent::StopActionMontageForRemoteOwner(
+	UAnimMontage* Montage)
+{
+	if (!IsValid(Montage) || !IsRemoteOwnerMontageTarget())
+	{
+		return;
+	}
+
+	ClientStopActionMontage(Montage);
+}
+
+void UKCAbilitySystemComponent::ClientPlayActionMontage_Implementation(
+	UAnimMontage* Montage,
+	float PlayRate,
+	FName StartSection)
+{
+	if (!IsValid(Montage) || !AbilityActorInfo.IsValid() ||
+		!AbilityActorInfo->IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (PlayMontageSimulated(Montage, PlayRate) <= 0.0f)
+	{
+		return;
+	}
+
+	// PlayMontageSimulated는 StartSection을 사용하지 않으므로 직접 이동한다.
+	if (!StartSection.IsNone())
+	{
+		if (UAnimInstance* AnimInstance = AbilityActorInfo->GetAnimInstance())
+		{
+			AnimInstance->Montage_JumpToSection(StartSection, Montage);
+		}
+	}
+}
+
+void UKCAbilitySystemComponent::ClientStopActionMontage_Implementation(
+	UAnimMontage* Montage)
+{
+	if (IsValid(Montage) && AbilityActorInfo.IsValid() &&
+		AbilityActorInfo->IsLocallyControlled())
+	{
+		StopMontageIfCurrent(*Montage);
+	}
+}
+
+bool UKCAbilitySystemComponent::IsRemoteOwnerMontageTarget() const
+{
+	// 리슨 서버 호스트는 서버에서 이미 재생하므로 중복 재생을 막는다.
+	return IsOwnerActorAuthoritative() && AbilityActorInfo.IsValid() &&
+		!AbilityActorInfo->IsLocallyControlled();
 }

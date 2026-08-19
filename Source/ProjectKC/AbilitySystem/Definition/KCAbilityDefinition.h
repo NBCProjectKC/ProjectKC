@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/AbilitySystem/Struct/KCActionHookStruct.h"
+#include "ProjectKC/AbilitySystem/Struct/KCActionMontageSpec.h"
 #include "UObject/Object.h"
 #include "KCAbilityDefinition.generated.h"
 
@@ -24,6 +25,16 @@ public:
 		Category = "KC|Ability",
 		meta = (ClampMin = "1"))
 	int32 AbilityLevel = 1;
+
+	/**
+	 * 사용 행동의 몽타주다. 아이템 사용은 이 몽타주의 Execute Notify 시점에 결과가 발생한다.
+	 * 함정처럼 Avatar 애니메이션이 없는 소스는 비워 둔다.
+	 */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "KC|Ability|Presentation")
+	FKCActionMontageSpec ActionMontage;
 
 	/** 특정 Action GA에만 필요한 데이터다. 지원하지 않는 GA에서는 비어 있어야 한다. */
 	UPROPERTY(

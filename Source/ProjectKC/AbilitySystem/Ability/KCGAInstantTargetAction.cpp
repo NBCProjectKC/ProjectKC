@@ -3,6 +3,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "GameFramework/Actor.h"
 #include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
 
 UKCGAInstantTargetAction::UKCGAInstantTargetAction()
@@ -11,33 +12,46 @@ UKCGAInstantTargetAction::UKCGAInstantTargetAction()
 	AddRequiredActionHook(TAG_KC_ActionHook_Target_OnTrigger);
 }
 
-void UKCGAInstantTargetAction::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
+bool UKCGAInstantTargetAction::PrepareUseAction(
 	const FGameplayEventData* TriggerEventData)
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
-	{
-		return;
-	}
+	PreparedTargetActor.Reset();
+	PreparedHitResult = FHitResult();
+	bHasPreparedHitResult = false;
 
 	AActor* TargetActor = TriggerEventData
 		? const_cast<AActor*>(TriggerEventData->Target.Get())
 		: nullptr;
+	if (!IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	if (const FHitResult* HitResult =
+		TriggerEventData->ContextHandle.GetHitResult())
+	{
+		PreparedHitResult = *HitResult;
+		bHasPreparedHitResult = true;
+	}
+
+	PreparedTargetActor = TargetActor;
+	return true;
+}
+
+bool UKCGAInstantTargetAction::ExecuteUseAction()
+{
+	// 대기 중 대상이 사라졌다면 결과를 실행하지 않고 취소한다.
+	AActor* TargetActor = PreparedTargetActor.Get();
+	if (!IsValid(TargetActor))
+	{
+		return false;
+	}
+
 	UAbilitySystemComponent* TargetAbilitySystem =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-	const FHitResult* HitResult = TriggerEventData
-		? TriggerEventData->ContextHandle.GetHitResult()
-		: nullptr;
-
-	const bool bCommitted = IsValid(TargetActor) &&
-		CommitAbility(Handle, ActorInfo, ActivationInfo);
-	const bool bExecuted = bCommitted && ExecuteActionHook(
+	return ExecuteActionHook(
 		TAG_KC_ActionHook_Target_OnTrigger,
 		TargetAbilitySystem,
 		TargetActor,
-		HitResult);
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, !bExecuted);
+		bHasPreparedHitResult ? &PreparedHitResult : nullptr);
 }

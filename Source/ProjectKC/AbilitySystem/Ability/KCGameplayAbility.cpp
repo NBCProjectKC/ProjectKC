@@ -20,6 +20,14 @@ bool UKCGameplayAbility::ValidateDefinitionContract(
 	FString& OutError) const
 {
 	OutError.Reset();
+	if (Definition.ActionMontage.HasMontage() && !bSupportsActionMontage)
+	{
+		OutError = FString::Printf(
+			TEXT("ActionClass '%s'가 Action Montage를 지원하지 않습니다."),
+			*GetClass()->GetName());
+		return false;
+	}
+
 	if (Definition.ActionConfig)
 	{
 		if (!SupportedActionConfigClass ||
@@ -164,6 +172,11 @@ void UKCGameplayAbility::SetSupportedActionConfigClass(
 {
 	SupportedActionConfigClass = ConfigClass;
 	bActionConfigRequired = bRequired;
+}
+
+void UKCGameplayAbility::SetSupportsActionMontage(bool bSupported)
+{
+	bSupportsActionMontage = bSupported;
 }
 
 bool UKCGameplayAbility::SetRuntimeMagnitude(

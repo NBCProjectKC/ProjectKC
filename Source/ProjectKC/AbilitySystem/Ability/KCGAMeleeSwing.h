@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGAUseActionBase.h"
 #include "KCGAMeleeSwing.generated.h"
 
 class AActor;
@@ -9,7 +9,7 @@ class UKCMeleeActionConfig;
 
 /** 서버에서 전방 근접 Sweep을 수행하고 각 대상의 Target.OnHit Hook을 실행한다. */
 UCLASS(Blueprintable)
-class PROJECTKC_API UKCGAMeleeSwing : public UKCGameplayAbility
+class PROJECTKC_API UKCGAMeleeSwing : public UKCGAUseActionBase
 {
 	GENERATED_BODY()
 
@@ -17,11 +17,9 @@ public:
 	UKCGAMeleeSwing();
 
 protected:
-	virtual void ActivateAbility(
-		const FGameplayAbilitySpecHandle Handle,
-		const FGameplayAbilityActorInfo* ActorInfo,
-		const FGameplayAbilityActivationInfo ActivationInfo,
+	virtual bool PrepareUseAction(
 		const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteUseAction() override;
 
 private:
 	void GatherHitResults(
