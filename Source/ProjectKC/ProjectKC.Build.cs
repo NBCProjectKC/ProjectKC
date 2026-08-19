@@ -19,6 +19,13 @@ public class ProjectKC : ModuleRules
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks"
+			
+			
+			"GameplayMessageRuntime", "NetCore",
+			
+			// Online & Steam Sessions
+			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam",
+			"AdvancedSessions", "AdvancedSteamSessions"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
