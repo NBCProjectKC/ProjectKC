@@ -31,7 +31,7 @@ void AKCPlayerController::BeginPlay()
 
 }
 
-void AKCPlayerController::Attack(const FInputActionValue& InputValue)
+void AKCPlayerController::UseHeldItem(const FInputActionValue& InputValue)
 {
 	if (!InputValue.Get<bool>())
 	{
@@ -40,7 +40,7 @@ void AKCPlayerController::Attack(const FInputActionValue& InputValue)
 
 	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
 	{
-		PlayerCharacter->TryAttack();
+		PlayerCharacter->TryUseHeldItem();
 	}
 }
 
@@ -84,7 +84,10 @@ void AKCPlayerController::SetupInputComponent()
 	if (AttackAction)
 	{
 		EnhancedInputComponent->BindAction(
-			AttackAction, ETriggerEvent::Started, this, &AKCPlayerController::Attack);
+			AttackAction,
+			ETriggerEvent::Started,
+			this,
+			&AKCPlayerController::UseHeldItem);
 	}
 
 	if (InteractAction)

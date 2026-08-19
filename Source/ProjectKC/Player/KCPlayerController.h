@@ -23,7 +23,7 @@ protected:
 
 private:
 	void Move(const FInputActionValue& InputValue);
-	void Attack(const FInputActionValue& InputValue);
+	void UseHeldItem(const FInputActionValue& InputValue);
 	void Interact(const FInputActionValue& InputValue);
 	void DropHeldItem(const FInputActionValue& InputValue);
 	void UpdateCharacterFacing(float DeltaSeconds);

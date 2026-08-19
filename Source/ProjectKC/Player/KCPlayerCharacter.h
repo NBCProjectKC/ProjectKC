@@ -1,46 +1,71 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "KCPlayerCharacter.generated.h"
 
+class UAbilitySystemComponent;
 class UCameraComponent;
-class UKCPlayerCombatComponent;
+class UKCAbilitySystemComponent;
+class UKCHeldItemComponent;
+class UKCItemDefinition;
+class UKCKnockbackComponent;
 class UKCPlayerInteractionComponent;
 class USpringArmComponent;
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FKCPlayerInputRequestedSignature);
+class UStaticMeshComponent;
+#if WITH_EDITOR
+struct FPropertyChangedEvent;
+#endif
 
 UCLASS()
-class PROJECTKC_API AKCPlayerCharacter : public ACharacter
+class PROJECTKC_API AKCPlayerCharacter
+	: public ACharacter
+	, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
 public:
 	AKCPlayerCharacter();
 
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual void OnConstruction(const FTransform& Transform) override;
+
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
-	void TryAttack();
+	bool TryUseHeldItem();
 	void RequestInteract();
 	void RequestDropHeldItem();
 
-	UPROPERTY(BlueprintAssignable, Category = "Input|Interaction")
-	FKCPlayerInputRequestedSignature OnDropHeldItemInputRequested;
+	UFUNCTION(BlueprintPure, Category = "KC|Ability")
+	UKCAbilitySystemComponent* GetKCAbilitySystemComponent() const;
 
-	virtual float TakeDamage(
-		float DamageAmount,
-		struct FDamageEvent const& DamageEvent,
-		AController* EventInstigator,
-		AActor* DamageCauser) override;
+	UFUNCTION(BlueprintPure, Category = "KC|Item")
+	UKCHeldItemComponent* GetHeldItemComponent() const;
 
-	UFUNCTION(BlueprintPure, Category = "Combat")
-	UKCPlayerCombatComponent* GetCombatComponent() const;
+	UFUNCTION(BlueprintPure, Category = "KC|Knockback")
+	UKCKnockbackComponent* GetKnockbackComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UKCPlayerInteractionComponent* GetInteractionComponent() const;
 
+	/** 선택한 Item Definition을 실제 HandItem/Grip 계산으로 에디터에 표시한다. */
+	UFUNCTION(CallInEditor, Category = "KC|Item|Preview")
+	void RefreshHeldItemPreview();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void OnRep_Controller() override;
+	virtual void PawnClientRestart() override;
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(
+		FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 private:
+	void InitializeAbilityActorInfo();
 	void ApplyFacingYaw(float FacingYaw);
 
 	UFUNCTION(Server, Unreliable)
@@ -52,13 +77,32 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> TopDownCameraComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat",
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UKCPlayerCombatComponent> CombatComponent;
+	TObjectPtr<UKCAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCHeldItemComponent> HeldItemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Knockback",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCKnockbackComponent> KnockbackComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerInteractionComponent> InteractionComponent;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(
+		EditAnywhere,
+		Category = "KC|Item|Preview",
+		meta = (DisplayThumbnail = true))
+	TObjectPtr<UKCItemDefinition> PreviewItemDefinition;
+
+	UPROPERTY(VisibleAnywhere, Category = "KC|Item|Preview")
+	TObjectPtr<UStaticMeshComponent> HeldItemPreviewMesh;
+#endif
 
 	float FacingReplicationElapsed = 0.0f;
 	float LastSentFacingYaw = 0.0f;
