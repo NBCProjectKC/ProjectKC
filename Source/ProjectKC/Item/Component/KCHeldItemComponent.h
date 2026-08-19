@@ -15,7 +15,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 
 /** 한 Actor가 한 번에 하나의 월드 아이템만 들도록 보장하는 Holder 측 컴포넌트다. */
 UCLASS(BlueprintType, ClassGroup = (KC), meta = (BlueprintSpawnableComponent))
-class PROJECTKC_API UKCHeldItemComponent : public UActorComponent
+class /**
+ * Manages the item held by an actor, including pickup, use, dropping, attachment, and replication.
+ */
+PROJECTKC_API UKCHeldItemComponent : public UActorComponent
 {
 	GENERATED_BODY()
 

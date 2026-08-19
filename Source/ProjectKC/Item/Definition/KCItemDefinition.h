@@ -9,7 +9,12 @@ class UKCAbilityDefinition;
 
 /** 인벤토리와 무관한 단일 월드 아이템의 불변 구성 데이터다. */
 UCLASS(BlueprintType)
-class PROJECTKC_API UKCItemDefinition : public UPrimaryDataAsset
+class /**
+ * Determines whether the item has a configured use action.
+ *
+ * @return `true` if a use action is configured, `false` otherwise.
+ */
+PROJECTKC_API UKCItemDefinition : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 

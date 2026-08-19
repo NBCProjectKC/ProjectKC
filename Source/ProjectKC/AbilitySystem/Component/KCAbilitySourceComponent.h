@@ -12,6 +12,9 @@ class UKCAbilitySystemComponent;
 
 /** Handle과 대상 ASC Owner를 한 번에 복제하는 Source Binding 상태다. */
 USTRUCT()
+/**
+ * Clears the granted ability handle and owning actor.
+ */
 struct PROJECTKC_API FKCAbilitySourceBindingState
 {
 	GENERATED_BODY()

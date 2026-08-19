@@ -6,6 +6,9 @@
 #include "Components/BoxComponent.h"
 #include "Misc/DataValidation.h"
 
+/**
+ * @brief Creates and configures the trap actor's trigger, ability system, and ability source components.
+ */
 AKCAbilityTrapActor::AKCAbilityTrapActor()
 {
 	bReplicates = true;
@@ -25,6 +28,11 @@ AKCAbilityTrapActor::AKCAbilityTrapActor()
 		CreateDefaultSubobject<UKCAbilitySourceComponent>(TEXT("AbilitySource"));
 }
 
+/**
+ * @brief Configures the ability source with the assigned action definition.
+ *
+ * @param Transform The actor's construction transform.
+ */
 void AKCAbilityTrapActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -32,6 +40,13 @@ void AKCAbilityTrapActor::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+/**
+ * @brief Validates the configured action definition and inherited actor data.
+ *
+ * @return EDataValidationResult Invalid when the action definition is missing or
+ *         fails its action contract; otherwise the superclass result, or Valid
+ *         when the superclass does not perform validation.
+ */
 EDataValidationResult AKCAbilityTrapActor::IsDataValid(
 	FDataValidationContext& Context) const
 {
@@ -52,11 +67,19 @@ EDataValidationResult AKCAbilityTrapActor::IsDataValid(
 }
 #endif
 
+/**
+ * @brief Retrieves the trap actor's ability system component.
+ *
+ * @return UAbilitySystemComponent* The actor's ability system component.
+ */
 UAbilitySystemComponent* AKCAbilityTrapActor::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
 }
 
+/**
+ * @brief Initializes the ability source, ability system actor information, and trigger overlap handling when play begins.
+ */
 void AKCAbilityTrapActor::BeginPlay()
 {
 	Super::BeginPlay();
@@ -73,6 +96,9 @@ void AKCAbilityTrapActor::BeginPlay()
 	}
 }
 
+/**
+ * @brief Revokes the trap's granted abilities during actor teardown.
+ */
 void AKCAbilityTrapActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (HasAuthority())
@@ -83,6 +109,13 @@ void AKCAbilityTrapActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+/**
+ * @brief Activates the trap ability source when another actor enters the trigger.
+ *
+ * @param OtherActor Actor that entered the trigger.
+ * @param bFromSweep Whether the overlap includes a sweep hit result.
+ * @param SweepResult Hit result associated with a sweep overlap.
+ */
 void AKCAbilityTrapActor::HandleTriggerBeginOverlap(
 	UPrimitiveComponent* OverlappedComponent,
 	AActor* OtherActor,

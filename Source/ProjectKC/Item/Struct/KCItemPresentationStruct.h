@@ -7,7 +7,13 @@ class UStaticMesh;
 
 /** 월드와 손에서 아이템을 표현하는 데 필요한 공통 데이터다. */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCItemPresentationStruct
+struct /**
+ * Computes the relative transform required to align the item's grip socket with the holder's hand socket.
+ *
+ * @param OutTransform Receives the computed relative transform.
+ * @returns `true` if the alignment transform was computed, `false` otherwise.
+ */
+PROJECTKC_API FKCItemPresentationStruct
 {
 	GENERATED_BODY()
 

@@ -14,7 +14,10 @@ struct FKCGameplayEffectRecipeStruct;
 
 /** Definition의 Action Hook을 실행하는 소스 독립적인 GA 기반 클래스다. */
 UCLASS(Abstract, Blueprintable)
-class PROJECTKC_API UKCGameplayAbility : public UGameplayAbility
+class /**
+ * Defines the base gameplay ability for executing action hooks and applying gameplay effect recipes.
+ */
+PROJECTKC_API UKCGameplayAbility : public UGameplayAbility
 {
 	GENERATED_BODY()
 

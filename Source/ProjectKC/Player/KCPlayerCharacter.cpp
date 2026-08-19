@@ -18,6 +18,9 @@ namespace
 	constexpr float MinimumFacingReplicationAngle = 0.5f;
 }
 
+/**
+ * @brief Initializes the replicated player character and its gameplay, movement, camera, interaction, and editor preview components.
+ */
 AKCPlayerCharacter::AKCPlayerCharacter()
 {
 	bReplicates = true;
@@ -83,22 +86,40 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 #endif
 }
 
+/**
+ * @brief Retrieves the character's ability system component.
+ *
+ * @return UAbilitySystemComponent* The character's ability system component.
+ */
 UAbilitySystemComponent* AKCPlayerCharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
 }
 
+/**
+ * @brief Refreshes the editor held-item preview after construction.
+ *
+ * @param Transform Transform supplied for the construction update.
+ */
 void AKCPlayerCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	RefreshHeldItemPreview();
 }
 
+/**
+ * @brief Attempts to use the currently held item.
+ *
+ * @return true if the held item is used successfully, false otherwise.
+ */
 bool AKCPlayerCharacter::TryUseHeldItem()
 {
 	return HeldItemComponent && HeldItemComponent->UseHeldItem();
 }
 
+/**
+ * @brief Requests an interaction for the locally controlled character.
+ */
 void AKCPlayerCharacter::RequestInteract()
 {
 	if (IsLocallyControlled())
@@ -110,6 +131,9 @@ void AKCPlayerCharacter::RequestInteract()
 	}
 }
 
+/**
+ * @brief Requests that the locally controlled character drop its held item.
+ */
 void AKCPlayerCharacter::RequestDropHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
@@ -118,26 +142,49 @@ void AKCPlayerCharacter::RequestDropHeldItem()
 	}
 }
 
+/**
+ * @brief Gets the character's ability system component.
+ *
+ * @return UKCAbilitySystemComponent* The character's ability system component.
+ */
 UKCAbilitySystemComponent* AKCPlayerCharacter::GetKCAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
 }
 
+/**
+ * @brief Retrieves the held-item component.
+ *
+ * @return UKCHeldItemComponent* The character's held-item component.
+ */
 UKCHeldItemComponent* AKCPlayerCharacter::GetHeldItemComponent() const
 {
 	return HeldItemComponent;
 }
 
+/**
+ * @brief Retrieves the character's knockback component.
+ *
+ * @return UKCKnockbackComponent* The knockback component.
+ */
 UKCKnockbackComponent* AKCPlayerCharacter::GetKnockbackComponent() const
 {
 	return KnockbackComponent;
 }
 
+/**
+ * @brief Retrieves the player interaction component.
+ *
+ * @return UKCPlayerInteractionComponent* The interaction component.
+ */
 UKCPlayerInteractionComponent* AKCPlayerCharacter::GetInteractionComponent() const
 {
 	return InteractionComponent;
 }
 
+/**
+ * @brief Refreshes the editor-only held-item preview mesh using the configured item and hand attachment.
+ */
 void AKCPlayerCharacter::RefreshHeldItemPreview()
 {
 #if WITH_EDITORONLY_DATA
@@ -192,6 +239,9 @@ void AKCPlayerCharacter::RefreshHeldItemPreview()
 }
 
 #if WITH_EDITOR
+/**
+ * @brief Refreshes the held-item preview after an editor property changes.
+ */
 void AKCPlayerCharacter::PostEditChangeProperty(
 	FPropertyChangedEvent& PropertyChangedEvent)
 {
@@ -200,30 +250,47 @@ void AKCPlayerCharacter::PostEditChangeProperty(
 }
 #endif
 
+/**
+ * @brief Initializes the character's ability actor information when play begins.
+ */
 void AKCPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializeAbilityActorInfo();
 }
 
+/**
+ * @brief Initializes ability actor information after the character is possessed.
+ *
+ * @param NewController Controller that possesses the character.
+ */
 void AKCPlayerCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	InitializeAbilityActorInfo();
 }
 
+/**
+ * @brief Initializes ability actor information after the controller is replicated.
+ */
 void AKCPlayerCharacter::OnRep_Controller()
 {
 	Super::OnRep_Controller();
 	InitializeAbilityActorInfo();
 }
 
+/**
+ * @brief Reinitializes ability actor information after the client restarts this pawn.
+ */
 void AKCPlayerCharacter::PawnClientRestart()
 {
 	Super::PawnClientRestart();
 	InitializeAbilityActorInfo();
 }
 
+/**
+ * @brief Initializes the ability system actor information for this character.
+ */
 void AKCPlayerCharacter::InitializeAbilityActorInfo()
 {
 	if (AbilitySystemComponent)
@@ -232,6 +299,12 @@ void AKCPlayerCharacter::InitializeAbilityActorInfo()
 	}
 }
 
+/**
+ * @brief Adds movement input in the specified world direction.
+ *
+ * @param WorldDirection Direction in world space.
+ * @param ScaleValue Movement input scale.
+ */
 void AKCPlayerCharacter::MoveInWorldDirection(const FVector& WorldDirection, const float ScaleValue)
 {
 	if (!FMath::IsNearlyZero(ScaleValue))

@@ -6,7 +6,11 @@ class AActor;
 class UAbilitySystemComponent;
 class UKCGameplayAbility;
 
-/** Action Hook의 Fragment들이 공유하는 한 번의 실행 문맥이다. */
+/**
+ * Determines whether the execution context is authoritative.
+ *
+ * @returns `true` if the context is authoritative, `false` otherwise.
+ */
 struct PROJECTKC_API FKCActionExecutionContext
 {
 	UKCGameplayAbility* Ability = nullptr;

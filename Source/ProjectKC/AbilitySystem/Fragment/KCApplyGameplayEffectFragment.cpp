@@ -4,6 +4,12 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "GameplayEffect.h"
 
+/**
+ * @brief Validates the configured gameplay effect recipe and tracking requirements.
+ *
+ * @param OutError Receives an error message when validation fails.
+ * @return true if the recipe and tracking configuration are valid, false otherwise.
+ */
 bool UKCApplyGameplayEffectFragment::Validate(FString& OutError) const
 {
 	if (!EffectRecipe.Validate(OutError))
@@ -29,6 +35,12 @@ bool UKCApplyGameplayEffectFragment::Validate(FString& OutError) const
 	return true;
 }
 
+/**
+ * @brief Determines whether the effect recipe declares a set-by-caller tag.
+ *
+ * @param DataTag Tag to search for in the effect recipe.
+ * @return true if the recipe contains an exact match for the tag, false otherwise.
+ */
 bool UKCApplyGameplayEffectFragment::DeclaresSetByCallerTag(
 	FGameplayTag DataTag) const
 {
@@ -39,6 +51,11 @@ bool UKCApplyGameplayEffectFragment::DeclaresSetByCallerTag(
 		});
 }
 
+/**
+ * @brief Adds the valid SetByCaller data tags declared by the effect recipe to a tag container.
+ *
+ * @param OutTags Container to which the declared tags are added.
+ */
 void UKCApplyGameplayEffectFragment::AppendDeclaredSetByCallerTags(
 	FGameplayTagContainer& OutTags) const
 {
@@ -51,6 +68,13 @@ void UKCApplyGameplayEffectFragment::AppendDeclaredSetByCallerTags(
 	}
 }
 
+/**
+ * @brief Determines whether the gameplay effect can execute in the current context.
+ *
+ * @param Context Execution context containing the ability and source and target ability system components.
+ * @param OutError Receives an error message when execution cannot proceed.
+ * @return true if all required components exist and execution has authority, false otherwise.
+ */
 bool UKCApplyGameplayEffectFragment::CanExecute(
 	const FKCActionExecutionContext& Context,
 	FString& OutError) const
@@ -72,6 +96,11 @@ bool UKCApplyGameplayEffectFragment::CanExecute(
 	return true;
 }
 
+/**
+ * @brief Applies the configured gameplay effect recipe through the ability.
+ *
+ * @return true if the ability exists and applies the recipe successfully, false otherwise.
+ */
 bool UKCApplyGameplayEffectFragment::Execute(
 	const FKCActionExecutionContext& Context) const
 {
