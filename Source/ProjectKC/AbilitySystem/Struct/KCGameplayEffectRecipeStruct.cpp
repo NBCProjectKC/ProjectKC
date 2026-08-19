@@ -2,6 +2,12 @@
 
 #include "GameplayEffect.h"
 
+/**
+ * @brief Validates the gameplay effect recipe and reports the first validation error.
+ *
+ * @param OutError Receives an empty string when valid or a description of the first error when invalid.
+ * @return true if the recipe is valid, false otherwise.
+ */
 bool FKCGameplayEffectRecipeStruct::Validate(FString& OutError) const
 {
 	OutError.Reset();

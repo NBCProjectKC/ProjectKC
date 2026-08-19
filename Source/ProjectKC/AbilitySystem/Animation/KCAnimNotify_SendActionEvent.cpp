@@ -7,6 +7,9 @@
 #include "GameFramework/Actor.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
+/**
+ * @brief Initializes the notify with the default action event tag and editor settings.
+ */
 UKCAnimNotify_SendActionEvent::UKCAnimNotify_SendActionEvent()
 {
 	ActionEventTag = TAG_KC_GameplayEvent_Action_Execute;
@@ -19,6 +22,11 @@ UKCAnimNotify_SendActionEvent::UKCAnimNotify_SendActionEvent()
 #endif
 }
 
+/**
+ * @brief Gets the notify name from the configured action event tag.
+ *
+ * @return FString The action event tag name, or a default notify name when the tag is invalid.
+ */
 FString UKCAnimNotify_SendActionEvent::GetNotifyName_Implementation() const
 {
 	return ActionEventTag.IsValid()
@@ -26,6 +34,13 @@ FString UKCAnimNotify_SendActionEvent::GetNotifyName_Implementation() const
 		: TEXT("KC Send Action Event");
 }
 
+/**
+ * @brief Sends the configured gameplay action event to the owning actor when running with authority.
+ *
+ * @param MeshComp Skeletal mesh component whose owner receives the event.
+ * @param Animation Animation containing the notify.
+ * @param EventReference Reference to the animation notify event.
+ */
 void UKCAnimNotify_SendActionEvent::Notify(
 	USkeletalMeshComponent* MeshComp,
 	UAnimSequenceBase* Animation,
@@ -52,6 +67,12 @@ void UKCAnimNotify_SendActionEvent::Notify(
 }
 
 #if WITH_EDITOR
+/**
+ * @brief Determines whether the notify can be placed on the specified animation.
+ *
+ * @param Animation Animation asset to evaluate.
+ * @return `true` if the animation is a montage, `false` otherwise.
+ */
 bool UKCAnimNotify_SendActionEvent::CanBePlaced(
 	UAnimSequenceBase* Animation) const
 {

@@ -9,7 +9,10 @@ class UInputAction;
 class UInputMappingContext;
 
 UCLASS()
-class PROJECTKC_API AKCPlayerController : public APlayerController
+class /**
+ * Player controller for handling character input and per-frame orientation updates.
+ */
+PROJECTKC_API AKCPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 

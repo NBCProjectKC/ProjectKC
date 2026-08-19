@@ -4,6 +4,12 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "GameFramework/Actor.h"
 
+/**
+ * @brief Validates the configured horizontal and vertical knockback speeds.
+ *
+ * @param OutError Receives a localized error message when validation fails.
+ * @return true if both speeds are finite, nonnegative, and at least one is nonzero; false otherwise.
+ */
 bool UKCKnockbackFragment::Validate(FString& OutError) const
 {
 	OutError.Reset();
@@ -29,6 +35,13 @@ bool UKCKnockbackFragment::Validate(FString& OutError) const
 	return true;
 }
 
+/**
+ * @brief Determines whether the configured knockback can be applied to the target.
+ *
+ * @param Context Execution context containing the authority and target information.
+ * @param OutError Receives an error message when execution cannot proceed.
+ * @return true if the target can receive the knockback, false otherwise.
+ */
 bool UKCKnockbackFragment::CanExecute(
 	const FKCActionExecutionContext& Context,
 	FString& OutError) const
@@ -53,6 +66,12 @@ bool UKCKnockbackFragment::CanExecute(
 	return true;
 }
 
+/**
+ * @brief Applies the configured knockback to the target actor.
+ *
+ * @param Context Execution context containing the target actor and authority state.
+ * @return true if the knockback request is built and applied successfully, false otherwise.
+ */
 bool UKCKnockbackFragment::Execute(
 	const FKCActionExecutionContext& Context) const
 {
@@ -73,6 +92,13 @@ bool UKCKnockbackFragment::Execute(
 		KnockbackComponent->ApplyKnockback(Request);
 }
 
+/**
+ * @brief Builds a knockback request from the execution context and configured speeds.
+ *
+ * @param Context Execution context used to resolve the knockback direction.
+ * @param OutRequest Request populated with the resolved direction, speeds, and velocity override settings.
+ * @return true if the request is populated successfully, false if the resolved direction is nearly zero.
+ */
 bool UKCKnockbackFragment::BuildRequest(
 	const FKCActionExecutionContext& Context,
 	FKCKnockbackRequest& OutRequest) const
@@ -91,6 +117,15 @@ bool UKCKnockbackFragment::BuildRequest(
 	return true;
 }
 
+/**
+ * @brief Resolves a normalized horizontal knockback direction from the configured direction mode.
+ *
+ * Falls back to the source actor's horizontal forward direction when the configured direction
+ * cannot be normalized.
+ *
+ * @param Context Execution context containing the source actor, target actor, and hit result.
+ * @return FVector Normalized horizontal direction, or a zero vector when no valid direction is available.
+ */
 FVector UKCKnockbackFragment::ResolveDirection(
 	const FKCActionExecutionContext& Context) const
 {

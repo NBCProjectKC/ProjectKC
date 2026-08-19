@@ -10,11 +10,21 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
 #include "ProjectKC/AbilitySystem/Struct/KCGameplayEffectRecipeStruct.h"
 
+/**
+ * @brief Creates an instanced-per-actor gameplay ability.
+ */
 UKCGameplayAbility::UKCGameplayAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
 
+/**
+ * @brief Validates a definition against the features supported by this ability.
+ *
+ * @param Definition Definition to validate.
+ * @param OutError Receives a description of the first validation failure.
+ * @return true if the definition satisfies the ability's requirements, false otherwise.
+ */
 bool UKCGameplayAbility::ValidateDefinitionContract(
 	const UKCAbilityDefinition& Definition,
 	FString& OutError) const
@@ -75,6 +85,16 @@ bool UKCGameplayAbility::ValidateDefinitionContract(
 	return true;
 }
 
+/**
+ * @brief Determines whether the ability can activate for the specified ability spec.
+ *
+ * @param Handle Ability spec handle to evaluate.
+ * @param ActorInfo Information about the actor attempting activation.
+ * @param SourceTags Tags associated with the ability source.
+ * @param TargetTags Tags associated with the ability target.
+ * @param OptionalRelevantTags Tags describing relevant activation requirements.
+ * @return `true` if the definition resolves and the superclass permits activation, `false` otherwise.
+ */
 bool UKCGameplayAbility::CanActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -96,6 +116,14 @@ bool UKCGameplayAbility::CanActivateAbility(
 		OptionalRelevantTags);
 }
 
+/**
+ * @brief Activates the ability using the definition resolved for the specified ability spec.
+ *
+ * @param Handle Handle of the ability spec being activated.
+ * @param ActorInfo Information about the owning actor and its ability system.
+ * @param ActivationInfo Information describing the activation request.
+ * @param TriggerEventData Optional event data that triggered activation.
+ */
 void UKCGameplayAbility::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -116,6 +144,15 @@ void UKCGameplayAbility::ActivateAbility(
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 }
 
+/**
+ * @brief Ends the ability and removes gameplay effects tracked during its activation.
+ *
+ * @param Handle Handle of the ability being ended.
+ * @param ActorInfo Information about the ability's owner.
+ * @param ActivationInfo Activation state of the ability.
+ * @param bReplicateEndAbility Whether the end event should be replicated.
+ * @param bWasCancelled Whether the ability was cancelled.
+ */
 void UKCGameplayAbility::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -149,6 +186,11 @@ void UKCGameplayAbility::EndAbility(
 		bWasCancelled);
 }
 
+/**
+ * @brief Adds an action hook tag to the set supported by this ability.
+ *
+ * @param HookTag Tag identifying the supported action hook.
+ */
 void UKCGameplayAbility::AddSupportedActionHook(FGameplayTag HookTag)
 {
 	if (HookTag.IsValid())
@@ -157,6 +199,11 @@ void UKCGameplayAbility::AddSupportedActionHook(FGameplayTag HookTag)
 	}
 }
 
+/**
+ * @brief Marks an action hook as both supported and required by this ability.
+ *
+ * @param HookTag Tag identifying the action hook.
+ */
 void UKCGameplayAbility::AddRequiredActionHook(FGameplayTag HookTag)
 {
 	if (HookTag.IsValid())
@@ -166,6 +213,12 @@ void UKCGameplayAbility::AddRequiredActionHook(FGameplayTag HookTag)
 	}
 }
 
+/**
+ * @brief Sets the action configuration class supported by this ability.
+ *
+ * @param ConfigClass Action configuration class to support.
+ * @param bRequired Whether an action configuration is required.
+ */
 void UKCGameplayAbility::SetSupportedActionConfigClass(
 	TSubclassOf<UKCActionConfig> ConfigClass,
 	bool bRequired)
@@ -174,11 +227,23 @@ void UKCGameplayAbility::SetSupportedActionConfigClass(
 	bActionConfigRequired = bRequired;
 }
 
+/**
+ * @brief Enables or disables support for action montages.
+ *
+ * @param bSupported Whether action montages are supported.
+ */
 void UKCGameplayAbility::SetSupportsActionMontage(bool bSupported)
 {
 	bSupportsActionMontage = bSupported;
 }
 
+/**
+ * @brief Sets a runtime set-by-caller magnitude for the active ability definition.
+ *
+ * @param DataTag Tag identifying the set-by-caller magnitude.
+ * @param Magnitude Finite magnitude value to store.
+ * @return true if the magnitude was accepted, false otherwise.
+ */
 bool UKCGameplayAbility::SetRuntimeMagnitude(
 	FGameplayTag DataTag,
 	float Magnitude)
@@ -194,6 +259,15 @@ bool UKCGameplayAbility::SetRuntimeMagnitude(
 	return true;
 }
 
+/**
+ * @brief Executes the active action hook with the specified target and hit context.
+ *
+ * @param HookTag Tag identifying the active action hook.
+ * @param TargetAbilitySystem Ability system associated with the target, if applicable.
+ * @param TargetActor Actor associated with the target, if applicable.
+ * @param HitResult Optional hit result used as execution context.
+ * @return true if the hook is available and all required fragments execute successfully; false otherwise.
+ */
 bool UKCGameplayAbility::ExecuteActionHook(
 	FGameplayTag HookTag,
 	UAbilitySystemComponent* TargetAbilitySystem,
@@ -252,16 +326,34 @@ bool UKCGameplayAbility::ExecuteActionHook(
 	return true;
 }
 
+/**
+ * @brief Gets the definition currently active for this ability.
+ *
+ * @return const UKCAbilityDefinition* The active ability definition, or nullptr if none is active.
+ */
 const UKCAbilityDefinition* UKCGameplayAbility::GetActiveDefinition() const
 {
 	return ActiveDefinition;
 }
 
+/**
+ * @brief Retrieves the action configuration for the active ability definition.
+ *
+ * @return const UKCActionConfig* The active action configuration, or nullptr when no definition is active.
+ */
 const UKCActionConfig* UKCGameplayAbility::GetActiveActionConfig() const
 {
 	return ActiveDefinition ? ActiveDefinition->ActionConfig : nullptr;
 }
 
+/**
+ * @brief Applies a gameplay-effect recipe to the target in the execution context.
+ *
+ * @param Recipe Gameplay-effect configuration to apply.
+ * @param Context Execution context containing the source and target ability systems.
+ * @param bTrackUntilAbilityEnds Whether to track the applied effect for removal when the ability ends.
+ * @return bool `true` if the recipe application was attempted successfully, `false` if the context or effect specification is invalid.
+ */
 bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
 	const FKCGameplayEffectRecipeStruct& Recipe,
 	const FKCActionExecutionContext& Context,
@@ -307,6 +399,15 @@ bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
 	return true;
 }
 
+/**
+ * @brief Resolves and validates the definition associated with an ability spec.
+ *
+ * @param Handle Ability spec handle used to locate the definition.
+ * @param ActorInfo Actor information containing the ability system component.
+ * @param OutDefinition Receives the resolved ability definition on success.
+ * @param OutError Optional destination for a localized error message.
+ * @return true if the definition is resolved and belongs to this ability class, false otherwise.
+ */
 bool UKCGameplayAbility::ResolveDefinitionForSpec(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -354,6 +455,12 @@ bool UKCGameplayAbility::ResolveDefinitionForSpec(
 	return true;
 }
 
+/**
+ * @brief Creates a gameplay-effect specification from a recipe.
+ *
+ * @param Recipe Effect class, level, granted tags, and set-by-caller values used to build the specification.
+ * @return FGameplayEffectSpecHandle The constructed specification, or an invalid handle if the ability system, effect class, or specification is unavailable.
+ */
 FGameplayEffectSpecHandle UKCGameplayAbility::MakeEffectSpec(
 	const FKCGameplayEffectRecipeStruct& Recipe) const
 {

@@ -7,7 +7,13 @@
 
 /** 등록된 Gameplay Tag를 이름으로 안전하게 조회하는 공용 Blueprint/Python 진입점이다. */
 UCLASS()
-class PROJECTKC_API UKCGameplayTagBlueprintLibrary
+class /**
+ * Resolves a registered Gameplay Tag by name.
+ *
+ * @param TagName Name of the Gameplay Tag to resolve.
+ * @return The registered Gameplay Tag, or an invalid tag when no matching tag exists.
+ */
+PROJECTKC_API UKCGameplayTagBlueprintLibrary
 	: public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()

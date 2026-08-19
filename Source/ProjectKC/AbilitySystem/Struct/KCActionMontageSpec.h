@@ -10,7 +10,23 @@ class UAnimMontage;
  * 결과가 아니라 행동의 수명주기와 판정 시점을 결정하므로 Fragment가 아니다.
  */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCActionMontageSpec
+struct /**
+ * Determines whether an animation montage is assigned.
+ *
+ * @return `true` if a montage is assigned, `false` otherwise.
+ */
+bool HasMontage() const;
+
+/**
+ * Validates the montage playback configuration.
+ *
+ * An unassigned montage is valid; the owning definition determines whether one is required.
+ *
+ * @param OutError Receives the validation error message when the configuration is invalid.
+ * @return `true` if the configuration is valid, `false` otherwise.
+ */
+bool Validate(FString& OutError) const;
+PROJECTKC_API FKCActionMontageSpec
 {
 	GENERATED_BODY()
 

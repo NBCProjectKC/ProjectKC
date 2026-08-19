@@ -9,7 +9,12 @@
  * 구체 GA는 자신이 지원하는 Config 클래스를 선언하고 타입을 검증한다.
  */
 UCLASS(Abstract, BlueprintType, EditInlineNew, DefaultToInstanced)
-class PROJECTKC_API UKCActionConfig : public UObject
+class /**
+ * Validates the action configuration.
+ * @param OutError Receives an error message when validation fails.
+ * @returns `true` if the configuration is valid, `false` otherwise.
+ */
+PROJECTKC_API UKCActionConfig : public UObject
 {
 	GENERATED_BODY()
 

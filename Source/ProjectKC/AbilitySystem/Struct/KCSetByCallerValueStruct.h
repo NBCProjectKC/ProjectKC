@@ -6,7 +6,12 @@
 
 /** GameplayEffect의 SetByCaller 자리에 넣을 태그와 기본 수치다. */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCSetByCallerValueStruct
+struct /**
+ * Validates the SetByCaller gameplay tag and magnitude values.
+ * @param OutError Receives a description of the validation failure.
+ * @returns `true` if the values are valid, `false` otherwise.
+ */
+PROJECTKC_API FKCSetByCallerValueStruct
 {
 	GENERATED_BODY()
 

@@ -12,7 +12,11 @@ class UKCAbilitySourceInterface : public UInterface
 	GENERATED_BODY()
 };
 
-/** 아이템, 함정 등 구체 타입과 무관하게 불변 Ability Definition을 제공하는 계약이다. */
+/**
+ * Resolves the ability definition provided by this source.
+ * @param OutDefinition Receives the resolved immutable ability definition.
+ * @returns `true` if the definition was resolved, `false` otherwise.
+ */
 class PROJECTKC_API IKCAbilitySourceInterface
 {
 	GENERATED_BODY()

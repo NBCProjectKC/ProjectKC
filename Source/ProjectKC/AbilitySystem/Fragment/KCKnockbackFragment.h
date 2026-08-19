@@ -5,7 +5,10 @@
 #include "KCKnockbackFragment.generated.h"
 
 UENUM(BlueprintType)
-enum class EKCKnockbackDirectionMode : uint8
+enum /**
+ * Applies configurable physical knockback to the execution context's target.
+ */
+class EKCKnockbackDirectionMode : uint8
 {
 	SourceToTarget,
 	SourceForward,

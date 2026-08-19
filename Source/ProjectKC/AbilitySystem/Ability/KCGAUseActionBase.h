@@ -14,7 +14,12 @@ class UAnimMontage;
  * 활성화 절차를 파생 GA마다 복사하지 않는 것이 이 클래스의 존재 이유다.
  */
 UCLASS(Abstract)
-class PROJECTKC_API UKCGAUseActionBase : public UKCGameplayAbility
+class /**
+ * Manages a use action lifecycle and coordinates its execution with an optional action montage.
+ *
+ * Derived abilities validate and prepare action data before implementing the action execution.
+ */
+PROJECTKC_API UKCGAUseActionBase : public UKCGameplayAbility
 {
 	GENERATED_BODY()
 
