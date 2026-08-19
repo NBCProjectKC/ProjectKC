@@ -15,7 +15,18 @@
 	],
 	"Plugins": [
 		{
+			"Name": "GameplayAbilities",
+			"Enabled": true
+		},
+		{
 			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "McpAutomationBridge",
 			"Enabled": true,
 			"TargetAllowList": [
 				"Editor"
