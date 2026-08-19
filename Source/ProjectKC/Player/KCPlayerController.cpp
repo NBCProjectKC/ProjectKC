@@ -13,9 +13,6 @@ AKCPlayerController::AKCPlayerController()
 	DefaultMouseCursor = EMouseCursor::Crosshairs;
 }
 
-/**
- * @brief Initializes the controller and adds the configured player input mapping context.
- */
 void AKCPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -34,11 +31,6 @@ void AKCPlayerController::BeginPlay()
 
 }
 
-/**
- * @brief Attempts to use the currently held item when the input is pressed.
- *
- * @param InputValue Boolean input value that determines whether the action was pressed.
- */
 void AKCPlayerController::UseHeldItem(const FInputActionValue& InputValue)
 {
 	if (!InputValue.Get<bool>())
@@ -78,9 +70,6 @@ void AKCPlayerController::DropHeldItem(const FInputActionValue& InputValue)
 	}
 }
 
-/**
- * @brief Configures enhanced input bindings for movement, item use, interaction, and dropping held items.
- */
 void AKCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();

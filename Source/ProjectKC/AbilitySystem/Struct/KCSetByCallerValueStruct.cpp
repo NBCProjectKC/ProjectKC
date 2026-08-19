@@ -1,11 +1,5 @@
 #include "ProjectKC/AbilitySystem/Struct/KCSetByCallerValueStruct.h"
 
-/**
- * @brief Validates the set-by-caller data.
- *
- * @param OutError Receives an error message when validation fails; cleared before validation.
- * @return true if the data tag is valid and the magnitude is finite, false otherwise.
- */
 bool FKCSetByCallerValueStruct::Validate(FString& OutError) const
 {
 	OutError.Reset();

@@ -2,39 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/AbilitySystem/Struct/KCActionHookStruct.h"
-#include "ProjectKC/AbilitySystem/Struct/KCActionMontageSpec.h"
 #include "UObject/Object.h"
 #include "KCAbilityDefinition.generated.h"
 
 class UKCActionConfig;
+class UKCActionMontageConfig;
 class UKCGameplayAbility;
 
 /** 소스의 상위 Definition 안에 인라인으로 조립되는 불변 Action 정의다. */
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
-class /**
- * Finds the action hook associated with a gameplay tag.
- * @param HookTag Gameplay tag identifying the hook.
- * @returns The matching action hook, or nullptr when no hook matches.
- */
-
-/**
- * Determines whether a set-by-caller gameplay tag is declared by the action definition.
- * @param DataTag Gameplay tag to check.
- * @returns true if the tag is declared, false otherwise.
- */
-
-/**
- * Validates the ability definition.
- * @param OutError Receives an error message when validation fails.
- * @returns true if the definition is valid, false otherwise.
- */
-
-/**
- * Validates the ability definition against the associated action's contract.
- * @param OutError Receives an error message when validation fails.
- * @returns true if the definition satisfies the action contract, false otherwise.
- */
-PROJECTKC_API UKCAbilityDefinition : public UObject
+class PROJECTKC_API UKCAbilityDefinition : public UObject
 {
 	GENERATED_BODY()
 
@@ -55,9 +32,10 @@ public:
 	 */
 	UPROPERTY(
 		EditDefaultsOnly,
+		Instanced,
 		BlueprintReadOnly,
 		Category = "KC|Ability|Presentation")
-	FKCActionMontageSpec ActionMontage;
+	TObjectPtr<UKCActionMontageConfig> ActionMontage;
 
 	/** 특정 Action GA에만 필요한 데이터다. 지원하지 않는 GA에서는 비어 있어야 한다. */
 	UPROPERTY(

@@ -13,13 +13,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogKCMeleeSwing, Log, All);
 
 namespace KCMeleeSwing
 {
-	/**
-	 * @brief Excludes the source actor and its source object's owning actor from collision queries.
-	 *
-	 * @param QueryParams Collision query parameters to update.
-	 * @param SourceActor Actor initiating the query.
-	 * @param SourceObject Actor or actor component associated with the query source.
-	 */
 	void AddIgnoredSourceActors(
 		FCollisionQueryParams& QueryParams,
 		const AActor& SourceActor,
@@ -43,13 +36,6 @@ namespace KCMeleeSwing
 		}
 	}
 
-	/**
-	 * @brief Determines whether an actor is owned by or attached to another actor.
-	 *
-	 * @param Candidate Actor to examine.
-	 * @param PossibleParent Actor that may own or parent the candidate.
-	 * @return true if the candidate is owned by or attached to the possible parent, false otherwise.
-	 */
 	bool IsOwnedOrAttachedTo(
 		const AActor& Candidate,
 		const AActor& PossibleParent)
@@ -59,9 +45,6 @@ namespace KCMeleeSwing
 	}
 }
 
-/**
- * @brief Configures the melee swing ability for server-only execution and target-hit action handling.
- */
 UKCGAMeleeSwing::UKCGAMeleeSwing()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
@@ -69,12 +52,6 @@ UKCGAMeleeSwing::UKCGAMeleeSwing()
 	AddRequiredActionHook(TAG_KC_ActionHook_Target_OnHit);
 }
 
-/**
- * @brief Determines whether the melee swing can execute for the current authoritative avatar and action configuration.
- *
- * @param TriggerEventData Gameplay event data associated with the activation attempt.
- * @return true if the avatar has authority and the active action configuration is a melee configuration, false otherwise.
- */
 bool UKCGAMeleeSwing::PrepareUseAction(
 	const FGameplayEventData* TriggerEventData)
 {
@@ -83,11 +60,6 @@ bool UKCGAMeleeSwing::PrepareUseAction(
 		Cast<UKCMeleeActionConfig>(GetActiveActionConfig()) != nullptr;
 }
 
-/**
- * @brief Applies the melee hit action to eligible targets.
- *
- * @return true if the action was processed, including when no target was hit; false if the source actor, authority, or melee configuration is invalid.
- */
 bool UKCGAMeleeSwing::ExecuteUseAction()
 {
 	AActor* SourceActor = GetAvatarActorFromActorInfo();
@@ -143,13 +115,6 @@ bool UKCGAMeleeSwing::ExecuteUseAction()
 	return true;
 }
 
-/**
- * @brief Gathers valid melee targets encountered by a sphere sweep.
- *
- * @param Config Melee action configuration defining the sweep parameters and target object types.
- * @param SourceActor Actor performing the melee swing.
- * @param OutHits Receives one hit result per valid target, ordered by distance.
- */
 void UKCGAMeleeSwing::GatherHitResults(
 	const UKCMeleeActionConfig& Config,
 	AActor& SourceActor,
@@ -198,12 +163,12 @@ void UKCGAMeleeSwing::GatherHitResults(
 		{
 			const float LeftDistance = FMath::IsFinite(Left.Distance)
 				? Left.Distance
-				: FVector::DistSquared(
+				: FVector::Dist(
 					SourceActor.GetActorLocation(),
 					Left.ImpactPoint);
 			const float RightDistance = FMath::IsFinite(Right.Distance)
 				? Right.Distance
-				: FVector::DistSquared(
+				: FVector::Dist(
 					SourceActor.GetActorLocation(),
 					Right.ImpactPoint);
 			if (!FMath::IsNearlyEqual(LeftDistance, RightDistance))
@@ -238,14 +203,6 @@ void UKCGAMeleeSwing::GatherHitResults(
 	}
 }
 
-/**
- * @brief Determines whether the path from the source actor to the target actor is unobstructed.
- *
- * @param Config Melee action configuration controlling obstruction checks and trace parameters.
- * @param SourceActor Actor from which the obstruction trace originates.
- * @param TargetActor Actor whose path is being checked.
- * @return `true` if obstruction checking is disabled or the trace reaches the target or one of its owned or attached actors; `false` otherwise.
- */
 bool UKCGAMeleeSwing::IsPathUnobstructed(
 	const UKCMeleeActionConfig& Config,
 	const AActor& SourceActor,

@@ -12,9 +12,6 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCWorldItem, Log, All);
 
-/**
- * @brief Initializes the replicated world-item actor and its mesh and ability-source components.
- */
 AKCWorldItemActor::AKCWorldItemActor()
 {
 	bReplicates = true;
@@ -31,11 +28,6 @@ AKCWorldItemActor::AKCWorldItemActor()
 		CreateDefaultSubobject<UKCAbilitySourceComponent>(TEXT("AbilitySource"));
 }
 
-/**
- * @brief Requests pickup of this item for a valid interactor when the item can be picked up.
- *
- * @param Interactor Actor attempting to pick up the item.
- */
 void AKCWorldItemActor::Interact_Implementation(AActor* Interactor)
 {
 	if (!HasAuthority() || !IsValid(Interactor) || !CanBePickedUp())
@@ -50,11 +42,6 @@ void AKCWorldItemActor::Interact_Implementation(AActor* Interactor)
 	}
 }
 
-/**
- * @brief Refreshes the item definition and applies the corresponding presentation during construction.
- *
- * @param Transform The actor transform used for construction.
- */
 void AKCWorldItemActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -63,12 +50,6 @@ void AKCWorldItemActor::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
-/**
- * @brief Validates the item's definition and inherited actor data.
- *
- * @param Context Validation context that receives an error when the item definition is missing or invalid.
- * @return EDataValidationResult Validation result for this actor.
- */
 EDataValidationResult AKCWorldItemActor::IsDataValid(
 	FDataValidationContext& Context) const
 {
@@ -88,9 +69,6 @@ EDataValidationResult AKCWorldItemActor::IsDataValid(
 }
 #endif
 
-/**
- * @brief Initializes the item definition and applies its current state presentation when play begins.
- */
 void AKCWorldItemActor::BeginPlay()
 {
 	Super::BeginPlay();
@@ -107,12 +85,6 @@ void AKCWorldItemActor::BeginPlay()
 	ApplyStatePresentation();
 }
 
-/**
- * @brief Replaces the item's definition while it is in the world.
- *
- * @param NewDefinition Valid definition to assign to the item.
- * @return `true` if the definition was initialized successfully, `false` otherwise.
- */
 bool AKCWorldItemActor::InitializeItem(UKCItemDefinition* NewDefinition)
 {
 	if (!HasAuthority() || RuntimeState.State != EKCWorldItemState::World ||
@@ -136,14 +108,6 @@ bool AKCWorldItemActor::InitializeItem(UKCItemDefinition* NewDefinition)
 	return true;
 }
 
-/**
- * @brief Transitions the item into a held state and attaches it to the holder.
- *
- * @param NewHolder Actor that will hold the item.
- * @param AttachParent Component to attach to; the holder's root component is used when null.
- * @param AttachSocket Socket on the attachment parent.
- * @return true if the item enters the held state successfully, false otherwise.
- */
 bool AKCWorldItemActor::EnterHeldState(
 	AActor* NewHolder,
 	USceneComponent* AttachParent,
@@ -163,7 +127,6 @@ bool AKCWorldItemActor::EnterHeldState(
 		return false;
 	}
 
-	const FTransform PreviousWorldTransform = GetActorTransform();
 	ItemMesh->SetSimulatePhysics(false);
 	ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -177,18 +140,14 @@ bool AKCWorldItemActor::EnterHeldState(
 		return false;
 	}
 
-	if (!AlignGripToAttachmentSocket())
-	{
-		DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		SetActorTransform(PreviousWorldTransform);
-		ApplyStatePresentation();
-		return false;
-	}
+	AlignGripToAttachmentSocket();
 
 	RuntimeState.Holder = NewHolder;
 	RuntimeState.State = EKCWorldItemState::Held;
 	SetOwner(NewHolder);
 
+	// 사용 Ability 부여에 실패해도 운반은 가능하다.
+	// 사용만 막히고, TryActivate()가 부여된 Handle이 없으므로 자연히 false를 반환한다.
 	if (IsUsable())
 	{
 		UKCAbilitySystemComponent* HolderAbilitySystem =
@@ -197,13 +156,12 @@ bool AKCWorldItemActor::EnterHeldState(
 		if (!HolderAbilitySystem ||
 			!AbilitySourceComponent->GrantToAbilitySystem(HolderAbilitySystem))
 		{
-			SetOwner(nullptr);
-			RuntimeState.Holder = nullptr;
-			RuntimeState.State = EKCWorldItemState::World;
-			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			SetActorTransform(PreviousWorldTransform);
-			ApplyStatePresentation();
-			return false;
+			UE_LOG(
+				LogKCWorldItem,
+				Warning,
+				TEXT("Holder '%s'에 KC ASC가 없거나 부여에 실패해 Item '%s'을 운반 전용으로 듭니다."),
+				*GetNameSafe(NewHolder),
+				*GetName());
 		}
 	}
 
@@ -212,16 +170,6 @@ bool AKCWorldItemActor::EnterHeldState(
 	return true;
 }
 
-/**
- * @brief Returns a held item to the world at the specified transform.
- *
- * Revokes the item's granted abilities, clears its holder and ownership, and
- * optionally applies an impulse when physics simulation is active.
- *
- * @param DropTransform World transform to apply after detaching the item.
- * @param DropImpulse Impulse to apply to the item, if nonzero.
- * @return true if the item was successfully returned to the world, false otherwise.
- */
 bool AKCWorldItemActor::ExitHeldState(
 	const FTransform& DropTransform,
 	const FVector& DropImpulse)
@@ -231,9 +179,15 @@ bool AKCWorldItemActor::ExitHeldState(
 		return false;
 	}
 
+	// 회수에 실패해도 드롭은 진행한다. 아이템이 손에 갇히는 쪽이 더 나쁘다.
+	// 남은 Spec은 Held 상태가 아니면 ActivateUse()가 막고, 재획득 시 재사용된다.
 	if (!AbilitySourceComponent->Revoke(true))
 	{
-		return false;
+		UE_LOG(
+			LogKCWorldItem,
+			Warning,
+			TEXT("Item '%s'의 Ability 회수에 실패했지만 드롭은 진행합니다."),
+			*GetName());
 	}
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	SetOwner(nullptr);
@@ -252,11 +206,6 @@ bool AKCWorldItemActor::ExitHeldState(
 	return true;
 }
 
-/**
- * @brief Activates the item's use ability while the item is held and usable.
- *
- * @return `true` if the held item is usable and its ability activates successfully, `false` otherwise.
- */
 bool AKCWorldItemActor::ActivateUse()
 {
 	return RuntimeState.State == EKCWorldItemState::Held &&
@@ -264,12 +213,6 @@ bool AKCWorldItemActor::ActivateUse()
 		AbilitySourceComponent->TryActivate();
 }
 
-/**
- * @brief Activates the held item's use ability against a target actor.
- *
- * @param TargetActor Actor targeted by the item ability.
- * @return true if the ability activates successfully, false otherwise.
- */
 bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
 {
 	return HasAuthority() &&
@@ -278,72 +221,37 @@ bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
 		AbilitySourceComponent->TryActivateWithTarget(TargetActor);
 }
 
-/**
- * @brief Determines whether the item can be picked up.
- *
- * @return `true` if the item is in the world with a valid definition, `false` otherwise.
- */
 bool AKCWorldItemActor::CanBePickedUp() const
 {
 	return RuntimeState.State == EKCWorldItemState::World &&
 		bDefinitionValid;
 }
 
-/**
- * @brief Determines whether the item can be used.
- *
- * @return `true` if the item definition is valid and usable, `false` otherwise.
- */
 bool AKCWorldItemActor::IsUsable() const
 {
 	return bDefinitionValid && ItemDefinition->IsUsable();
 }
 
-/**
- * @brief Gets the item's current state.
- *
- * @return EKCWorldItemState Current item state.
- */
 EKCWorldItemState AKCWorldItemActor::GetItemState() const
 {
 	return RuntimeState.State;
 }
 
-/**
- * @brief Gets the actor currently holding the item.
- *
- * @return AActor* The holding actor, or `nullptr` when the item is not held.
- */
 AActor* AKCWorldItemActor::GetHolder() const
 {
 	return RuntimeState.Holder;
 }
 
-/**
- * @brief Gets the item's definition.
- *
- * @return UKCItemDefinition* The item's current definition.
- */
 UKCItemDefinition* AKCWorldItemActor::GetItemDefinition() const
 {
 	return ItemDefinition;
 }
 
-/**
- * @brief Gets the component that renders the world item.
- *
- * @return UStaticMeshComponent* The item's static mesh component.
- */
 UStaticMeshComponent* AKCWorldItemActor::GetItemMesh() const
 {
 	return ItemMesh;
 }
 
-/**
- * @brief Registers the actor properties replicated to clients.
- *
- * @param OutLifetimeProps Collection to which replicated properties are added.
- */
 void AKCWorldItemActor::GetLifetimeReplicatedProps(
 	TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -353,9 +261,6 @@ void AKCWorldItemActor::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(AKCWorldItemActor, ItemDefinition);
 }
 
-/**
- * @brief Updates the item's presentation, attachment, and state notifications after replicated state changes.
- */
 void AKCWorldItemActor::OnRep_RuntimeState()
 {
 	ApplyStatePresentation();
@@ -363,9 +268,6 @@ void AKCWorldItemActor::OnRep_RuntimeState()
 	BroadcastStateChanged();
 }
 
-/**
- * @brief Refreshes the item definition and reapplies its replicated presentation and attachment.
- */
 void AKCWorldItemActor::OnRep_ItemDefinition()
 {
 	RefreshDefinition();
@@ -373,12 +275,6 @@ void AKCWorldItemActor::OnRep_ItemDefinition()
 	RefreshReplicatedAttachment();
 }
 
-/**
- * @brief Refreshes the item's presentation and ability configuration from its definition.
- *
- * @param OutError Receives a description of the failure, or is cleared on success. May be null.
- * @return true if the item definition is valid and its ability configuration is applied, false otherwise.
- */
 bool AKCWorldItemActor::RefreshDefinition(FString* OutError)
 {
 	bDefinitionValid = false;
@@ -424,35 +320,24 @@ bool AKCWorldItemActor::RefreshDefinition(FString* OutError)
 	return true;
 }
 
-/**
- * @brief Aligns the item to the grip transform defined by its item definition.
- *
- * @return true if the grip alignment was applied, false if the required item data or alignment transform is unavailable.
- */
-bool AKCWorldItemActor::AlignGripToAttachmentSocket()
+void AKCWorldItemActor::AlignGripToAttachmentSocket()
 {
-	if (!ItemDefinition || !ItemMesh)
+	// Grip 소켓은 선택 사항이다. 없으면 아이템 원점을 Hand 소켓에 맞춘다.
+	FTransform AlignmentTransform = FTransform::Identity;
+	if (ItemDefinition &&
+		!ItemDefinition->Presentation.TryGetGripAlignmentTransform(
+			AlignmentTransform))
 	{
-		return false;
-	}
-
-	FTransform AlignmentTransform;
-	if (!ItemDefinition->Presentation.TryGetGripAlignmentTransform(
-		AlignmentTransform))
-	{
-		return false;
+		UE_LOG(
+			LogKCWorldItem,
+			Verbose,
+			TEXT("Item '%s'에 Grip 소켓이 없어 원점을 Hand 소켓에 맞춥니다."),
+			*GetName());
 	}
 
 	SetActorRelativeTransform(AlignmentTransform);
-	return true;
 }
 
-/**
- * @brief Restores the client's attachment to the replicated holder and hand socket.
- *
- * Detaches the item when it is in the world and retries attachment when the holder,
- * attachment component, or socket is not yet available.
- */
 void AKCWorldItemActor::RefreshReplicatedAttachment()
 {
 	if (HasAuthority())
@@ -514,19 +399,9 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 		return;
 	}
 
-	if (!AlignGripToAttachmentSocket())
-	{
-		UE_LOG(
-			LogKCWorldItem,
-			Verbose,
-			TEXT("Client Item '%s'의 Grip 정렬 데이터가 아직 준비되지 않았습니다."),
-			*GetName());
-	}
+	AlignGripToAttachmentSocket();
 }
 
-/**
- * @brief Applies collision and physics settings for the item's current definition and world state.
- */
 void AKCWorldItemActor::ApplyStatePresentation()
 {
 	if (!bDefinitionValid)
@@ -550,9 +425,6 @@ void AKCWorldItemActor::ApplyStatePresentation()
 		ItemDefinition->Presentation.bSimulatePhysicsInWorld);
 }
 
-/**
- * @brief Notifies listeners of the item's current state and holder.
- */
 void AKCWorldItemActor::BroadcastStateChanged()
 {
 	OnItemStateChanged.Broadcast(RuntimeState.State, RuntimeState.Holder);

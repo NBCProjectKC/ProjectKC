@@ -1,11 +1,5 @@
 #include "ProjectKC/AbilitySystem/Struct/KCActionHookStruct.h"
 
-/**
- * @brief Validates the action hook and its fragments, reporting the first validation failure.
- *
- * @param OutError Receives the validation error message, or is cleared when validation succeeds.
- * @return true if the hook tag and all fragments are valid, false otherwise.
- */
 bool FKCActionHookStruct::Validate(FString& OutError) const
 {
 	OutError.Reset();
@@ -51,12 +45,6 @@ bool FKCActionHookStruct::Validate(FString& OutError) const
 	return true;
 }
 
-/**
- * @brief Determines whether any valid fragment declares the specified data tag.
- *
- * @param DataTag Data tag to search for.
- * @return true if a valid fragment declares the data tag, false otherwise.
- */
 bool FKCActionHookStruct::DeclaresSetByCallerTag(FGameplayTag DataTag) const
 {
 	return Fragments.ContainsByPredicate(

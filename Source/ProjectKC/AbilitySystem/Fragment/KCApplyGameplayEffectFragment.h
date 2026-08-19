@@ -7,12 +7,7 @@
 
 /** 실행 문맥의 대상 ASC에 하나의 GameplayEffect Recipe를 적용한다. */
 UCLASS(EditInlineNew, DefaultToInstanced, meta = (DisplayName = "Apply Gameplay Effect"))
-class /**
- * Applies a gameplay effect recipe to the target ability system component.
- *
- * @note Infinite effects can optionally be tracked and removed when the ability ends.
- */
-PROJECTKC_API UKCApplyGameplayEffectFragment : public UKCActionFragment
+class PROJECTKC_API UKCApplyGameplayEffectFragment : public UKCActionFragment
 {
 	GENERATED_BODY()
 

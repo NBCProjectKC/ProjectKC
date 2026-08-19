@@ -8,10 +8,7 @@ class AActor;
 
 /** GameplayEvent의 Target을 실행 대상으로 삼아 Target.OnTrigger Fragment를 실행한다. */
 UCLASS(Blueprintable)
-class /**
- * Prepares and executes an action against the target actor from gameplay event data.
- */
-PROJECTKC_API UKCGAInstantTargetAction : public UKCGAUseActionBase
+class PROJECTKC_API UKCGAInstantTargetAction : public UKCGAUseActionBase
 {
 	GENERATED_BODY()
 

@@ -9,12 +9,7 @@ class UGameplayEffect;
 
 /** 하나의 GameplayEffectSpec을 만들기 위한 소스 독립적인 재료다. */
 USTRUCT(BlueprintType)
-struct /**
- * Validates the gameplay effect recipe and provides an error description when invalid.
- * @param OutError Receives a description of the validation error.
- * @return `true` if the recipe is valid, `false` otherwise.
- */
-PROJECTKC_API FKCGameplayEffectRecipeStruct
+struct PROJECTKC_API FKCGameplayEffectRecipeStruct
 {
 	GENERATED_BODY()
 

@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCUseAction, Log, All);
@@ -14,11 +15,6 @@ UKCGAUseActionBase::UKCGAUseActionBase()
 	SetSupportsActionMontage(true);
 }
 
-/**
- * @brief Prepares and commits the use action, then executes it immediately or through its configured montage.
- *
- * The ability is cancelled when preparation, commitment, montage playback, or action execution fails.
- */
 void UKCGAUseActionBase::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -59,24 +55,20 @@ void UKCGAUseActionBase::ActivateAbility(
 	}
 
 	// 함정처럼 Avatar 애니메이션이 없는 소스는 기존 즉시 실행 경로를 유지한다.
-	if (!Definition->ActionMontage.HasMontage())
+	const UKCActionMontageConfig* MontageConfig = Definition->ActionMontage;
+	if (!MontageConfig)
 	{
 		RunUseActionOnce();
 		FinishUseAction(!bUseActionSucceeded);
 		return;
 	}
 
-	if (!StartActionMontage(Definition->ActionMontage))
+	if (!StartActionMontage(*MontageConfig))
 	{
 		FinishUseAction(true);
 	}
 }
 
-/**
- * @brief Ends the ability and stops the remote owner's action montage when the ability is cancelled.
- *
- * @param bWasCancelled Whether the ability was cancelled.
- */
 void UKCGAUseActionBase::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -111,16 +103,10 @@ void UKCGAUseActionBase::EndAbility(
 		bWasCancelled);
 }
 
-/**
- * @brief Starts the action montage and waits for its execution event.
- *
- * @param MontageSpec Montage playback settings, including the montage, play rate, and start section.
- * @return true if montage playback was started successfully, false otherwise.
- */
 bool UKCGAUseActionBase::StartActionMontage(
-	const FKCActionMontageSpec& MontageSpec)
+	const UKCActionMontageConfig& MontageConfig)
 {
-	UAnimMontage* Montage = MontageSpec.Montage.Get();
+	UAnimMontage* Montage = MontageConfig.Montage.Get();
 	if (!IsValid(Montage))
 	{
 		return false;
@@ -149,9 +135,9 @@ bool UKCGAUseActionBase::StartActionMontage(
 			this,
 			NAME_None,
 			Montage,
-			MontageSpec.PlayRate,
-			MontageSpec.StartSection,
-			MontageSpec.bStopWhenAbilityEnds);
+			MontageConfig.PlayRate,
+			MontageConfig.StartSection,
+			MontageConfig.bStopWhenAbilityEnds);
 	if (!MontageTask)
 	{
 		return false;
@@ -184,25 +170,20 @@ bool UKCGAUseActionBase::StartActionMontage(
 	}
 
 	RemoteOwnerMontage = Montage;
-	bStopRemoteOwnerMontageOnEnd = MontageSpec.bStopWhenAbilityEnds;
+	bStopRemoteOwnerMontageOnEnd = MontageConfig.bStopWhenAbilityEnds;
 
 	if (UKCAbilitySystemComponent* KCAbilitySystem =
 		Cast<UKCAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo()))
 	{
 		KCAbilitySystem->PlayActionMontageForRemoteOwner(
 			Montage,
-			MontageSpec.PlayRate,
-			MontageSpec.StartSection);
+			MontageConfig.PlayRate,
+			MontageConfig.StartSection);
 	}
 
 	return true;
 }
 
-/**
- * @brief Executes the use action when its gameplay event is received.
- *
- * @param Payload Gameplay event data associated with the action execution event.
- */
 void UKCGAUseActionBase::OnActionExecuteEventReceived(FGameplayEventData Payload)
 {
 	if (bFinishingUseAction || bUseActionAttempted)
@@ -218,11 +199,6 @@ void UKCGAUseActionBase::OnActionExecuteEventReceived(FGameplayEventData Payload
 	}
 }
 
-/**
- * @brief Completes the action when its montage finishes.
- *
- * Cancels the ability if the action execution event was not received or execution failed; otherwise, completes it successfully.
- */
 void UKCGAUseActionBase::OnActionMontageFinished()
 {
 	if (bFinishingUseAction)
@@ -246,17 +222,11 @@ void UKCGAUseActionBase::OnActionMontageFinished()
 	FinishUseAction(!bUseActionSucceeded);
 }
 
-/**
- * @brief Cancels the action when its montage is interrupted or cancelled.
- */
 void UKCGAUseActionBase::OnActionMontageAborted()
 {
 	FinishUseAction(true);
 }
 
-/**
- * @brief Executes the use action at most once for the current ability activation.
- */
 void UKCGAUseActionBase::RunUseActionOnce()
 {
 	if (bUseActionAttempted)
@@ -269,11 +239,6 @@ void UKCGAUseActionBase::RunUseActionOnce()
 	bUseActionSucceeded = ExecuteUseAction();
 }
 
-/**
- * @brief Finishes the current action ability.
- *
- * @param bWasCancelled Whether the ability should end in a cancelled state.
- */
 void UKCGAUseActionBase::FinishUseAction(bool bWasCancelled)
 {
 	if (bFinishingUseAction)

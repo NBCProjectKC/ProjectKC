@@ -9,10 +9,7 @@ class UKCMeleeActionConfig;
 
 /** 서버에서 전방 근접 Sweep을 수행하고 각 대상의 Target.OnHit Hook을 실행한다. */
 UCLASS(Blueprintable)
-class /**
- * Performs a forward melee sweep and invokes hit responses for affected targets.
- */
-PROJECTKC_API UKCGAMeleeSwing : public UKCGAUseActionBase
+class PROJECTKC_API UKCGAMeleeSwing : public UKCGAUseActionBase
 {
 	GENERATED_BODY()
 

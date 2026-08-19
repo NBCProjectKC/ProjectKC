@@ -2,13 +2,8 @@
 
 #include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
 #include "ProjectKC/AbilitySystem/Config/KCActionConfig.h"
+#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
 
-/**
- * @brief Finds an action hook with the specified tag.
- *
- * @param HookTag Tag to match exactly.
- * @return const FKCActionHookStruct* Pointer to the matching action hook, or nullptr if no match exists.
- */
 const FKCActionHookStruct* UKCAbilityDefinition::FindActionHook(
 	FGameplayTag HookTag) const
 {
@@ -19,12 +14,6 @@ const FKCActionHookStruct* UKCAbilityDefinition::FindActionHook(
 		});
 }
 
-/**
- * @brief Determines whether any action hook declares the specified SetByCaller tag.
- *
- * @param DataTag SetByCaller tag to search for.
- * @return true if the tag is valid and declared by an action hook, false otherwise.
- */
 bool UKCAbilityDefinition::DeclaresSetByCallerTag(FGameplayTag DataTag) const
 {
 	return DataTag.IsValid() && ActionHooks.ContainsByPredicate(
@@ -34,12 +23,6 @@ bool UKCAbilityDefinition::DeclaresSetByCallerTag(FGameplayTag DataTag) const
 		});
 }
 
-/**
- * @brief Validates the ability definition and its action hooks.
- *
- * @param OutError Receives a description of the first validation failure, or is cleared when validation succeeds.
- * @return bool `true` if the definition is valid, `false` otherwise.
- */
 bool UKCAbilityDefinition::Validate(FString& OutError) const
 {
 	OutError.Reset();
@@ -55,13 +38,16 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		return false;
 	}
 
-	FString MontageError;
-	if (!ActionMontage.Validate(MontageError))
+	if (ActionMontage)
 	{
-		OutError = FString::Printf(
-			TEXT("ActionMontage가 유효하지 않습니다: %s"),
-			*MontageError);
-		return false;
+		FString MontageError;
+		if (!ActionMontage->Validate(MontageError))
+		{
+			OutError = FString::Printf(
+				TEXT("ActionMontage가 유효하지 않습니다: %s"),
+				*MontageError);
+			return false;
+		}
 	}
 
 	if (ActionConfig)
@@ -121,12 +107,6 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 	return true;
 }
 
-/**
- * @brief Validates the ability definition against its action class contract.
- *
- * @param OutError Receives an error message when validation fails.
- * @return true if the definition passes local and action contract validation, false otherwise.
- */
 bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 {
 	if (!Validate(OutError))

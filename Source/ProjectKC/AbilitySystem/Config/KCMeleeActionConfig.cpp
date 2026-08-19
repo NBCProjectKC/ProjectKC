@@ -2,11 +2,6 @@
 
 #include "CollisionQueryParams.h"
 
-/**
- * @brief Initializes default collision settings for melee actions.
- *
- * Targets pawn object types and uses the visibility channel for obstruction tracing.
- */
 UKCMeleeActionConfig::UKCMeleeActionConfig()
 {
 	TargetObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
@@ -14,12 +9,6 @@ UKCMeleeActionConfig::UKCMeleeActionConfig()
 		UEngineTypes::ConvertToTraceType(ECC_Visibility);
 }
 
-/**
- * @brief Validates the melee action configuration and reports the first validation error.
- *
- * @param OutError Receives an error message when validation fails; cleared before validation.
- * @return true if the configuration is valid, false otherwise.
- */
 bool UKCMeleeActionConfig::Validate(FString& OutError) const
 {
 	OutError.Reset();
@@ -83,7 +72,7 @@ bool UKCMeleeActionConfig::Validate(FString& OutError) const
 		const ECollisionChannel Channel =
 			UEngineTypes::ConvertToCollisionChannel(
 				ObstructionTraceChannel.GetValue());
-		if (Channel < ECC_WorldStatic || Channel >= ECC_MAX)
+		if (Channel >= ECC_MAX)
 		{
 			OutError = TEXT("ObstructionTraceChannel이 유효하지 않습니다.");
 			return false;

@@ -13,12 +13,7 @@ class UKCHeldItemComponent;
 class UKCItemDefinition;
 
 UENUM(BlueprintType)
-enum /**
- * Represents an item that transitions directly between the world and a holder.
- *
- * Provides pickup, drop, and use contracts without owning player input or inventory state.
- */
-class EKCWorldItemState : uint8
+enum class EKCWorldItemState : uint8
 {
 	World,
 	Held
@@ -128,7 +123,7 @@ private:
 	bool ActivateUse();
 	bool ActivateUseWithTarget(AActor* TargetActor);
 	bool RefreshDefinition(FString* OutError = nullptr);
-	bool AlignGripToAttachmentSocket();
+	void AlignGripToAttachmentSocket();
 	void RefreshReplicatedAttachment();
 	void ApplyStatePresentation();
 	void BroadcastStateChanged();

@@ -6,21 +6,12 @@
 #include "GameFramework/Actor.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
-/**
- * @brief Configures the action for server-only execution and registers the target-trigger action hook.
- */
 UKCGAInstantTargetAction::UKCGAInstantTargetAction()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	AddRequiredActionHook(TAG_KC_ActionHook_Target_OnTrigger);
 }
 
-/**
- * @brief Prepares the target actor and optional hit result from a gameplay event.
- *
- * @param TriggerEventData Gameplay event data containing the target actor and hit result.
- * @return true if a valid target actor was prepared, false otherwise.
- */
 bool UKCGAInstantTargetAction::PrepareUseAction(
 	const FGameplayEventData* TriggerEventData)
 {
@@ -47,11 +38,6 @@ bool UKCGAInstantTargetAction::PrepareUseAction(
 	return true;
 }
 
-/**
- * @brief Executes the target-trigger action for the prepared target.
- *
- * @return `true` if the action hook executes successfully, `false` if the target is invalid or the hook fails.
- */
 bool UKCGAInstantTargetAction::ExecuteUseAction()
 {
 	// 대기 중 대상이 사라졌다면 결과를 실행하지 않고 취소한다.
