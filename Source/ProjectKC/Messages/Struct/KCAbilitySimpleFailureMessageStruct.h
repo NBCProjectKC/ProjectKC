@@ -1,5 +1,5 @@
 /**
- * @file KCAbilitySimpleFailureMessage.h
+ * @file KCAbilitySimpleFailureMessageStruct.h
  * @brief 게임플레이 어빌리티 활성화 실패 시 UI/피드백으로 전송되는 메시지 구조체 정의
  */
 
@@ -7,16 +7,16 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "KCAbilitySimpleFailureMessage.generated.h"
+#include "KCAbilitySimpleFailureMessageStruct.generated.h"
 
 class APlayerController;
 
 /**
- * @struct FKCAbilitySimpleFailureMessage
+ * @struct FKCAbilitySimpleFailureMessageStruct
  * @brief 어빌리티 발동 실패 원인(쿨다운 등)과 안내 문구를 전달하는 페이로드
  */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCAbilitySimpleFailureMessage
+struct PROJECTKC_API FKCAbilitySimpleFailureMessageStruct
 {
 	GENERATED_BODY()
 

@@ -1,5 +1,5 @@
 /**
- * @file KCNotificationMessage.h
+ * @file KCNotificationMessageStruct.h
  * @brief UI 알림/토스트 피드(킬 피드, 획득 알림 등)를 위한 메시지 구조체 정의
  */
 
@@ -8,7 +8,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "NativeGameplayTags.h"
-#include "KCNotificationMessage.generated.h"
+#include "KCNotificationMessageStruct.generated.h"
 
 class UObject;
 class APlayerState;
@@ -16,11 +16,11 @@ class APlayerState;
 PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_KC_AddNotification_Message);
 
 /**
- * @struct FKCNotificationMessage
+ * @struct FKCNotificationMessageStruct
  * @brief UI 알림/로그 피드로 전달되는 메시지 페이로드
  */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCNotificationMessage
+struct PROJECTKC_API FKCNotificationMessageStruct
 {
 	GENERATED_BODY()
 

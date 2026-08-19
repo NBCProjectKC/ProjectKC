@@ -1,6 +1,6 @@
 /**
- * @file KCGameplayTagStack.h
- * @brief 태그와 개수(Count)를 묶어 네트워크로 동기화(FastArraySerializer)하는 구조체 정의
+ * @file KCGameplayTagStackContainerStruct.h
+ * @brief 여러 태그 스택을 관리하고 네트워크로 효율적으로 동기화(FastArraySerializer)하는 컨테이너 구조체 정의
  */
 
 #pragma once
@@ -8,50 +8,23 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Net/Serialization/FastArraySerializer.h"
-#include "KCGameplayTagStack.generated.h"
+#include "ProjectKC/Messages/Struct/KCGameplayTagStackStruct.h"
+#include "KCGameplayTagStackContainerStruct.generated.h"
 
-struct FKCGameplayTagStackContainer;
 struct FNetDeltaSerializeInfo;
 
 /**
- * @struct FKCGameplayTagStack
- * @brief 단일 태그 스택 (태그 + 카운트)
- */
-USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCGameplayTagStack : public FFastArraySerializerItem
-{
-	GENERATED_BODY()
-
-	FKCGameplayTagStack() {}
-
-	FKCGameplayTagStack(FGameplayTag InTag, int32 InStackCount)
-		: Tag(InTag)
-		, StackCount(InStackCount)
-	{
-	}
-
-	FString GetDebugString() const;
-
-private:
-	friend FKCGameplayTagStackContainer;
-
-	UPROPERTY()
-	FGameplayTag Tag;
-
-	UPROPERTY()
-	int32 StackCount = 0;
-};
-
-/**
- * @struct FKCGameplayTagStackContainer
+ * @struct FKCGameplayTagStackContainerStruct
  * @brief 여러 태그 스택을 관리하고 네트워크로 효율적으로 동기화하는 컨테이너
  */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCGameplayTagStackContainer : public FFastArraySerializer
+struct PROJECTKC_API FKCGameplayTagStackContainerStruct : public FFastArraySerializer
 {
 	GENERATED_BODY()
 
-	FKCGameplayTagStackContainer() {}
+	FKCGameplayTagStackContainerStruct()
+	{
+	}
 
 public:
 	/** @brief 특정 태그의 스택 수를 추가합니다. */
@@ -80,18 +53,18 @@ public:
 
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
 	{
-		return FFastArraySerializer::FastArrayDeltaSerialize<FKCGameplayTagStack, FKCGameplayTagStackContainer>(Stacks, DeltaParms, *this);
+		return FFastArraySerializer::FastArrayDeltaSerialize<FKCGameplayTagStackStruct, FKCGameplayTagStackContainerStruct>(Stacks, DeltaParms, *this);
 	}
 
 private:
 	UPROPERTY()
-	TArray<FKCGameplayTagStack> Stacks;
+	TArray<FKCGameplayTagStackStruct> Stacks;
 
 	TMap<FGameplayTag, int32> TagToCountMap;
 };
 
 template<>
-struct TStructOpsTypeTraits<FKCGameplayTagStackContainer> : public TStructOpsTypeTraitsBase2<FKCGameplayTagStackContainer>
+struct TStructOpsTypeTraits<FKCGameplayTagStackContainerStruct> : public TStructOpsTypeTraitsBase2<FKCGameplayTagStackContainerStruct>
 {
 	enum
 	{

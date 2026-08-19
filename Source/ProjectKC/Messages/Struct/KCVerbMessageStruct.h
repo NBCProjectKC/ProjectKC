@@ -1,5 +1,5 @@
 /**
- * @file KCVerbMessage.h
+ * @file KCVerbMessageStruct.h
  * @brief 게임 내 모든 행위(공격, 피격, 상호작용 등)를 표현하는 범용 게임플레이 메시지 구조체 정의
  */
 
@@ -7,14 +7,14 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "KCVerbMessage.generated.h"
+#include "KCVerbMessageStruct.generated.h"
 
 /**
- * @struct FKCVerbMessage
+ * @struct FKCVerbMessageStruct
  * @brief [시전자(Instigator)]가 [대상(Target)]에게 [동사(Verb)] 행위를 수행했음을 나타내는 표준 메시지 규격
  */
 USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCVerbMessage
+struct PROJECTKC_API FKCVerbMessageStruct
 {
 	GENERATED_BODY()
 

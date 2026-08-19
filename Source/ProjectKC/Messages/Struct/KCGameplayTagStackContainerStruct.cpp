@@ -1,19 +1,14 @@
 /**
- * @file KCGameplayTagStack.cpp
- * @brief FKCGameplayTagStackContainer의 태그 스택 관리 및 복제 구현부
+ * @file KCGameplayTagStackContainerStruct.cpp
+ * @brief FKCGameplayTagStackContainerStruct의 태그 스택 관리 및 복제 구현부
  */
 
-#include "ProjectKC/Messages/Struct/KCGameplayTagStack.h"
+#include "ProjectKC/Messages/Struct/KCGameplayTagStackContainerStruct.h"
 #include "UObject/Stack.h"
 
-#include UE_INLINE_GENERATED_CPP_BY_NAME(KCGameplayTagStack)
+#include UE_INLINE_GENERATED_CPP_BY_NAME(KCGameplayTagStackContainerStruct)
 
-FString FKCGameplayTagStack::GetDebugString() const
-{
-	return FString::Printf(TEXT("%sx%d"), *Tag.ToString(), StackCount);
-}
-
-void FKCGameplayTagStackContainer::AddStack(FGameplayTag Tag, int32 StackCount)
+void FKCGameplayTagStackContainerStruct::AddStack(FGameplayTag Tag, int32 StackCount)
 {
 	if (!Tag.IsValid())
 	{
@@ -23,7 +18,7 @@ void FKCGameplayTagStackContainer::AddStack(FGameplayTag Tag, int32 StackCount)
 
 	if (StackCount > 0)
 	{
-		for (FKCGameplayTagStack& Stack : Stacks)
+		for (FKCGameplayTagStackStruct& Stack : Stacks)
 		{
 			if (Stack.Tag == Tag)
 			{
@@ -35,13 +30,13 @@ void FKCGameplayTagStackContainer::AddStack(FGameplayTag Tag, int32 StackCount)
 			}
 		}
 
-		FKCGameplayTagStack& NewStack = Stacks.Emplace_GetRef(Tag, StackCount);
+		FKCGameplayTagStackStruct& NewStack = Stacks.Emplace_GetRef(Tag, StackCount);
 		MarkItemDirty(NewStack);
 		TagToCountMap.Add(Tag, StackCount);
 	}
 }
 
-void FKCGameplayTagStackContainer::RemoveStack(FGameplayTag Tag, int32 StackCount)
+void FKCGameplayTagStackContainerStruct::RemoveStack(FGameplayTag Tag, int32 StackCount)
 {
 	if (!Tag.IsValid())
 	{
@@ -53,7 +48,7 @@ void FKCGameplayTagStackContainer::RemoveStack(FGameplayTag Tag, int32 StackCoun
 	{
 		for (auto It = Stacks.CreateIterator(); It; ++It)
 		{
-			FKCGameplayTagStack& Stack = *It;
+			FKCGameplayTagStackStruct& Stack = *It;
 			if (Stack.Tag == Tag)
 			{
 				if (Stack.StackCount <= StackCount)
@@ -75,7 +70,7 @@ void FKCGameplayTagStackContainer::RemoveStack(FGameplayTag Tag, int32 StackCoun
 	}
 }
 
-void FKCGameplayTagStackContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
+void FKCGameplayTagStackContainerStruct::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
 {
 	for (int32 Index : RemovedIndices)
 	{
@@ -84,20 +79,20 @@ void FKCGameplayTagStackContainer::PreReplicatedRemove(const TArrayView<int32> R
 	}
 }
 
-void FKCGameplayTagStackContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
+void FKCGameplayTagStackContainerStruct::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
 	for (int32 Index : AddedIndices)
 	{
-		const FKCGameplayTagStack& Stack = Stacks[Index];
+		const FKCGameplayTagStackStruct& Stack = Stacks[Index];
 		TagToCountMap.Add(Stack.Tag, Stack.StackCount);
 	}
 }
 
-void FKCGameplayTagStackContainer::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
+void FKCGameplayTagStackContainerStruct::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
 {
 	for (int32 Index : ChangedIndices)
 	{
-		const FKCGameplayTagStack& Stack = Stacks[Index];
+		const FKCGameplayTagStackStruct& Stack = Stacks[Index];
 		TagToCountMap.Add(Stack.Tag, Stack.StackCount);
 	}
 }

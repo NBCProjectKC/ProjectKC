@@ -7,7 +7,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "ProjectKC/Messages/Struct/KCVerbMessage.h"
+#include "ProjectKC/Messages/Struct/KCVerbMessageStruct.h"
 #include "KCVerbMessageHelpers.generated.h"
 
 class APlayerController;
