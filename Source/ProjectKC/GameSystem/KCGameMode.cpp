@@ -3,6 +3,8 @@
 #include "KCGameSystemTags.h"
 #include "KCIngredientSubmittedStruct.h"
 #include "KCGamePhaseType.h"
+#include "Player/KCPlayerCharacter.h"
+#include "Player/KCPlayerController.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 
 AKCGameMode::AKCGameMode()
@@ -11,6 +13,9 @@ AKCGameMode::AKCGameMode()
 
 void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, int32 Count)
 {
+	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
+	PlayerControllerClass = AKCPlayerController::StaticClass();
+	
 	FKCIngredientSubmittedStruct FakeMessage;
 	FakeMessage.TeamId = TeamId;
 	FakeMessage.SubmittedCount = Count;
