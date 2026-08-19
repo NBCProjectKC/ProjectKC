@@ -13,11 +13,11 @@ public class ProjectKC : ModuleRules
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			
-			// GMS (Gameplay Message Subsystem)
-			"GameplayTags", "GameplayMessageRuntime",
+			// GMS & Core Messages
+			"GameplayTags", "GameplayMessageRuntime", "NetCore",
 			
 			// Online & Steam Sessions
-			"OnlineSubsystem", "OnlineSubsystemSteam",
+			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam",
 			"AdvancedSessions", "AdvancedSteamSessions"
 		});
 
