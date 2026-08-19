@@ -27,4 +27,11 @@ namespace KCGameplayTags
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Lobby_FindResult);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Lobby_JoinResult);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Lobby_DestroyResult);
+	
+	/* =========================================================================
+	 *  GameSystem Messages
+	 * ========================================================================= */
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_PhaseChanged);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_ScoreChanged);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Ingredient_Submitted);
 }

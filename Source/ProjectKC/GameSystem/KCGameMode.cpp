@@ -1,7 +1,7 @@
 #include "KCGameMode.h"
 #include "KCGameState.h"
-#include "KCGameSystemTags.h"
-#include "KCIngredientSubmittedStruct.h"
+#include "Messages/KCGameplayTags.h"
+#include "Messages/Struct/KCIngredientSubmittedStruct.h"
 #include "KCGamePhaseType.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
@@ -9,18 +9,17 @@
 
 AKCGameMode::AKCGameMode()
 {
+	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
+	PlayerControllerClass = AKCPlayerController::StaticClass();
 }
 
 void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, int32 Count)
 {
-	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
-	PlayerControllerClass = AKCPlayerController::StaticClass();
-	
 	FKCIngredientSubmittedStruct FakeMessage;
 	FakeMessage.TeamId = TeamId;
 	FakeMessage.SubmittedCount = Count;
 
-	OnIngredientSubmitted(TAG_Event_Ingredient_Submitted, FakeMessage);
+	OnIngredientSubmitted(KCGameplayTags::Message_Ingredient_Submitted, FakeMessage);
 }
 
 bool AKCGameMode::ReadyToStartMatch_Implementation()
@@ -35,7 +34,7 @@ void AKCGameMode::HandleMatchHasStarted()
 	KCGameState = GetGameState<AKCGameState>();
 
 	IngredientSubmittedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCIngredientSubmittedStruct>(
-		TAG_Event_Ingredient_Submitted,
+		KCGameplayTags::Message_Ingredient_Submitted,
 		this,
 		&AKCGameMode::OnIngredientSubmitted
 	);
