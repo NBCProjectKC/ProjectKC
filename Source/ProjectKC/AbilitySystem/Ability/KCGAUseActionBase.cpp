@@ -5,7 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCUseAction, Log, All);
 

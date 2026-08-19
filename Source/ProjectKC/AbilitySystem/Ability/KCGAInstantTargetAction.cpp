@@ -4,7 +4,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Actor.h"
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 UKCGAInstantTargetAction::UKCGAInstantTargetAction()
 {

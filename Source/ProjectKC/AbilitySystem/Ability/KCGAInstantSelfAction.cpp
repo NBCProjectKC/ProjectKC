@@ -1,7 +1,7 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGAInstantSelfAction.h"
 
 #include "AbilitySystemComponent.h"
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 UKCGAInstantSelfAction::UKCGAInstantSelfAction()
 {

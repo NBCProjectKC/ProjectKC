@@ -9,7 +9,7 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGAInstantSelfAction.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 
 namespace KCItemDefinitionTests

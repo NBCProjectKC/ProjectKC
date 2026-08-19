@@ -1,4 +1,4 @@
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_Self_OnActivate, "ActionHook.Self.OnActivate");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_Self_WhileActive, "ActionHook.Self.WhileActive");

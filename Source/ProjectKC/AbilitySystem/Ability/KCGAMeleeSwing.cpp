@@ -7,7 +7,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "ProjectKC/AbilitySystem/Config/KCMeleeActionConfig.h"
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCMeleeSwing, Log, All);
 
