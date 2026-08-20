@@ -54,13 +54,6 @@ bool UKCItemDefinition::Validate(FString& OutError) const
 				*AbilityError);
 			return false;
 		}
-
-		// 사용 가능한 아이템은 자기 고유의 사용 동작을 반드시 보여 준다.
-		if (!UseAction->ActionMontage.HasMontage())
-		{
-			OutError = TEXT("사용 가능한 아이템의 UseAction에는 사용 Montage가 필요합니다.");
-			return false;
-		}
 	}
 
 	return true;

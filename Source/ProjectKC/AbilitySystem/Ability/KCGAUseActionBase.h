@@ -3,10 +3,10 @@
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
-#include "ProjectKC/AbilitySystem/Struct/KCActionMontageSpec.h"
 #include "KCGAUseActionBase.generated.h"
 
 class UAnimMontage;
+class UKCActionMontageConfig;
 
 /**
  * 사용 행동 한 번의 수명주기를 Action Montage에 맞춰 관리하는 GA 기반 클래스다.
@@ -53,7 +53,7 @@ private:
 	UFUNCTION()
 	void OnActionMontageAborted();
 
-	bool StartActionMontage(const FKCActionMontageSpec& MontageSpec);
+	bool StartActionMontage(const UKCActionMontageConfig& MontageConfig);
 	void RunUseActionOnce();
 	void FinishUseAction(bool bWasCancelled);
 

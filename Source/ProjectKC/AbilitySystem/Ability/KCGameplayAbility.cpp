@@ -20,7 +20,7 @@ bool UKCGameplayAbility::ValidateDefinitionContract(
 	FString& OutError) const
 {
 	OutError.Reset();
-	if (Definition.ActionMontage.HasMontage() && !bSupportsActionMontage)
+	if (Definition.ActionMontage && !bSupportsActionMontage)
 	{
 		OutError = FString::Printf(
 			TEXT("ActionClass '%s'가 Action Montage를 지원하지 않습니다."),
@@ -334,7 +334,8 @@ bool UKCGameplayAbility::ResolveDefinitionForSpec(
 		return false;
 	}
 
-	if (!UKCAbilitySystemComponent::ResolveDefinitionFromSource(
+	// Grant 시점에 검증을 마쳤고 Grant 중에는 Definition을 교체할 수 없다.
+	if (!UKCAbilitySystemComponent::GetDefinitionFromSource(
 		Spec->SourceObject.Get(),
 		OutDefinition,
 		OutError))

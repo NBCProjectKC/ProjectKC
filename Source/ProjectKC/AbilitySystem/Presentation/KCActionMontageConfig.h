@@ -1,19 +1,28 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "KCActionMontageSpec.generated.h"
+#include "UObject/Object.h"
+#include "KCActionMontageConfig.generated.h"
 
 class UAnimMontage;
 
 /**
  * 한 번의 사용 행동이 재생할 몽타주 설정이다.
  * 결과가 아니라 행동의 수명주기와 판정 시점을 결정하므로 Fragment가 아니다.
+ *
+ * ActionConfig와 같은 인라인 Instanced 오브젝트다. 함정처럼 Avatar 애니메이션이
+ * 없는 소스는 이 오브젝트를 아예 두지 않으므로 불필요한 값을 갖지 않는다.
  */
-USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCActionMontageSpec
+UCLASS(
+	BlueprintType,
+	EditInlineNew,
+	DefaultToInstanced,
+	meta = (DisplayName = "Action Montage"))
+class PROJECTKC_API UKCActionMontageConfig : public UObject
 {
 	GENERATED_BODY()
 
+public:
 	/** 즉시 재생 안정성을 우선해 첫 버전은 하드 레퍼런스를 사용한다. */
 	UPROPERTY(
 		EditDefaultsOnly,
@@ -42,8 +51,6 @@ struct PROJECTKC_API FKCActionMontageSpec
 		Category = "KC|Ability|Presentation")
 	bool bStopWhenAbilityEnds = true;
 
-	bool HasMontage() const;
-
-	/** 몽타주가 비어 있는 것 자체는 유효하다. 필수 여부는 상위 Definition이 판단한다. */
-	bool Validate(FString& OutError) const;
+	/** 이 오브젝트가 존재한다는 것 자체가 몽타주 재생 의사이므로 Montage는 필수다. */
+	virtual bool Validate(FString& OutError) const;
 };

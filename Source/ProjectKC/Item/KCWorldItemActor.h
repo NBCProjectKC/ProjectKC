@@ -123,7 +123,7 @@ private:
 	bool ActivateUse();
 	bool ActivateUseWithTarget(AActor* TargetActor);
 	bool RefreshDefinition(FString* OutError = nullptr);
-	bool AlignGripToAttachmentSocket();
+	void AlignGripToAttachmentSocket();
 	void RefreshReplicatedAttachment();
 	void ApplyStatePresentation();
 	void BroadcastStateChanged();

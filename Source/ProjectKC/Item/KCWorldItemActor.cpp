@@ -127,7 +127,6 @@ bool AKCWorldItemActor::EnterHeldState(
 		return false;
 	}
 
-	const FTransform PreviousWorldTransform = GetActorTransform();
 	ItemMesh->SetSimulatePhysics(false);
 	ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -141,18 +140,14 @@ bool AKCWorldItemActor::EnterHeldState(
 		return false;
 	}
 
-	if (!AlignGripToAttachmentSocket())
-	{
-		DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		SetActorTransform(PreviousWorldTransform);
-		ApplyStatePresentation();
-		return false;
-	}
+	AlignGripToAttachmentSocket();
 
 	RuntimeState.Holder = NewHolder;
 	RuntimeState.State = EKCWorldItemState::Held;
 	SetOwner(NewHolder);
 
+	// 사용 Ability 부여에 실패해도 운반은 가능하다.
+	// 사용만 막히고, TryActivate()가 부여된 Handle이 없으므로 자연히 false를 반환한다.
 	if (IsUsable())
 	{
 		UKCAbilitySystemComponent* HolderAbilitySystem =
@@ -161,13 +156,12 @@ bool AKCWorldItemActor::EnterHeldState(
 		if (!HolderAbilitySystem ||
 			!AbilitySourceComponent->GrantToAbilitySystem(HolderAbilitySystem))
 		{
-			SetOwner(nullptr);
-			RuntimeState.Holder = nullptr;
-			RuntimeState.State = EKCWorldItemState::World;
-			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			SetActorTransform(PreviousWorldTransform);
-			ApplyStatePresentation();
-			return false;
+			UE_LOG(
+				LogKCWorldItem,
+				Warning,
+				TEXT("Holder '%s'에 KC ASC가 없거나 부여에 실패해 Item '%s'을 운반 전용으로 듭니다."),
+				*GetNameSafe(NewHolder),
+				*GetName());
 		}
 	}
 
@@ -185,9 +179,15 @@ bool AKCWorldItemActor::ExitHeldState(
 		return false;
 	}
 
+	// 회수에 실패해도 드롭은 진행한다. 아이템이 손에 갇히는 쪽이 더 나쁘다.
+	// 남은 Spec은 Held 상태가 아니면 ActivateUse()가 막고, 재획득 시 재사용된다.
 	if (!AbilitySourceComponent->Revoke(true))
 	{
-		return false;
+		UE_LOG(
+			LogKCWorldItem,
+			Warning,
+			TEXT("Item '%s'의 Ability 회수에 실패했지만 드롭은 진행합니다."),
+			*GetName());
 	}
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	SetOwner(nullptr);
@@ -320,22 +320,22 @@ bool AKCWorldItemActor::RefreshDefinition(FString* OutError)
 	return true;
 }
 
-bool AKCWorldItemActor::AlignGripToAttachmentSocket()
+void AKCWorldItemActor::AlignGripToAttachmentSocket()
 {
-	if (!ItemDefinition || !ItemMesh)
+	// Grip 소켓은 선택 사항이다. 없으면 아이템 원점을 Hand 소켓에 맞춘다.
+	FTransform AlignmentTransform = FTransform::Identity;
+	if (ItemDefinition &&
+		!ItemDefinition->Presentation.TryGetGripAlignmentTransform(
+			AlignmentTransform))
 	{
-		return false;
-	}
-
-	FTransform AlignmentTransform;
-	if (!ItemDefinition->Presentation.TryGetGripAlignmentTransform(
-		AlignmentTransform))
-	{
-		return false;
+		UE_LOG(
+			LogKCWorldItem,
+			Verbose,
+			TEXT("Item '%s'에 Grip 소켓이 없어 원점을 Hand 소켓에 맞춥니다."),
+			*GetName());
 	}
 
 	SetActorRelativeTransform(AlignmentTransform);
-	return true;
 }
 
 void AKCWorldItemActor::RefreshReplicatedAttachment()
@@ -399,14 +399,7 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 		return;
 	}
 
-	if (!AlignGripToAttachmentSocket())
-	{
-		UE_LOG(
-			LogKCWorldItem,
-			Verbose,
-			TEXT("Client Item '%s'의 Grip 정렬 데이터가 아직 준비되지 않았습니다."),
-			*GetName());
-	}
+	AlignGripToAttachmentSocket();
 }
 
 void AKCWorldItemActor::ApplyStatePresentation()

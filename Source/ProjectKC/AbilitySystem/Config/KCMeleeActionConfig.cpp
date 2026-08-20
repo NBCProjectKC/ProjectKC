@@ -72,7 +72,7 @@ bool UKCMeleeActionConfig::Validate(FString& OutError) const
 		const ECollisionChannel Channel =
 			UEngineTypes::ConvertToCollisionChannel(
 				ObstructionTraceChannel.GetValue());
-		if (Channel < ECC_WorldStatic || Channel >= ECC_MAX)
+		if (Channel >= ECC_MAX)
 		{
 			OutError = TEXT("ObstructionTraceChannel이 유효하지 않습니다.");
 			return false;

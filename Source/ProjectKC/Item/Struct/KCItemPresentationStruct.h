@@ -14,7 +14,10 @@ struct PROJECTKC_API FKCItemPresentationStruct
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item")
 	TObjectPtr<UStaticMesh> StaticMesh;
 
-	/** 이 메시 소켓이 Holder의 Hand 소켓과 일치하도록 아이템을 정렬한다. */
+	/**
+	 * 이 메시 소켓이 Holder의 Hand 소켓과 일치하도록 아이템을 정렬한다.
+	 * 선택 사항이다. 소켓이 없으면 아이템 원점을 Hand 소켓에 맞춘다.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item")
 	FName GripSocketName = TEXT("Grip");
 

@@ -1,18 +1,14 @@
-#include "ProjectKC/AbilitySystem/Struct/KCActionMontageSpec.h"
+#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
 
 #include "Animation/AnimMontage.h"
 
-bool FKCActionMontageSpec::HasMontage() const
-{
-	return IsValid(Montage);
-}
-
-bool FKCActionMontageSpec::Validate(FString& OutError) const
+bool UKCActionMontageConfig::Validate(FString& OutError) const
 {
 	OutError.Reset();
-	if (!HasMontage())
+	if (!IsValid(Montage))
 	{
-		return true;
+		OutError = TEXT("Montage가 비어 있습니다.");
+		return false;
 	}
 
 	if (!FMath::IsFinite(PlayRate) || PlayRate <= 0.0f)

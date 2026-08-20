@@ -2,6 +2,7 @@
 
 #include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
 #include "ProjectKC/AbilitySystem/Config/KCActionConfig.h"
+#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
 
 const FKCActionHookStruct* UKCAbilityDefinition::FindActionHook(
 	FGameplayTag HookTag) const
@@ -37,13 +38,16 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		return false;
 	}
 
-	FString MontageError;
-	if (!ActionMontage.Validate(MontageError))
+	if (ActionMontage)
 	{
-		OutError = FString::Printf(
-			TEXT("ActionMontage가 유효하지 않습니다: %s"),
-			*MontageError);
-		return false;
+		FString MontageError;
+		if (!ActionMontage->Validate(MontageError))
+		{
+			OutError = FString::Printf(
+				TEXT("ActionMontage가 유효하지 않습니다: %s"),
+				*MontageError);
+			return false;
+		}
 	}
 
 	if (ActionConfig)

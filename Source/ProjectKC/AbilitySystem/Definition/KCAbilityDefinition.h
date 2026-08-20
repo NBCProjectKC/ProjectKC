@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/AbilitySystem/Struct/KCActionHookStruct.h"
-#include "ProjectKC/AbilitySystem/Struct/KCActionMontageSpec.h"
 #include "UObject/Object.h"
 #include "KCAbilityDefinition.generated.h"
 
 class UKCActionConfig;
+class UKCActionMontageConfig;
 class UKCGameplayAbility;
 
 /** 소스의 상위 Definition 안에 인라인으로 조립되는 불변 Action 정의다. */
@@ -32,9 +32,10 @@ public:
 	 */
 	UPROPERTY(
 		EditDefaultsOnly,
+		Instanced,
 		BlueprintReadOnly,
 		Category = "KC|Ability|Presentation")
-	FKCActionMontageSpec ActionMontage;
+	TObjectPtr<UKCActionMontageConfig> ActionMontage;
 
 	/** 특정 Action GA에만 필요한 데이터다. 지원하지 않는 GA에서는 비어 있어야 한다. */
 	UPROPERTY(

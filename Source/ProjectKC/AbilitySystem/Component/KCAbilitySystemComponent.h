@@ -16,7 +16,18 @@ class PROJECTKC_API UKCAbilitySystemComponent : public UAbilitySystemComponent
 	GENERATED_BODY()
 
 public:
+	/** Grant 시점 전용이다. Definition 전체를 재귀 검증하므로 비용이 크다. */
 	static bool ResolveDefinitionFromSource(
+		const UObject* SourceObject,
+		const UKCAbilityDefinition*& OutDefinition,
+		FString* OutError = nullptr);
+
+	/**
+	 * 검증 없이 소스가 제공하는 Definition만 가져온다.
+	 * Definition은 Grant 시점에 이미 검증됐고 Grant 중에는 교체할 수 없으므로,
+	 * 매 활성화마다 재검증하지 않는다.
+	 */
+	static bool GetDefinitionFromSource(
 		const UObject* SourceObject,
 		const UKCAbilityDefinition*& OutDefinition,
 		FString* OutError = nullptr);

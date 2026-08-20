@@ -10,7 +10,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCAbilitySystem, Log, All);
 
-bool UKCAbilitySystemComponent::ResolveDefinitionFromSource(
+bool UKCAbilitySystemComponent::GetDefinitionFromSource(
 	const UObject* SourceObject,
 	const UKCAbilityDefinition*& OutDefinition,
 	FString* OutError)
@@ -38,6 +38,19 @@ bool UKCAbilitySystemComponent::ResolveDefinitionFromSource(
 		return false;
 	}
 
+	return true;
+}
+
+bool UKCAbilitySystemComponent::ResolveDefinitionFromSource(
+	const UObject* SourceObject,
+	const UKCAbilityDefinition*& OutDefinition,
+	FString* OutError)
+{
+	if (!GetDefinitionFromSource(SourceObject, OutDefinition, OutError))
+	{
+		return false;
+	}
+
 	FString ValidationError;
 	if (!OutDefinition->ValidateWithActionContract(ValidationError))
 	{
@@ -55,9 +68,10 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::GrantAbilityFromSource(
 	UObject* SourceObject,
 	int32 InputId)
 {
+	// 검증은 GrantAbilityDefinition에서 정확히 한 번 수행한다.
 	const UKCAbilityDefinition* Definition = nullptr;
 	FString Error;
-	if (!ResolveDefinitionFromSource(SourceObject, Definition, &Error))
+	if (!GetDefinitionFromSource(SourceObject, Definition, &Error))
 	{
 		UE_LOG(
 			LogKCAbilitySystem,

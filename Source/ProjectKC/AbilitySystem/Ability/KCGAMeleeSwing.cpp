@@ -163,12 +163,12 @@ void UKCGAMeleeSwing::GatherHitResults(
 		{
 			const float LeftDistance = FMath::IsFinite(Left.Distance)
 				? Left.Distance
-				: FVector::DistSquared(
+				: FVector::Dist(
 					SourceActor.GetActorLocation(),
 					Left.ImpactPoint);
 			const float RightDistance = FMath::IsFinite(Right.Distance)
 				? Right.Distance
-				: FVector::DistSquared(
+				: FVector::Dist(
 					SourceActor.GetActorLocation(),
 					Right.ImpactPoint);
 			if (!FMath::IsNearlyEqual(LeftDistance, RightDistance))

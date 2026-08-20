@@ -14,6 +14,7 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
+#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
 #include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
@@ -21,6 +22,15 @@
 
 namespace KCAbilityDefinitionTests
 {
+	UKCActionMontageConfig* AddMontage(UKCAbilityDefinition* Definition)
+	{
+		UKCActionMontageConfig* MontageConfig =
+			NewObject<UKCActionMontageConfig>(Definition);
+		MontageConfig->Montage = NewObject<UAnimMontage>(MontageConfig);
+		Definition->ActionMontage = MontageConfig;
+		return MontageConfig;
+	}
+
 	UKCApplyGameplayEffectFragment* AddEffectFragment(
 		UKCAbilityDefinition* Definition,
 		FKCActionHookStruct& Hook)
@@ -201,28 +211,37 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		KCAbilityDefinitionTests::MakeKnockbackOnlyDefinition()
 			->ValidateWithActionContract(Error));
 
+	TestNull(
+		TEXT("Montage가 필요 없는 Definition은 Montage 오브젝트 자체를 갖지 않는다."),
+		KCAbilityDefinitionTests::MakeKnockbackOnlyDefinition()
+			->ActionMontage.Get());
+
 	UKCAbilityDefinition* MontageDefinition =
 		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	MontageDefinition->ActionMontage.Montage =
-		NewObject<UAnimMontage>(MontageDefinition);
+	KCAbilityDefinitionTests::AddMontage(MontageDefinition);
 	TestTrue(
 		TEXT("사용 Montage를 지정한 근접 공격 Definition은 유효하다."),
 		MontageDefinition->ValidateWithActionContract(Error));
 
+	UKCAbilityDefinition* EmptyMontageDefinition =
+		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
+	KCAbilityDefinitionTests::AddMontage(EmptyMontageDefinition)->Montage =
+		nullptr;
+	TestFalse(
+		TEXT("Montage 오브젝트만 만들고 Montage를 비워 두면 거부한다."),
+		EmptyMontageDefinition->Validate(Error));
+
 	UKCAbilityDefinition* ZeroPlayRateDefinition =
 		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	ZeroPlayRateDefinition->ActionMontage.Montage =
-		NewObject<UAnimMontage>(ZeroPlayRateDefinition);
-	ZeroPlayRateDefinition->ActionMontage.PlayRate = 0.0f;
+	KCAbilityDefinitionTests::AddMontage(ZeroPlayRateDefinition)->PlayRate =
+		0.0f;
 	TestFalse(
 		TEXT("PlayRate가 0 이하인 Action Montage는 거부한다."),
 		ZeroPlayRateDefinition->Validate(Error));
 
 	UKCAbilityDefinition* NaNPlayRateDefinition =
 		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	NaNPlayRateDefinition->ActionMontage.Montage =
-		NewObject<UAnimMontage>(NaNPlayRateDefinition);
-	NaNPlayRateDefinition->ActionMontage.PlayRate =
+	KCAbilityDefinitionTests::AddMontage(NaNPlayRateDefinition)->PlayRate =
 		std::numeric_limits<float>::quiet_NaN();
 	TestFalse(
 		TEXT("유한하지 않은 PlayRate를 가진 Action Montage는 거부한다."),
@@ -230,10 +249,8 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 
 	UKCAbilityDefinition* MissingSectionDefinition =
 		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	MissingSectionDefinition->ActionMontage.Montage =
-		NewObject<UAnimMontage>(MissingSectionDefinition);
-	MissingSectionDefinition->ActionMontage.StartSection =
-		TEXT("KCTestMissingSection");
+	KCAbilityDefinitionTests::AddMontage(MissingSectionDefinition)
+		->StartSection = TEXT("KCTestMissingSection");
 	TestFalse(
 		TEXT("Montage에 없는 StartSection을 지정하면 거부한다."),
 		MissingSectionDefinition->Validate(Error));
@@ -245,8 +262,7 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Montage를 쓰지 않는 GA의 Hook 없는 Definition은 유효하다."),
 		UnsupportedMontageDefinition->ValidateWithActionContract(Error));
-	UnsupportedMontageDefinition->ActionMontage.Montage =
-		NewObject<UAnimMontage>(UnsupportedMontageDefinition);
+	KCAbilityDefinitionTests::AddMontage(UnsupportedMontageDefinition);
 	TestFalse(
 		TEXT("Action Montage를 지원하지 않는 GA에 Montage를 지정하면 거부한다."),
 		UnsupportedMontageDefinition->ValidateWithActionContract(Error));

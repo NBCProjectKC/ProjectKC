@@ -96,7 +96,8 @@ void AKCPlayerCharacter::OnConstruction(const FTransform& Transform)
 
 bool AKCPlayerCharacter::TryUseHeldItem()
 {
-	return HeldItemComponent && HeldItemComponent->UseHeldItem();
+	return IsLocallyControlled() && HeldItemComponent &&
+		HeldItemComponent->UseHeldItem();
 }
 
 void AKCPlayerCharacter::RequestInteract()

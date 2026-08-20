@@ -36,14 +36,6 @@ bool FKCItemPresentationStruct::Validate(FString& OutError) const
 		return false;
 	}
 
-	if (GripSocketName.IsNone() || !StaticMesh->FindSocket(GripSocketName))
-	{
-		OutError = FString::Printf(
-			TEXT("StaticMesh에 Grip 소켓 '%s'가 없습니다."),
-			*GripSocketName.ToString());
-		return false;
-	}
-
 	if (WorldCollisionProfile.IsNone())
 	{
 		OutError = TEXT("WorldCollisionProfile이 비어 있습니다.");

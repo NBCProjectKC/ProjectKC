@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCUseAction, Log, All);
@@ -54,14 +55,15 @@ void UKCGAUseActionBase::ActivateAbility(
 	}
 
 	// 함정처럼 Avatar 애니메이션이 없는 소스는 기존 즉시 실행 경로를 유지한다.
-	if (!Definition->ActionMontage.HasMontage())
+	const UKCActionMontageConfig* MontageConfig = Definition->ActionMontage;
+	if (!MontageConfig)
 	{
 		RunUseActionOnce();
 		FinishUseAction(!bUseActionSucceeded);
 		return;
 	}
 
-	if (!StartActionMontage(Definition->ActionMontage))
+	if (!StartActionMontage(*MontageConfig))
 	{
 		FinishUseAction(true);
 	}
@@ -102,9 +104,9 @@ void UKCGAUseActionBase::EndAbility(
 }
 
 bool UKCGAUseActionBase::StartActionMontage(
-	const FKCActionMontageSpec& MontageSpec)
+	const UKCActionMontageConfig& MontageConfig)
 {
-	UAnimMontage* Montage = MontageSpec.Montage.Get();
+	UAnimMontage* Montage = MontageConfig.Montage.Get();
 	if (!IsValid(Montage))
 	{
 		return false;
@@ -133,9 +135,9 @@ bool UKCGAUseActionBase::StartActionMontage(
 			this,
 			NAME_None,
 			Montage,
-			MontageSpec.PlayRate,
-			MontageSpec.StartSection,
-			MontageSpec.bStopWhenAbilityEnds);
+			MontageConfig.PlayRate,
+			MontageConfig.StartSection,
+			MontageConfig.bStopWhenAbilityEnds);
 	if (!MontageTask)
 	{
 		return false;
@@ -168,15 +170,15 @@ bool UKCGAUseActionBase::StartActionMontage(
 	}
 
 	RemoteOwnerMontage = Montage;
-	bStopRemoteOwnerMontageOnEnd = MontageSpec.bStopWhenAbilityEnds;
+	bStopRemoteOwnerMontageOnEnd = MontageConfig.bStopWhenAbilityEnds;
 
 	if (UKCAbilitySystemComponent* KCAbilitySystem =
 		Cast<UKCAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo()))
 	{
 		KCAbilitySystem->PlayActionMontageForRemoteOwner(
 			Montage,
-			MontageSpec.PlayRate,
-			MontageSpec.StartSection);
+			MontageConfig.PlayRate,
+			MontageConfig.StartSection);
 	}
 
 	return true;
