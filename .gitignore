@@ -192,7 +192,6 @@ Build/Android/res/*/*
 # Ignore plugins binaries on deep subfolders
 Plugins/**/Binaries/*
 Plugins/**/Intermediate/*
-Plugins/**/McpAutomationBridge/*
 Plugins/**/UnrealAgent/*
 
 # Ignore local documentation
