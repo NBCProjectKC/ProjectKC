@@ -139,6 +139,8 @@ fabric.properties
 *.xcodeproj
 *.xcworkspace
 *.sln
+*.slnx
+.vsconfig
 *.suo
 *.opensdf
 *.sdf
