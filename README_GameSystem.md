@@ -11,13 +11,13 @@ Source/ProjectKC/
 ├── GameSystem/
 │   ├── KCGameMode.h / .cpp        서버 전용 판정 로직 (승리 조건, 매치 시작/종료)
 │   ├── KCGameState.h / .cpp       서버+클라 공용 데이터 (점수, 게임 페이즈)
-│   └── KCGameSystemTags.h / .cpp  이벤트 채널(GameplayTag) 목록
-├── Struct/
-│   ├── KCIngredientSubmittedStruct.h   냄비 투입 이벤트 데이터
-│   ├── KCScoreChangedStruct.h          점수 변경 이벤트 데이터
-│   └── KCGamePhaseChangedStruct.h      게임 페이즈 변경 이벤트 데이터
-└── Enum/
-    └── KCGamePhaseType.h                대기중 / 진행중 / 종료
+│   └── KCGamePhaseType.h          대기중 / 진행중 / 종료 (Enum)
+└── Messages/
+    ├── KCGameplayTags.h / .cpp    이벤트 채널(GameplayTag) 목록 (프로젝트 공용)
+    └── Struct/
+        ├── KCIngredientSubmittedStruct.h   냄비 투입 이벤트 데이터
+        ├── KCScoreChangedStruct.h          점수 변경 이벤트 데이터
+        └── KCGamePhaseChangedStruct.h      게임 페이즈 변경 이벤트 데이터
 ```
 
 ## 승리 조건 두 가지
@@ -31,59 +31,52 @@ Source/ProjectKC/
 
 ```
 [플레이어 접속] → GameMode가 매 틱 ReadyToStartMatch() 확인
-     ↓ (GetNumPlayers() >= RequiredPlayerCount가 되는 순간)
+     ↓ (GetNumPlayers() >= GetRequiredPlayerCount()가 되는 순간)
 [HandleMatchHasStarted()] → KCGameState에 팀 수 알려줌 + 이벤트 리스너 등록 + Phase를 Playing으로
 
-[서버] 클라이언트가 냄비에 재료 넣음
-   └─ (여기까지 오는 방법은 2번/4번 담당 — RPC 등)
+[클라이언트] 플레이어가 냄비 앞에서 재료 투입 시도(상호작용)
+   └─ 창훈님 Server RPC로 서버에 요청 전달
 
-[서버] FKCIngredientSubmittedStruct 이벤트 Broadcast
-   └─ KCGameMode가 Listen → 점수 계산 → KCGameState에 반영 → 승리 조건 체크
+[서버] KCGameplayTags::Message_Ingredient_Submitted 채널로
+FKCIngredientSubmittedStruct(TeamId, SubmittedCount) 채워서 Broadcast
 
+[서버] KCGameMode가 Listen → 점수 계산 → KCGameState에 반영 → 승리 조건 체크
+   
 [서버] KCGameState의 TeamScores, CurrentPhase 값 변경
    └─ Replication으로 모든 클라이언트에 자동 전파
 
 [서버 + 모든 클라] OnRep 함수 호출됨
    └─ FKCScoreChangedStruct / FKCGamePhaseChangedStruct 로컬 Broadcast
 
-[각자 컴퓨터] UI(6번) 등이 이 이벤트를 Listen해서 화면 갱신
+[각자 컴퓨터] 이 이벤트를 Listen해서 화면 갱신
 
 [승리 조건 충족] → EndGame() → EndMatch() 호출 → HandleMatchHasEnded()에서 리스너 해제
 ```
 
-## 설치 방법 (.Build.cs 수정 필요)
-
-`Source/ProjectKC/ProjectKC.Build.cs` 열어서 `PublicDependencyModuleNames`에 추가:
-
-```csharp
-PublicDependencyModuleNames.AddRange(new string[] {
-    "Core", "CoreUObject", "Engine", "InputCore",
-    "GameplayTags",              // 추가
-    "GameplayMessageRuntime"     // 추가 (Gameplay Message Router 플러그인)
-});
-```
-
-`.uproject`의 `Plugins` 목록에 `GameplayMessageRuntime` 없으면 에디터 `Edit > Plugins`에서 "Gameplay Message Router" 검색해서 키기.
-
 ## TO. 고은님
 
-1. **`Event.Ingredient.Submitted`를 어디서 Broadcast할지**
-   클라이언트가 냄비 앞에서 상호작용 → Server RPC → 서버 검증 후 이 이벤트를 Broadcast하는 흐름이 될 텐데, RPC를 어디(냄비 액터? 컨트롤러?)에 만들지는 인철님과 이야기해보시면 될 것 같습니다.
+PlayerState `GetTeamId()` 스펙
 
-2. **TeamId 출처: PlayerState**
-   "이 플레이어가 몇 번 팀인지"는 `PlayerState`에 `int32 GetTeamId() const` 같은 조회 함수 형태로 있으면 충분합니다. 이 PlayerState 클래스 자체(로비 배정 로직 포함)는 4번이 만드는 게 자연스럽고, GameSystem은 그 함수만 갖다 쓰는 소비자 입장이에요.
+**int32 GetTeamId() const;**
+
+요구사항
+- PlayerState 클래스에 public으로 존재
+- 리턴값: 0부터 시작하는 정수 (GameSystem의 TeamCount, 기본값 2, 범위 안의 값)
+- 매치 시작 시점(HandleMatchHasStarted 호출 시점)엔 모든 플레이어가 이 값을 이미 갖고 있어야 함 → 로비 단계에서 팀 배정이 끝나 있어야 함
+
+말씀드렸던 함수 구현 이렇게 부탁드립니다!
+
+
+## TO. 창훈님
+
+냄비에 재료 투입이 확정되는 시점에 `FKCIngredientSubmittedStruct`(`TeamId`, `SubmittedCount`) 채워주시고
+`KCGameplayTags::Message_Ingredient_Submitted` 채널로 Broadcast 해주시면 될 것 같습니다.
+
+`TeamId` 채워주실 때 `PlayerState`의 `GetTeamId()` 호출하시면 됩니다.
+
 
 ## TO. 승재님
 
-`TAG_Event_Game_ScoreChanged`, `TAG_Event_Game_PhaseChanged` 이 두 채널만 Listen하면 점수/상태 UI 갱신 가능합니다.
-
-## TO. 인철님
-
-냄비에 재료 투입이 서버에서 최종 확정되는 시점에 `FKCIngredientSubmittedStruct`(필드: `TeamId`, `SubmittedCount`)를 채워서 `TAG_Event_Ingredient_Submitted`로 Broadcast 해주시면 될 것 같습니다.
-
-## TODO
-
-- [v] 컴파일/PIE 테스트 — 완료
-- [ ] **Asset Manager + 비동기 로드 적용**: MVP 단계에선 해당 없음.
-- [ ] 게임 종료 후 처리(로비 복귀, 결과 화면 UI 연동)
-
+`KCGameplayTags::Message_Game_ScoreChanged`
+`KCGameplayTags::Message_Game_PhaseChanged`
+이 두 채널 Listen 하셔서 점수/상태 UI 갱신 하시면 될 것 같습니다.

@@ -17,11 +17,10 @@ public class ProjectKC : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"GameplayAbilities",
-			"GameplayTags",
 			"GameplayTasks",
 			
-			
-			"GameplayMessageRuntime", "NetCore",
+			// GMS
+			"GameplayTags","GameplayMessageRuntime", "NetCore",
 			
 			// Online & Steam Sessions
 			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam",

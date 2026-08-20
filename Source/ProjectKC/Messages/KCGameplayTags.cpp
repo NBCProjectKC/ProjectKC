@@ -25,6 +25,13 @@ namespace KCGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Lobby_JoinResult, "Message.Lobby.JoinResult", "세션 참가 완료 시 발행되는 메시지 채널입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Lobby_DestroyResult, "Message.Lobby.DestroyResult", "세션 파괴 완료 시 발행되는 메시지 채널입니다.");
 
+	/* =========================================================================
+	 *  GameSystem Messages
+	 * ========================================================================= */
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Game_PhaseChanged, "Message.Game.PhaseChanged", "게임 진행 단계(대기/진행/종료)가 바뀔 때 브로드캐스트되는 메시지 채널입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Game_ScoreChanged, "Message.Game.ScoreChanged", "팀 점수가 변경될 때 브로드캐스트되는 메시지 채널입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Ingredient_Submitted, "Message.Ingredient.Submitted", "냄비에 재료가 투입될 때 서버에서 브로드캐스트되는 메시지 채널입니다. (반드시 서버에서만 Broadcast 되어야 함)");
+	
 	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString)
 	{
 		const UGameplayTagsManager& Manager = UGameplayTagsManager::Get();

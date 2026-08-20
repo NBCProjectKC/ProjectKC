@@ -1,9 +1,9 @@
 #include "KCGameState.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
-#include "KCGameSystemTags.h"
-#include "KCGamePhaseChangedStruct.h"
-#include "KCScoreChangedStruct.h"
+#include "Messages/Struct/KCGamePhaseChangedStruct.h"
+#include "Messages/Struct/KCScoreChangedStruct.h"
+#include "Messages/KCGameplayTags.h"
 
 AKCGameState::AKCGameState()
 {
@@ -70,7 +70,7 @@ void AKCGameState::OnRep_CurrentPhase()
 	FKCGamePhaseChangedStruct Message;
 	Message.NewPhase = CurrentPhase;
 
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(TAG_Event_Game_PhaseChanged, Message);
+	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Game_PhaseChanged, Message);
 }
 
 void AKCGameState::OnRep_TeamScores()
@@ -81,6 +81,6 @@ void AKCGameState::OnRep_TeamScores()
 		Message.TeamId = TeamId;
 		Message.NewScore = TeamScores[TeamId];
 
-		UGameplayMessageSubsystem::Get(this).BroadcastMessage(TAG_Event_Game_ScoreChanged, Message);
+		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Game_ScoreChanged, Message);
 	}
 }
