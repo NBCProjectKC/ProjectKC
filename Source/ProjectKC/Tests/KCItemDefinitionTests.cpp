@@ -6,9 +6,10 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "GameplayEffect.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAInstantSelfAction.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGAAction.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
-#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
+#include "ProjectKC/AbilitySystem/Timing/KCMontageActionTiming.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
@@ -32,14 +33,15 @@ namespace KCItemDefinitionTests
 	{
 		UKCAbilityDefinition* Definition =
 			NewObject<UKCAbilityDefinition>(Outer);
-		Definition->ActionClass = UKCGAInstantSelfAction::StaticClass();
-		UKCActionMontageConfig* MontageConfig =
-			NewObject<UKCActionMontageConfig>(Definition);
-		MontageConfig->Montage = NewObject<UAnimMontage>(MontageConfig);
-		Definition->ActionMontage = MontageConfig;
+		Definition->ActionClass = UKCGAAction::StaticClass();
+		Definition->ActionTargeting = NewObject<UKCSelfTargeting>(Definition);
+		UKCMontageActionTiming* Timing =
+			NewObject<UKCMontageActionTiming>(Definition);
+		Timing->Montage = NewObject<UAnimMontage>(Timing);
+		Definition->ActionTiming = Timing;
 
 		FKCActionHookStruct Hook;
-		Hook.HookTag = TAG_KC_ActionHook_Self_OnActivate;
+		Hook.HookTag = TAG_KC_ActionHook_OnExecute;
 		UKCApplyGameplayEffectFragment* Fragment =
 			NewObject<UKCApplyGameplayEffectFragment>(Definition);
 		Fragment->EffectRecipe.EffectClass = UGameplayEffect::StaticClass();
@@ -112,12 +114,12 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 		KCItemDefinitionTests::MakeCarryOnlyItem();
 	MissingMontageItem->UseAction =
 		KCItemDefinitionTests::MakeValidUseAbility(MissingMontageItem);
-	MissingMontageItem->UseAction->ActionMontage = nullptr;
+	MissingMontageItem->UseAction->ActionTiming = nullptr;
 	TestTrue(
-		TEXT("Montage가 없어도 사용 Ability 자체의 계약은 유효하다."),
+		TEXT("Timing이 없어도 사용 Ability 자체의 계약은 유효하다."),
 		MissingMontageItem->UseAction->ValidateWithActionContract(Error));
 	TestTrue(
-		TEXT("Montage 없는 사용 아이템도 유효하다. 애니메이션 없이 즉시 실행된다."),
+		TEXT("Timing 없는 사용 아이템도 유효하다. 활성화 즉시 실행된다."),
 		MissingMontageItem->Validate(Error));
 
 	UKCItemDefinition* MissingMeshItem = NewObject<UKCItemDefinition>();

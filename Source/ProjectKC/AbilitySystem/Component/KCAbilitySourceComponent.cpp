@@ -3,10 +3,13 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogKCAbilitySource, Log, All);
 
 UKCAbilitySourceComponent::UKCAbilitySourceComponent()
 {
@@ -81,8 +84,27 @@ bool UKCAbilitySourceComponent::GrantToAbilitySystem(
 bool UKCAbilitySourceComponent::TryActivate()
 {
 	UKCAbilitySystemComponent* AbilitySystem = GetGrantedAbilitySystem();
-	return AbilitySystem &&
-		AbilitySystem->TryActivateGrantedAbility(BindingState.AbilityHandle);
+	if (!AbilitySystem)
+	{
+		return false;
+	}
+
+	// Target이 필요한 방식을 Target 없이 발동하면 조용히 실패하므로 원인을 남긴다.
+	const UKCActionTargeting* Targeting =
+		AbilityDefinition ? AbilityDefinition->ActionTargeting : nullptr;
+	if (Targeting && Targeting->RequiresActivationTarget())
+	{
+		UE_LOG(
+			LogKCAbilitySource,
+			Warning,
+			TEXT("'%s'는 활성화 Target이 필요해 TryActivate()로 발동할 수 없습니다. ")
+			TEXT("TryActivateWithTarget()을 사용하세요. Source='%s'"),
+			*Targeting->GetClass()->GetName(),
+			*GetNameSafe(GetOwner()));
+		return false;
+	}
+
+	return AbilitySystem->TryActivateGrantedAbility(BindingState.AbilityHandle);
 }
 
 bool UKCAbilitySourceComponent::TryActivateWithTarget(AActor* TargetActor)

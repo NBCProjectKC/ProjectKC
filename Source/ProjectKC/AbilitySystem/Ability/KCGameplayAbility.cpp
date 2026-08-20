@@ -4,7 +4,6 @@
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
-#include "ProjectKC/AbilitySystem/Config/KCActionConfig.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
@@ -20,34 +19,6 @@ bool UKCGameplayAbility::ValidateDefinitionContract(
 	FString& OutError) const
 {
 	OutError.Reset();
-	if (Definition.ActionMontage && !bSupportsActionMontage)
-	{
-		OutError = FString::Printf(
-			TEXT("ActionClass '%s'가 Action Montage를 지원하지 않습니다."),
-			*GetClass()->GetName());
-		return false;
-	}
-
-	if (Definition.ActionConfig)
-	{
-		if (!SupportedActionConfigClass ||
-			!Definition.ActionConfig->IsA(SupportedActionConfigClass))
-		{
-			OutError = FString::Printf(
-				TEXT("ActionClass '%s'가 ActionConfig '%s'를 지원하지 않습니다."),
-				*GetClass()->GetName(),
-				*GetNameSafe(Definition.ActionConfig));
-			return false;
-		}
-	}
-	else if (bActionConfigRequired)
-	{
-		OutError = FString::Printf(
-			TEXT("ActionClass '%s'에 필요한 ActionConfig가 없습니다."),
-			*GetClass()->GetName());
-		return false;
-	}
-
 	for (const FKCActionHookStruct& Hook : Definition.ActionHooks)
 	{
 		if (!SupportedActionHooks.HasTagExact(Hook.HookTag))
@@ -110,7 +81,6 @@ void UKCGameplayAbility::ActivateAbility(
 	}
 
 	ActiveDefinition = const_cast<UKCAbilityDefinition*>(Definition);
-	RuntimeMagnitudes.Reset();
 	TrackedActiveEffects.Reset();
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
@@ -138,7 +108,6 @@ void UKCGameplayAbility::EndAbility(
 	}
 
 	TrackedActiveEffects.Reset();
-	RuntimeMagnitudes.Reset();
 	ActiveDefinition = nullptr;
 
 	Super::EndAbility(
@@ -164,34 +133,6 @@ void UKCGameplayAbility::AddRequiredActionHook(FGameplayTag HookTag)
 		SupportedActionHooks.AddTag(HookTag);
 		RequiredActionHooks.AddTag(HookTag);
 	}
-}
-
-void UKCGameplayAbility::SetSupportedActionConfigClass(
-	TSubclassOf<UKCActionConfig> ConfigClass,
-	bool bRequired)
-{
-	SupportedActionConfigClass = ConfigClass;
-	bActionConfigRequired = bRequired;
-}
-
-void UKCGameplayAbility::SetSupportsActionMontage(bool bSupported)
-{
-	bSupportsActionMontage = bSupported;
-}
-
-bool UKCGameplayAbility::SetRuntimeMagnitude(
-	FGameplayTag DataTag,
-	float Magnitude)
-{
-	if (!DataTag.IsValid() || !FMath::IsFinite(Magnitude) ||
-		!ActiveDefinition ||
-		!ActiveDefinition->DeclaresSetByCallerTag(DataTag))
-	{
-		return false;
-	}
-
-	RuntimeMagnitudes.Add(DataTag, Magnitude);
-	return true;
 }
 
 bool UKCGameplayAbility::ExecuteActionHook(
@@ -257,21 +198,17 @@ const UKCAbilityDefinition* UKCGameplayAbility::GetActiveDefinition() const
 	return ActiveDefinition;
 }
 
-const UKCActionConfig* UKCGameplayAbility::GetActiveActionConfig() const
-{
-	return ActiveDefinition ? ActiveDefinition->ActionConfig : nullptr;
-}
-
 bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
 	const FKCGameplayEffectRecipeStruct& Recipe,
 	const FKCActionExecutionContext& Context,
+	UAbilitySystemComponent* TargetAbilitySystem,
 	bool bTrackUntilAbilityEnds)
 {
 	UAbilitySystemComponent* SourceAbilitySystem =
 		GetAbilitySystemComponentFromActorInfo();
 	if (Context.Ability != this ||
 		Context.SourceAbilitySystem != SourceAbilitySystem ||
-		!Context.TargetAbilitySystem ||
+		!TargetAbilitySystem ||
 		!Context.IsAuthoritative())
 	{
 		return false;
@@ -284,7 +221,7 @@ bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
 	}
 
 	FActiveGameplayEffectHandle ActiveHandle;
-	if (Context.TargetAbilitySystem == SourceAbilitySystem)
+	if (TargetAbilitySystem == SourceAbilitySystem)
 	{
 		ActiveHandle = SourceAbilitySystem->ApplyGameplayEffectSpecToSelf(
 			*SpecHandle.Data.Get());
@@ -293,14 +230,14 @@ bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
 	{
 		ActiveHandle = SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(
 			*SpecHandle.Data.Get(),
-			Context.TargetAbilitySystem);
+			TargetAbilitySystem);
 	}
 
 	if (bTrackUntilAbilityEnds && ActiveHandle.IsValid())
 	{
 		FKCTrackedActiveEffect& TrackedEffect =
 			TrackedActiveEffects.AddDefaulted_GetRef();
-		TrackedEffect.TargetAbilitySystem = Context.TargetAbilitySystem;
+		TrackedEffect.TargetAbilitySystem = TargetAbilitySystem;
 		TrackedEffect.EffectHandle = ActiveHandle;
 	}
 
@@ -378,12 +315,10 @@ FGameplayEffectSpecHandle UKCGameplayAbility::MakeEffectSpec(
 	}
 
 	SpecHandle.Data->DynamicGrantedTags.AppendTags(Recipe.DynamicGrantedTags);
+	// Recipe가 자기 값을 직접 들고 있으므로 같은 태그라도 GE마다 다른 값을 넣을 수 있다.
 	for (const FKCSetByCallerValueStruct& Value : Recipe.SetByCallers)
 	{
-		const float* RuntimeMagnitude = RuntimeMagnitudes.Find(Value.DataTag);
-		SpecHandle.Data->SetSetByCallerMagnitude(
-			Value.DataTag,
-			RuntimeMagnitude ? *RuntimeMagnitude : Value.Magnitude);
+		SpecHandle.Data->SetSetByCallerMagnitude(Value.DataTag, Value.Magnitude);
 	}
 
 	return SpecHandle;

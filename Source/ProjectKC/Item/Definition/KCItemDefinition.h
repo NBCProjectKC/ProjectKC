@@ -19,10 +19,14 @@ public:
 		FDataValidationContext& Context) const override;
 #endif
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	FText DisplayName;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item")
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Item",
+		meta = (ShowOnlyInnerProperties))
 	FKCItemPresentationStruct Presentation;
 
 	/** 비어 있으면 좌클릭 사용 기능이 없는 운반 전용 아이템이다. */
@@ -30,10 +34,10 @@ public:
 		EditDefaultsOnly,
 		Instanced,
 		BlueprintReadOnly,
-		Category = "KC|Item|Use")
+		Category = "Item")
 	TObjectPtr<UKCAbilityDefinition> UseAction;
 
-	UFUNCTION(BlueprintPure, Category = "KC|Item")
+	UFUNCTION(BlueprintPure, Category = "Item")
 	bool IsUsable() const;
 
 	bool Validate(FString& OutError) const;
