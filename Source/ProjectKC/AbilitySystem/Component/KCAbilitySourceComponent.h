@@ -46,6 +46,15 @@ public:
 	/** Grant 중에는 Definition을 바꿀 수 없다. */
 	bool ConfigureAbilityDefinition(UKCAbilityDefinition* NewDefinition);
 
+	/**
+	 * Owner 자신의 ASC에 저작된 Definition을 부여한다.
+	 * 함정·AI·캐릭터 내재 능력처럼 스스로 능력을 갖는 소스의 공통 배선이다.
+	 * 호출 전에 Owner의 ASC가 InitAbilityActorInfo를 마쳐야 한다.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Ability")
+	bool GrantToOwner();
+
+	/** 아이템처럼 홀더의 ASC에 부여하는 소스가 사용한다. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Ability")
 	bool GrantToAbilitySystem(UKCAbilitySystemComponent* AbilitySystem);
 
@@ -67,6 +76,20 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Ability")
 	bool HasAbilityDefinition() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Ability")
+	UKCAbilityDefinition* GetActionDefinition() const;
+
+	/**
+	 * 이 컴포넌트에 직접 저작하는 Action Definition이다.
+	 * 아이템처럼 상위 데이터에서 런타임에 주입하는 소스는 비워 둔다.
+	 */
+	UPROPERTY(
+		EditDefaultsOnly,
+		Instanced,
+		BlueprintReadOnly,
+		Category = "KC|Ability")
+	TObjectPtr<UKCAbilityDefinition> ActionDefinition;
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

@@ -19,8 +19,38 @@ UKCAbilitySourceComponent::UKCAbilitySourceComponent()
 bool UKCAbilitySourceComponent::ResolveAbilityDefinition(
 	const UKCAbilityDefinition*& OutDefinition) const
 {
-	OutDefinition = AbilityDefinition;
-	return IsValid(AbilityDefinition);
+	// 런타임 주입값이 있으면 우선하고, 없으면 컴포넌트에 저작된 값을 쓴다.
+	OutDefinition = AbilityDefinition ? AbilityDefinition.Get() : ActionDefinition.Get();
+	return IsValid(OutDefinition);
+}
+
+UKCAbilityDefinition* UKCAbilitySourceComponent::GetActionDefinition() const
+{
+	return ActionDefinition;
+}
+
+bool UKCAbilitySourceComponent::GrantToOwner()
+{
+	AActor* Owner = GetOwner();
+	if (!Owner || !Owner->HasAuthority())
+	{
+		return false;
+	}
+
+	UKCAbilitySystemComponent* OwnerAbilitySystem =
+		Cast<UKCAbilitySystemComponent>(
+			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner));
+	if (!OwnerAbilitySystem)
+	{
+		UE_LOG(
+			LogKCAbilitySource,
+			Warning,
+			TEXT("Owner '%s'에 KC ASC가 없어 Ability를 부여하지 못했습니다."),
+			*GetNameSafe(Owner));
+		return false;
+	}
+
+	return GrantToAbilitySystem(OwnerAbilitySystem);
 }
 
 bool UKCAbilitySourceComponent::ConfigureAbilityDefinition(

@@ -13,6 +13,7 @@
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCEventTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCOverlapTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSweepTargeting.h"
 #include "ProjectKC/AbilitySystem/Timing/KCMontageActionTiming.h"
@@ -88,6 +89,13 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Sweep 대상 Definition은 유효하다."),
 		MakeDefinition(UKCSweepTargeting::StaticClass())
 			->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Overlap 대상 Definition은 유효하다."),
+		MakeDefinition(UKCOverlapTargeting::StaticClass())
+			->ValidateWithActionContract(Error));
+	TestFalse(
+		TEXT("Overlap 방식은 활성화 Target을 요구하지 않는다."),
+		GetDefault<UKCOverlapTargeting>()->RequiresActivationTarget());
 
 	UKCAbilityDefinition* NoTargeting =
 		MakeDefinition(UKCSelfTargeting::StaticClass());
