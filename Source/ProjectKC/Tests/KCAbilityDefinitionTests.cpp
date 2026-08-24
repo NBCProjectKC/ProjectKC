@@ -4,7 +4,7 @@
 
 #include "Animation/AnimMontage.h"
 #include "GameplayEffect.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAAction.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
@@ -40,7 +40,7 @@ namespace KCAbilityDefinitionTests
 		TSubclassOf<UKCActionTargeting> TargetingClass)
 	{
 		UKCAbilityDefinition* Definition = NewObject<UKCAbilityDefinition>();
-		Definition->ActionClass = UKCGAAction::StaticClass();
+		Definition->ActionClass = UKCGA_Action::StaticClass();
 		Definition->ActionTargeting =
 			NewObject<UKCActionTargeting>(Definition, TargetingClass);
 

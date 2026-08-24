@@ -8,3 +8,9 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_KC_GameplayEvent_AbilitySource_Trigger, "GameplayEven
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_GameplayEvent_Action_Execute, "GameplayEvent.Action.Execute");
 
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Data_Damage_Flat, "Data.Damage.Flat");
+UE_DEFINE_GAMEPLAY_TAG(
+	TAG_KC_Data_Cooking_Progress_Increase,
+	"Data.Cooking.Progress.Increase");
+UE_DEFINE_GAMEPLAY_TAG(
+	TAG_KC_Data_Cooking_Progress_Decrease,
+	"Data.Cooking.Progress.Decrease");

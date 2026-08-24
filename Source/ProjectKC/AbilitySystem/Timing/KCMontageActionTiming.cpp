@@ -3,7 +3,7 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/AnimMontage.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAAction.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
@@ -37,7 +37,7 @@ bool UKCMontageActionTiming::Validate(FString& OutError) const
 	return true;
 }
 
-bool UKCMontageActionTiming::ScheduleExecution(UKCGAAction& Ability) const
+bool UKCMontageActionTiming::ScheduleExecution(UKCGA_Action& Ability) const
 {
 	UAnimMontage* MontageToPlay = Montage.Get();
 	if (!IsValid(MontageToPlay))
@@ -60,7 +60,7 @@ bool UKCMontageActionTiming::ScheduleExecution(UKCGAAction& Ability) const
 
 	EventTask->EventReceived.AddDynamic(
 		&Ability,
-		&UKCGAAction::HandleTimingExecuteEvent);
+		&UKCGA_Action::HandleTimingExecuteEvent);
 	EventTask->ReadyForActivation();
 
 	UAbilityTask_PlayMontageAndWait* MontageTask =
@@ -77,13 +77,13 @@ bool UKCMontageActionTiming::ScheduleExecution(UKCGAAction& Ability) const
 	}
 
 	MontageTask->OnCompleted.AddDynamic(
-		&Ability, &UKCGAAction::HandleTimingCompleted);
+		&Ability, &UKCGA_Action::HandleTimingCompleted);
 	MontageTask->OnBlendOut.AddDynamic(
-		&Ability, &UKCGAAction::HandleTimingCompleted);
+		&Ability, &UKCGA_Action::HandleTimingCompleted);
 	MontageTask->OnInterrupted.AddDynamic(
-		&Ability, &UKCGAAction::HandleTimingAborted);
+		&Ability, &UKCGA_Action::HandleTimingAborted);
 	MontageTask->OnCancelled.AddDynamic(
-		&Ability, &UKCGAAction::HandleTimingAborted);
+		&Ability, &UKCGA_Action::HandleTimingAborted);
 
 	// AnimInstance가 없거나 재생에 실패하면 이 호출 안에서 바로 취소가 전파된다.
 	MontageTask->ReadyForActivation();
@@ -112,7 +112,7 @@ bool UKCMontageActionTiming::ScheduleExecution(UKCGAAction& Ability) const
 	return true;
 }
 
-void UKCMontageActionTiming::CancelExecution(UKCGAAction& Ability) const
+void UKCMontageActionTiming::CancelExecution(UKCGA_Action& Ability) const
 {
 	if (!bStopWhenAbilityEnds || !IsValid(Montage))
 	{

@@ -4,7 +4,7 @@
 #include "UObject/Object.h"
 #include "KCActionTiming.generated.h"
 
-class UKCGAAction;
+class UKCGA_Action;
 
 /**
  * 행동의 결과를 "언제" 실행할지 정하는 방식이다.
@@ -28,9 +28,9 @@ public:
 	 * 실행 시점을 예약한다. 예약에 성공하면 GA는 결과를 만들지 않고 대기한다.
 	 * @return 예약에 실패하면 false. GA가 사용을 취소한다.
 	 */
-	virtual bool ScheduleExecution(UKCGAAction& Ability) const
+	virtual bool ScheduleExecution(UKCGA_Action& Ability) const
 		PURE_VIRTUAL(UKCActionTiming::ScheduleExecution, return false;);
 
 	/** Ability가 취소로 끝날 때 남은 연출을 정리한다. */
-	virtual void CancelExecution(UKCGAAction& Ability) const {}
+	virtual void CancelExecution(UKCGA_Action& Ability) const {}
 };

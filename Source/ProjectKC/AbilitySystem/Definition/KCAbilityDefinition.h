@@ -7,7 +7,7 @@
 
 class UKCActionTargeting;
 class UKCActionTiming;
-class UKCGameplayAbility;
+class UKCGA_Base;
 
 /**
  * 소스의 상위 Definition 안에 인라인으로 조립되는 불변 Action 정의다.
@@ -21,7 +21,7 @@ class PROJECTKC_API UKCAbilityDefinition : public UObject
 
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
-	TSubclassOf<UKCGameplayAbility> ActionClass;
+	TSubclassOf<UKCGA_Base> ActionClass;
 
 	UPROPERTY(
 		EditDefaultsOnly,

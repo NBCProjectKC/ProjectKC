@@ -1,6 +1,6 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "GameplayEffect.h"
 
