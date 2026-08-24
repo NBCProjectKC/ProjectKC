@@ -24,9 +24,8 @@ protected:
 	virtual bool ReadyToStartMatch_Implementation() override;
 	virtual void HandleMatchHasStarted() override;
 
-	// TODO: 실제 전투 레벨 이름으로 교체 필요
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Lobby")
-	FString BattleLevelName = TEXT("Lvl_Battle");
+	FString BattleLevelName = TEXT("L_GasRange");
 	
 private:
 	// 기본값
