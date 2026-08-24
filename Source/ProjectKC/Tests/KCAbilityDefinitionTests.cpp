@@ -4,80 +4,60 @@
 
 #include "Animation/AnimMontage.h"
 #include "GameplayEffect.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAMeleeSwing.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAInstantSelfAction.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAInstantTargetAction.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGAAction.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
-#include "ProjectKC/AbilitySystem/Config/KCMeleeActionConfig.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
-#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
-#include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCEventTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCOverlapTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCSweepTargeting.h"
+#include "ProjectKC/AbilitySystem/Timing/KCMontageActionTiming.h"
 
 #include <limits>
 
 namespace KCAbilityDefinitionTests
 {
-	UKCActionMontageConfig* AddMontage(UKCAbilityDefinition* Definition)
-	{
-		UKCActionMontageConfig* MontageConfig =
-			NewObject<UKCActionMontageConfig>(Definition);
-		MontageConfig->Montage = NewObject<UAnimMontage>(MontageConfig);
-		Definition->ActionMontage = MontageConfig;
-		return MontageConfig;
-	}
-
 	UKCApplyGameplayEffectFragment* AddEffectFragment(
 		UKCAbilityDefinition* Definition,
-		FKCActionHookStruct& Hook)
+		FKCActionHookStruct& Hook,
+		EKCActionScope Scope = EKCActionScope::Target)
 	{
 		UKCApplyGameplayEffectFragment* Fragment =
 			NewObject<UKCApplyGameplayEffectFragment>(Definition);
 		Fragment->EffectRecipe.EffectClass = UGameplayEffect::StaticClass();
+		Fragment->ApplicationScope = Scope;
 		Hook.Fragments.Add(Fragment);
 		return Fragment;
 	}
 
-	UKCAbilityDefinition* MakeValidSelfDefinition()
+	/** 대상 수집 방식만 다르고 나머지는 같은 최소 Definition이다. */
+	UKCAbilityDefinition* MakeDefinition(
+		TSubclassOf<UKCActionTargeting> TargetingClass)
 	{
 		UKCAbilityDefinition* Definition = NewObject<UKCAbilityDefinition>();
-		Definition->ActionClass = UKCGAInstantSelfAction::StaticClass();
+		Definition->ActionClass = UKCGAAction::StaticClass();
+		Definition->ActionTargeting =
+			NewObject<UKCActionTargeting>(Definition, TargetingClass);
 
 		FKCActionHookStruct Hook;
-		Hook.HookTag = TAG_KC_ActionHook_Self_OnActivate;
+		Hook.HookTag = TAG_KC_ActionHook_OnExecute;
 		AddEffectFragment(Definition, Hook);
 		Definition->ActionHooks.Add(MoveTemp(Hook));
 		return Definition;
 	}
 
-	UKCAbilityDefinition* MakeKnockbackOnlyDefinition()
+	UKCMontageActionTiming* AddMontageTiming(UKCAbilityDefinition* Definition)
 	{
-		UKCAbilityDefinition* Definition = NewObject<UKCAbilityDefinition>();
-		Definition->ActionClass = UKCGAInstantTargetAction::StaticClass();
-
-		FKCActionHookStruct Hook;
-		Hook.HookTag = TAG_KC_ActionHook_Target_OnTrigger;
-		Hook.Fragments.Add(NewObject<UKCKnockbackFragment>(Definition));
-		Definition->ActionHooks.Add(MoveTemp(Hook));
-		return Definition;
-	}
-
-	UKCAbilityDefinition* MakeValidMeleeDefinition()
-	{
-		UKCAbilityDefinition* Definition = NewObject<UKCAbilityDefinition>();
-		Definition->ActionClass = UKCGAMeleeSwing::StaticClass();
-		Definition->ActionConfig =
-			NewObject<UKCMeleeActionConfig>(Definition);
-
-		FKCActionHookStruct Hook;
-		Hook.HookTag = TAG_KC_ActionHook_Target_OnHit;
-		Hook.Fragments.Add(NewObject<UKCKnockbackFragment>(Definition));
-		Definition->ActionHooks.Add(MoveTemp(Hook));
-		return Definition;
+		UKCMontageActionTiming* Timing =
+			NewObject<UKCMontageActionTiming>(Definition);
+		Timing->Montage = NewObject<UAnimMontage>(Timing);
+		Definition->ActionTiming = Timing;
+		return Timing;
 	}
 }
 
@@ -88,229 +68,227 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 {
+	using namespace KCAbilityDefinitionTests;
 	FString Error;
+
 	TestTrue(
 		TEXT("등록된 네이티브 Gameplay Tag를 이름으로 안전하게 조회한다."),
 		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
-			TEXT("ActionHook.Target.OnHit")) ==
-			TAG_KC_ActionHook_Target_OnHit);
-	TestFalse(
-		TEXT("등록되지 않은 Gameplay Tag 이름은 Invalid Tag를 반환한다."),
-		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
-			TEXT("KC.Test.NotRegistered"))
-			.IsValid());
+			TEXT("ActionHook.OnExecute")) == TAG_KC_ActionHook_OnExecute);
 
+	// ── 대상 수집 축 ───────────────────────────────────────
+	TestTrue(
+		TEXT("Self 대상 Definition은 유효하다."),
+		MakeDefinition(UKCSelfTargeting::StaticClass())
+			->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Event 대상 Definition은 유효하다."),
+		MakeDefinition(UKCEventTargeting::StaticClass())
+			->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Sweep 대상 Definition은 유효하다."),
+		MakeDefinition(UKCSweepTargeting::StaticClass())
+			->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Overlap 대상 Definition은 유효하다."),
+		MakeDefinition(UKCOverlapTargeting::StaticClass())
+			->ValidateWithActionContract(Error));
+	TestFalse(
+		TEXT("Overlap 방식은 활성화 Target을 요구하지 않는다."),
+		GetDefault<UKCOverlapTargeting>()->RequiresActivationTarget());
+
+	UKCAbilityDefinition* NoTargeting =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	NoTargeting->ActionTargeting = nullptr;
+	TestFalse(
+		TEXT("대상 수집 방식이 없는 Definition은 거부한다."),
+		NoTargeting->Validate(Error));
+
+	// ── 활성화 계약이 타게팅 방식에서 나온다 ───────────────
+	TestTrue(
+		TEXT("Event 방식만 활성화 Target을 요구한다."),
+		GetDefault<UKCEventTargeting>()->RequiresActivationTarget());
+	TestFalse(
+		TEXT("Self 방식은 활성화 Target을 요구하지 않는다."),
+		GetDefault<UKCSelfTargeting>()->RequiresActivationTarget());
+	TestFalse(
+		TEXT("Sweep 방식은 활성화 Target을 요구하지 않는다."),
+		GetDefault<UKCSweepTargeting>()->RequiresActivationTarget());
+
+	// ── 실행 시점 축 ───────────────────────────────────────
+	TestNull(
+		TEXT("타이밍이 필요 없는 소스는 Timing 오브젝트를 갖지 않는다."),
+		MakeDefinition(UKCEventTargeting::StaticClass())->ActionTiming.Get());
+
+	UKCAbilityDefinition* MontageDefinition =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontageTiming(MontageDefinition);
+	TestTrue(
+		TEXT("몽타주 타이밍을 조립한 Definition은 유효하다."),
+		MontageDefinition->ValidateWithActionContract(Error));
+
+	UKCAbilityDefinition* EmptyMontage =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontageTiming(EmptyMontage)->Montage = nullptr;
+	TestFalse(
+		TEXT("몽타주 타이밍인데 Montage가 비면 거부한다."),
+		EmptyMontage->Validate(Error));
+
+	UKCAbilityDefinition* ZeroPlayRate =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontageTiming(ZeroPlayRate)->PlayRate = 0.0f;
+	TestFalse(
+		TEXT("PlayRate가 0 이하면 거부한다."),
+		ZeroPlayRate->Validate(Error));
+
+	UKCAbilityDefinition* NaNPlayRate =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontageTiming(NaNPlayRate)->PlayRate =
+		std::numeric_limits<float>::quiet_NaN();
+	TestFalse(
+		TEXT("유한하지 않은 PlayRate는 거부한다."),
+		NaNPlayRate->Validate(Error));
+
+	UKCAbilityDefinition* MissingSection =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontageTiming(MissingSection)->StartSection =
+		TEXT("KCTestMissingSection");
+	TestFalse(
+		TEXT("Montage에 없는 StartSection은 거부한다."),
+		MissingSection->Validate(Error));
+
+	// ── 적용 범위 축: 흡혈 무기가 데이터만으로 조립된다 ────
+	UKCAbilityDefinition* Lifesteal =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	UKCApplyGameplayEffectFragment* DamageFragment =
+		CastChecked<UKCApplyGameplayEffectFragment>(
+			Lifesteal->ActionHooks[0].Fragments[0]);
+	FKCSetByCallerValueStruct DamageValue;
+	DamageValue.DataTag = TAG_KC_Data_Damage_Flat;
+	DamageValue.Magnitude = 10.0f;
+	DamageFragment->EffectRecipe.SetByCallers.Add(DamageValue);
+
+	UKCApplyGameplayEffectFragment* HealFragment = AddEffectFragment(
+		Lifesteal,
+		Lifesteal->ActionHooks[0],
+		EKCActionScope::Source);
+	FKCSetByCallerValueStruct HealValue;
+	HealValue.DataTag = TAG_KC_Data_Damage_Flat;
+	HealValue.Magnitude = 5.0f;
+	HealFragment->EffectRecipe.SetByCallers.Add(HealValue);
+
+	TestTrue(
+		TEXT("같은 태그로 대상 10 / 소스 5를 주는 조합은 유효하다."),
+		Lifesteal->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("한 Hook에 서로 다른 Scope의 Fragment를 함께 조립한다."),
+		Lifesteal->ActionHooks[0].Fragments.Num() == 2 &&
+		DamageFragment->ApplicationScope == EKCActionScope::Target &&
+		HealFragment->ApplicationScope == EKCActionScope::Source);
+
+	// ── 시점을 여러 개 조립한다 ────────────────────────────
+	UKCAbilityDefinition* MultiHook =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	FKCActionHookStruct StartHook;
+	StartHook.HookTag = TAG_KC_ActionHook_OnStart;
+	AddEffectFragment(MultiHook, StartHook, EKCActionScope::Source);
+	MultiHook->ActionHooks.Add(MoveTemp(StartHook));
+	TestTrue(
+		TEXT("OnStart와 OnExecute를 한 Definition에 함께 조립한다."),
+		MultiHook->ValidateWithActionContract(Error));
+
+	UKCAbilityDefinition* DuplicateHook =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	// 같은 배열의 원소를 그대로 Add하면 UE가 어서션에 걸리므로 복사본을 만든다.
+	const FKCActionHookStruct HookCopy = DuplicateHook->ActionHooks[0];
+	DuplicateHook->ActionHooks.Add(HookCopy);
+	TestFalse(
+		TEXT("같은 시점 Hook이 중복되면 거부한다."),
+		DuplicateHook->Validate(Error));
+
+	// ── 기존 계약 회귀 ─────────────────────────────────────
 	UKCAbilityDefinition* EmptyDefinition = NewObject<UKCAbilityDefinition>();
 	TestFalse(
 		TEXT("ActionClass가 없는 Definition은 거부한다."),
 		EmptyDefinition->Validate(Error));
 
-	UKCAbilityDefinition* ValidDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	TestTrue(
-		TEXT("지원 Hook과 GE Fragment를 갖춘 Definition은 유효하다."),
-		ValidDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* UnsupportedDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	UnsupportedDefinition->ActionHooks[0].HookTag =
-		TAG_KC_ActionHook_Target_OnTrigger;
-	TestFalse(
-		TEXT("GA가 지원하지 않는 Hook은 계약 검증에서 거부한다."),
-		UnsupportedDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* DuplicateHookDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	const FKCActionHookStruct DuplicateHook =
-		DuplicateHookDefinition->ActionHooks[0];
-	DuplicateHookDefinition->ActionHooks.Add(DuplicateHook);
-	TestFalse(
-		TEXT("중복 Action Hook은 거부한다."),
-		DuplicateHookDefinition->Validate(Error));
-
-	UKCAbilityDefinition* DuplicateValueDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	UKCApplyGameplayEffectFragment* EffectFragment =
-		CastChecked<UKCApplyGameplayEffectFragment>(
-			DuplicateValueDefinition->ActionHooks[0].Fragments[0]);
-	FKCSetByCallerValueStruct DuplicateValue;
-	DuplicateValue.DataTag = TAG_KC_Data_Damage_Flat;
-	EffectFragment->EffectRecipe.SetByCallers =
-		{DuplicateValue, DuplicateValue};
-	TestFalse(
-		TEXT("같은 GE Recipe 안의 중복 SetByCaller 태그는 거부한다."),
-		DuplicateValueDefinition->Validate(Error));
-
-	UKCAbilityDefinition* CrossFragmentDuplicateDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	UKCApplyGameplayEffectFragment* FirstEffectFragment =
-		CastChecked<UKCApplyGameplayEffectFragment>(
-			CrossFragmentDuplicateDefinition->ActionHooks[0].Fragments[0]);
-	FKCSetByCallerValueStruct SharedDamageValue;
-	SharedDamageValue.DataTag = TAG_KC_Data_Damage_Flat;
-	FirstEffectFragment->EffectRecipe.SetByCallers.Add(SharedDamageValue);
-	UKCApplyGameplayEffectFragment* SecondEffectFragment =
-		KCAbilityDefinitionTests::AddEffectFragment(
-			CrossFragmentDuplicateDefinition,
-			CrossFragmentDuplicateDefinition->ActionHooks[0]);
-	SecondEffectFragment->EffectRecipe.SetByCallers.Add(SharedDamageValue);
-	TestFalse(
-		TEXT("Definition 전체에서 모호한 SetByCaller 태그 중복을 거부한다."),
-		CrossFragmentDuplicateDefinition->Validate(Error));
-
-	UKCAbilityDefinition* KnockbackOnlyDefinition =
-		KCAbilityDefinitionTests::MakeKnockbackOnlyDefinition();
+	UKCAbilityDefinition* KnockbackOnly =
+		MakeDefinition(UKCEventTargeting::StaticClass());
+	KnockbackOnly->ActionHooks[0].Fragments.Empty();
+	KnockbackOnly->ActionHooks[0].Fragments.Add(
+		NewObject<UKCKnockbackFragment>(KnockbackOnly));
 	TestTrue(
 		TEXT("GE 없이 Knockback Fragment만 조립한 Definition도 유효하다."),
-		KnockbackOnlyDefinition->ValidateWithActionContract(Error));
+		KnockbackOnly->ValidateWithActionContract(Error));
 
-	UKCAbilityDefinition* InvalidKnockbackDefinition =
-		KCAbilityDefinitionTests::MakeKnockbackOnlyDefinition();
-	UKCKnockbackFragment* KnockbackFragment =
-		CastChecked<UKCKnockbackFragment>(
-			InvalidKnockbackDefinition->ActionHooks[0].Fragments[0]);
-	KnockbackFragment->HorizontalSpeed = 0.0f;
-	KnockbackFragment->VerticalSpeed = 0.0f;
-	TestFalse(
-		TEXT("실질적인 속도가 없는 Knockback Fragment는 거부한다."),
-		InvalidKnockbackDefinition->Validate(Error));
-
-	UKCAbilityDefinition* ValidMeleeDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	TestTrue(
-		TEXT("Melee Config와 OnHit Hook을 갖춘 근접 공격 Definition은 유효하다."),
-		ValidMeleeDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* MissingMeleeConfigDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	MissingMeleeConfigDefinition->ActionConfig = nullptr;
-	TestFalse(
-		TEXT("Melee GA는 Melee Config가 없으면 계약 검증에서 거부한다."),
-		MissingMeleeConfigDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* InvalidMeleeConfigDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	UKCMeleeActionConfig* InvalidMeleeConfig =
-		CastChecked<UKCMeleeActionConfig>(
-			InvalidMeleeConfigDefinition->ActionConfig);
-	InvalidMeleeConfig->TargetObjectTypes.Reset();
-	TestFalse(
-		TEXT("검색 Object Type이 없는 Melee Config는 거부한다."),
-		InvalidMeleeConfigDefinition->Validate(Error));
-
-	UKCAbilityDefinition* MissingOnHitDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	MissingOnHitDefinition->ActionHooks[0].HookTag =
-		TAG_KC_ActionHook_Target_OnTrigger;
-	TestFalse(
-		TEXT("Melee GA는 Target.OnHit Hook이 없으면 계약 검증에서 거부한다."),
-		MissingOnHitDefinition->ValidateWithActionContract(Error));
-
-	TestTrue(
-		TEXT("함정처럼 Montage가 없는 Definition도 계약 검증을 통과한다."),
-		KCAbilityDefinitionTests::MakeKnockbackOnlyDefinition()
-			->ValidateWithActionContract(Error));
-
-	TestNull(
-		TEXT("Montage가 필요 없는 Definition은 Montage 오브젝트 자체를 갖지 않는다."),
-		KCAbilityDefinitionTests::MakeKnockbackOnlyDefinition()
-			->ActionMontage.Get());
-
-	UKCAbilityDefinition* MontageDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	KCAbilityDefinitionTests::AddMontage(MontageDefinition);
-	TestTrue(
-		TEXT("사용 Montage를 지정한 근접 공격 Definition은 유효하다."),
-		MontageDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* EmptyMontageDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	KCAbilityDefinitionTests::AddMontage(EmptyMontageDefinition)->Montage =
-		nullptr;
-	TestFalse(
-		TEXT("Montage 오브젝트만 만들고 Montage를 비워 두면 거부한다."),
-		EmptyMontageDefinition->Validate(Error));
-
-	UKCAbilityDefinition* ZeroPlayRateDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	KCAbilityDefinitionTests::AddMontage(ZeroPlayRateDefinition)->PlayRate =
-		0.0f;
-	TestFalse(
-		TEXT("PlayRate가 0 이하인 Action Montage는 거부한다."),
-		ZeroPlayRateDefinition->Validate(Error));
-
-	UKCAbilityDefinition* NaNPlayRateDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	KCAbilityDefinitionTests::AddMontage(NaNPlayRateDefinition)->PlayRate =
-		std::numeric_limits<float>::quiet_NaN();
-	TestFalse(
-		TEXT("유한하지 않은 PlayRate를 가진 Action Montage는 거부한다."),
-		NaNPlayRateDefinition->Validate(Error));
-
-	UKCAbilityDefinition* MissingSectionDefinition =
-		KCAbilityDefinitionTests::MakeValidMeleeDefinition();
-	KCAbilityDefinitionTests::AddMontage(MissingSectionDefinition)
-		->StartSection = TEXT("KCTestMissingSection");
-	TestFalse(
-		TEXT("Montage에 없는 StartSection을 지정하면 거부한다."),
-		MissingSectionDefinition->Validate(Error));
-
-	UKCAbilityDefinition* UnsupportedMontageDefinition =
-		NewObject<UKCAbilityDefinition>();
-	UnsupportedMontageDefinition->ActionClass =
-		UKCGameplayAbility::StaticClass();
-	TestTrue(
-		TEXT("Montage를 쓰지 않는 GA의 Hook 없는 Definition은 유효하다."),
-		UnsupportedMontageDefinition->ValidateWithActionContract(Error));
-	KCAbilityDefinitionTests::AddMontage(UnsupportedMontageDefinition);
-	TestFalse(
-		TEXT("Action Montage를 지원하지 않는 GA에 Montage를 지정하면 거부한다."),
-		UnsupportedMontageDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* WrongConfigDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	WrongConfigDefinition->ActionConfig =
-		NewObject<UKCMeleeActionConfig>(WrongConfigDefinition);
-	TestFalse(
-		TEXT("Self GA에 Melee 전용 Config를 조립하면 계약 검증에서 거부한다."),
-		WrongConfigDefinition->ValidateWithActionContract(Error));
-
-	UKCAbilityDefinition* SetByCallerDefinition =
-		KCAbilityDefinitionTests::MakeValidSelfDefinition();
-	UKCApplyGameplayEffectFragment* SetByCallerFragment =
+	UKCAbilityDefinition* DuplicateInRecipe =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	UKCApplyGameplayEffectFragment* Fragment =
 		CastChecked<UKCApplyGameplayEffectFragment>(
-			SetByCallerDefinition->ActionHooks[0].Fragments[0]);
-	FKCSetByCallerValueStruct DamageValue;
-	DamageValue.DataTag = TAG_KC_Data_Damage_Flat;
-	DamageValue.Magnitude = 10.0f;
-	SetByCallerFragment->EffectRecipe.SetByCallers.Add(DamageValue);
+			DuplicateInRecipe->ActionHooks[0].Fragments[0]);
+	FKCSetByCallerValueStruct Duplicate;
+	Duplicate.DataTag = TAG_KC_Data_Damage_Flat;
+	Fragment->EffectRecipe.SetByCallers = {Duplicate, Duplicate};
+	TestFalse(
+		TEXT("같은 GE Recipe 안의 중복 SetByCaller 태그는 여전히 거부한다."),
+		DuplicateInRecipe->Validate(Error));
+
+	UKCAbilitySourceComponent* Source = NewObject<UKCAbilitySourceComponent>();
+	UKCAbilityDefinition* SourceDefinition =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	Source->ConfigureAbilityDefinition(SourceDefinition);
 	TestTrue(
-		TEXT("Definition은 Fragment가 선언한 SetByCaller 계약을 찾는다."),
-		SetByCallerDefinition->DeclaresSetByCallerTag(
-			TAG_KC_Data_Damage_Flat));
-
-	UKCAbilitySourceComponent* Source =
-		NewObject<UKCAbilitySourceComponent>();
-	Source->ConfigureAbilityDefinition(ValidDefinition);
-
-	const UKCAbilityDefinition* ResolvedDefinition = nullptr;
+		TEXT("런타임에 주입한 Definition을 공용 Source가 보유한 것으로 판정한다."),
+		Source->HasAbilityDefinition());
+	const UKCAbilityDefinition* Resolved = nullptr;
 	TestTrue(
 		TEXT("공용 Source 컴포넌트에서 Definition을 복원할 수 있다."),
 		UKCAbilitySystemComponent::ResolveDefinitionFromSource(
-			Source,
-			ResolvedDefinition,
-			&Error));
+			Source, Resolved, &Error));
 	TestTrue(
 		TEXT("복원한 Definition은 Source가 참조한 정확한 자산이다."),
-		ResolvedDefinition == ValidDefinition);
+		Resolved == SourceDefinition);
 
-	ResolvedDefinition = nullptr;
-	TestFalse(
-		TEXT("Ability Source 계약이 없는 UObject는 거부한다."),
-		UKCAbilitySystemComponent::ResolveDefinitionFromSource(
-			NewObject<UKCAbilitySystemComponent>(),
-			ResolvedDefinition,
-			&Error));
+	UKCAbilitySourceComponent* AuthoredSource =
+		NewObject<UKCAbilitySourceComponent>();
+	UKCAbilityDefinition* AuthoredDefinition =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AuthoredSource->ActionDefinition = AuthoredDefinition;
+	TestTrue(
+		TEXT("컴포넌트에 직접 저작한 ActionDefinition도 Source가 보유한 것으로 판정한다."),
+		AuthoredSource->HasAbilityDefinition());
+
+	Resolved = nullptr;
+	TestTrue(
+		TEXT("공용 Source에서 직접 저작한 ActionDefinition을 복원할 수 있다."),
+		AuthoredSource->ResolveAbilityDefinition(Resolved));
+	TestTrue(
+		TEXT("복원한 Definition은 Source에 직접 저작한 정확한 오브젝트다."),
+		Resolved == AuthoredDefinition);
+
+	UKCAbilityDefinition* InstanceDefinition =
+		MakeDefinition(UKCEventTargeting::StaticClass());
+	AuthoredSource->InstanceActionDefinition = InstanceDefinition;
+	Resolved = nullptr;
+	TestTrue(
+		TEXT("배치 인스턴스 Definition Override를 복원할 수 있다."),
+		AuthoredSource->ResolveAbilityDefinition(Resolved));
+	TestTrue(
+		TEXT("인스턴스 Override는 컴포넌트 기본 Definition보다 우선한다."),
+		Resolved == InstanceDefinition);
+
+	UKCAbilityDefinition* RuntimeDefinition =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	TestTrue(
+		TEXT("Grant 전에는 런타임 Definition을 주입할 수 있다."),
+		AuthoredSource->ConfigureAbilityDefinition(RuntimeDefinition));
+	Resolved = nullptr;
+	TestTrue(
+		TEXT("런타임 주입 Definition을 복원할 수 있다."),
+		AuthoredSource->ResolveAbilityDefinition(Resolved));
+	TestTrue(
+		TEXT("런타임 주입값은 인스턴스 Definition Override보다 우선한다."),
+		Resolved == RuntimeDefinition);
 
 	return true;
 }

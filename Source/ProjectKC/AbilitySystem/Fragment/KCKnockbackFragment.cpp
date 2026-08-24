@@ -34,14 +34,15 @@ bool UKCKnockbackFragment::CanExecute(
 	FString& OutError) const
 {
 	OutError.Reset();
-	if (!Context.IsAuthoritative() || !IsValid(Context.TargetActor))
+	AActor* ScopedActor = Context.ResolveScopedActor(ApplicationScope);
+	if (!Context.IsAuthoritative() || !IsValid(ScopedActor))
 	{
-		OutError = TEXT("넉백을 적용할 권한 또는 Target Actor가 없습니다.");
+		OutError = TEXT("넉백을 적용할 권한 또는 대상 Actor가 없습니다.");
 		return false;
 	}
 
 	UKCKnockbackComponent* KnockbackComponent =
-		Context.TargetActor->FindComponentByClass<UKCKnockbackComponent>();
+		ScopedActor->FindComponentByClass<UKCKnockbackComponent>();
 	FKCKnockbackRequest Request;
 	if (!KnockbackComponent || !BuildRequest(Context, Request) ||
 		!KnockbackComponent->CanApplyKnockback(Request))
@@ -56,13 +57,14 @@ bool UKCKnockbackFragment::CanExecute(
 bool UKCKnockbackFragment::Execute(
 	const FKCActionExecutionContext& Context) const
 {
-	if (!Context.IsAuthoritative() || !IsValid(Context.TargetActor))
+	AActor* ScopedActor = Context.ResolveScopedActor(ApplicationScope);
+	if (!Context.IsAuthoritative() || !IsValid(ScopedActor))
 	{
 		return false;
 	}
 
 	UKCKnockbackComponent* KnockbackComponent =
-		Context.TargetActor->FindComponentByClass<UKCKnockbackComponent>();
+		ScopedActor->FindComponentByClass<UKCKnockbackComponent>();
 	if (!KnockbackComponent)
 	{
 		return false;

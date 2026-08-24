@@ -7,7 +7,6 @@
 
 class AActor;
 class UAbilitySystemComponent;
-class UKCActionConfig;
 class UKCAbilityDefinition;
 struct FKCActionExecutionContext;
 struct FKCGameplayEffectRecipeStruct;
@@ -29,6 +28,7 @@ public:
 	bool ApplyGameplayEffectRecipe(
 		const FKCGameplayEffectRecipeStruct& Recipe,
 		const FKCActionExecutionContext& Context,
+		UAbilitySystemComponent* TargetAbilitySystem,
 		bool bTrackUntilAbilityEnds);
 
 protected:
@@ -54,14 +54,7 @@ protected:
 
 	void AddSupportedActionHook(FGameplayTag HookTag);
 	void AddRequiredActionHook(FGameplayTag HookTag);
-	void SetSupportedActionConfigClass(
-		TSubclassOf<UKCActionConfig> ConfigClass,
-		bool bRequired = true);
 
-	/** Action Montage 수명주기를 실행할 수 있는 GA만 true로 선언한다. */
-	void SetSupportsActionMontage(bool bSupported);
-
-	bool SetRuntimeMagnitude(FGameplayTag DataTag, float Magnitude);
 
 	bool ExecuteActionHook(
 		FGameplayTag HookTag,
@@ -70,7 +63,6 @@ protected:
 		const FHitResult* HitResult = nullptr);
 
 	const UKCAbilityDefinition* GetActiveDefinition() const;
-	const UKCActionConfig* GetActiveActionConfig() const;
 
 private:
 	struct FKCTrackedActiveEffect
@@ -91,11 +83,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UKCAbilityDefinition> ActiveDefinition;
 
-	TMap<FGameplayTag, float> RuntimeMagnitudes;
 	TArray<FKCTrackedActiveEffect> TrackedActiveEffects;
 	FGameplayTagContainer SupportedActionHooks;
 	FGameplayTagContainer RequiredActionHooks;
-	TSubclassOf<UKCActionConfig> SupportedActionConfigClass;
-	bool bActionConfigRequired = false;
-	bool bSupportsActionMontage = false;
 };

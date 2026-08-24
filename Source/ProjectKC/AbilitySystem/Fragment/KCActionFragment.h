@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "UObject/Object.h"
 #include "KCActionFragment.generated.h"
 
-struct FKCActionExecutionContext;
 
 /** Ability Action Hook에 인라인으로 조립되는 결과 기능의 기반 클래스다. */
 UCLASS(Abstract, EditInlineNew, DefaultToInstanced)
@@ -24,7 +24,14 @@ public:
 	virtual bool Execute(const FKCActionExecutionContext& Context) const
 		PURE_VIRTUAL(UKCActionFragment::Execute, return false;);
 
+	/**
+	 * 결과를 Hook이 지목한 대상에게 줄지, 행동한 소스에게 줄지 정한다.
+	 * 같은 Hook 안에서 대상 피해와 소스 회복을 함께 조립할 수 있다.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Apply")
+	EKCActionScope ApplicationScope = EKCActionScope::Target;
+
 	/** false면 실행 조건이 맞지 않을 때 이 Fragment만 건너뛴다. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Action")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Apply")
 	bool bRequired = true;
 };

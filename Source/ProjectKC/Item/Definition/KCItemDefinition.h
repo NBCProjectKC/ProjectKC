@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "ProjectKC/Item/Struct/KCItemPresentationStruct.h"
 #include "KCItemDefinition.generated.h"
 
@@ -19,10 +20,23 @@ public:
 		FDataValidationContext& Context) const override;
 #endif
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item")
+	/** 세이브, 레시피, 드롭 테이블 등에서 사용하는 안정적인 아이템 종류 식별자다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		AssetRegistrySearchable,
+		Category = "Item",
+		meta = (Categories = "Item.Id"))
+	FGameplayTag ItemId;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	FText DisplayName;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item")
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Item",
+		meta = (ShowOnlyInnerProperties))
 	FKCItemPresentationStruct Presentation;
 
 	/** 비어 있으면 좌클릭 사용 기능이 없는 운반 전용 아이템이다. */
@@ -30,10 +44,10 @@ public:
 		EditDefaultsOnly,
 		Instanced,
 		BlueprintReadOnly,
-		Category = "KC|Item|Use")
+		Category = "Item")
 	TObjectPtr<UKCAbilityDefinition> UseAction;
 
-	UFUNCTION(BlueprintPure, Category = "KC|Item")
+	UFUNCTION(BlueprintPure, Category = "Item")
 	bool IsUsable() const;
 
 	bool Validate(FString& OutError) const;

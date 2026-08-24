@@ -14,7 +14,7 @@ struct PROJECTKC_API FKCActionHookStruct
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
-		Category = "KC|Ability|Action",
+		Category = "Hook",
 		meta = (Categories = "ActionHook"))
 	FGameplayTag HookTag;
 
@@ -22,7 +22,7 @@ struct PROJECTKC_API FKCActionHookStruct
 		EditDefaultsOnly,
 		Instanced,
 		BlueprintReadOnly,
-		Category = "KC|Ability|Action")
+		Category = "Hook")
 	TArray<TObjectPtr<UKCActionFragment>> Fragments;
 
 	bool Validate(FString& OutError) const;
