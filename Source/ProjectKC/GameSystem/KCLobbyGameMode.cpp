@@ -1,5 +1,21 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+#include "KCLobbyGameMode.h"
 
+AKCLobbyGameMode::AKCLobbyGameMode()
+{
+}
 
-#include "GameSystem/KCLobbyGameMode.h"
+void AKCLobbyGameMode::SetRequiredPlayerCount(int32 InCount)
+{
+	RequiredPlayerCount = InCount;
+}
 
+bool AKCLobbyGameMode::ReadyToStartMatch_Implementation()
+{
+	return GetNumPlayers() >= RequiredPlayerCount;
+}
+
+void AKCLobbyGameMode::HandleMatchHasStarted()
+{
+	Super::HandleMatchHasStarted();
+	GetWorld()->ServerTravel(BattleLevelName);
+}
