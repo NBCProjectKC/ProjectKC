@@ -13,6 +13,7 @@ struct FKCIngredientSubmittedStruct
 	UPROPERTY(BlueprintReadOnly)
 	int32 TeamId = 0;
 
-	UPROPERTY(BlueprintReadOnly)
-	int32 SubmittedCount = 1;
+	// 투입된 재료의 ItemId(Item.Id.xxx)
+	UPROPERTY(BlueprintReadOnly, meta = (Categories = "Item.Id"))
+	FGameplayTag IngredientId;
 };

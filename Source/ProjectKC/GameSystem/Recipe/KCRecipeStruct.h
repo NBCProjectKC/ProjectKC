@@ -20,7 +20,7 @@ struct FKCRecipeStruct : public FTableRowBase
 	EKCRecipeTierType Tier = EKCRecipeTierType::Low;
 
 	// 필요한 재료 목록 (종류당 1개씩, 수량 개념 X)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Item.Id"))
 	TArray<FGameplayTag> RequiredIngredients;
 
 	// 냄비 체력바가 1초에 채워지는 양(%)
