@@ -5,47 +5,51 @@
 #include "UObject/Object.h"
 #include "KCAbilityDefinition.generated.h"
 
-class UKCActionConfig;
-class UKCActionMontageConfig;
+class UKCActionTargeting;
+class UKCActionTiming;
 class UKCGameplayAbility;
 
-/** 소스의 상위 Definition 안에 인라인으로 조립되는 불변 Action 정의다. */
+/**
+ * 소스의 상위 Definition 안에 인라인으로 조립되는 불변 Action 정의다.
+ * 아이템·함정·AI·캐릭터 내재 능력이 모두 이 타입 하나를 공유하고,
+ * 서로 다른 점은 인라인 축(Config / Timing / Fragment)의 조합으로 표현한다.
+ */
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
 class PROJECTKC_API UKCAbilityDefinition : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
 	TSubclassOf<UKCGameplayAbility> ActionClass;
 
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
-		Category = "KC|Ability",
+		Category = "Action",
 		meta = (ClampMin = "1"))
 	int32 AbilityLevel = 1;
 
+	/** 결과를 누구에게 적용할지 정한다. 대상 수집 방식이다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		Instanced,
+		BlueprintReadOnly,
+		Category = "Action")
+	TObjectPtr<UKCActionTargeting> ActionTargeting;
+
 	/**
-	 * 사용 행동의 몽타주다. 아이템 사용은 이 몽타주의 Execute Notify 시점에 결과가 발생한다.
-	 * 함정처럼 Avatar 애니메이션이 없는 소스는 비워 둔다.
+	 * 결과를 언제 실행할지 정한다. 비어 있으면 활성화 즉시 실행한다.
+	 * 아바타 애니메이션이 없는 소스는 비워 두므로 데이터를 갖지 않는다.
 	 */
 	UPROPERTY(
 		EditDefaultsOnly,
 		Instanced,
 		BlueprintReadOnly,
-		Category = "KC|Ability|Presentation")
-	TObjectPtr<UKCActionMontageConfig> ActionMontage;
+		Category = "Action")
+	TObjectPtr<UKCActionTiming> ActionTiming;
 
-	/** 특정 Action GA에만 필요한 데이터다. 지원하지 않는 GA에서는 비어 있어야 한다. */
-	UPROPERTY(
-		EditDefaultsOnly,
-		Instanced,
-		BlueprintReadOnly,
-		Category = "KC|Ability|Action")
-	TObjectPtr<UKCActionConfig> ActionConfig;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Action")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
 	TArray<FKCActionHookStruct> ActionHooks;
 
 	const FKCActionHookStruct* FindActionHook(FGameplayTag HookTag) const;

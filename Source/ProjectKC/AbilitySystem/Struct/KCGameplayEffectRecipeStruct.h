@@ -13,20 +13,20 @@ struct PROJECTKC_API FKCGameplayEffectRecipeStruct
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	TSubclassOf<UGameplayEffect> EffectClass;
 
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
-		Category = "KC|Ability|Effect",
+		Category = "Effect",
 		meta = (ClampMin = "0.0"))
 	float EffectLevel = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	TArray<FKCSetByCallerValueStruct> SetByCallers;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	FGameplayTagContainer DynamicGrantedTags;
 
 	bool Validate(FString& OutError) const;
