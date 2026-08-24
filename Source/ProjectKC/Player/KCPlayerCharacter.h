@@ -12,6 +12,7 @@ class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
 class UKCPlayerInteractionComponent;
+class USceneComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
 #if WITH_EDITOR
@@ -65,6 +66,7 @@ protected:
 #endif
 
 private:
+	void ConfigureDriverMesh();
 	void InitializeAbilityActorInfo();
 	void ApplyFacingYaw(float FacingYaw);
 
@@ -92,6 +94,30 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerInteractionComponent> InteractionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> AvatarBody;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> AvatarHandLeft;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> AvatarHandRight;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> AvatarFootLeft;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> AvatarFootRight;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USceneComponent> FaceAnchor;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(
