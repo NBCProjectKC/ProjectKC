@@ -21,10 +21,14 @@ public:
 		FString& OutError) const override;
 	virtual bool Execute(const FKCActionExecutionContext& Context) const override;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Effect",
+		meta = (ShowOnlyInnerProperties))
 	FKCGameplayEffectRecipeStruct EffectRecipe;
 
 	/** Infinite GE를 GA 종료 시 자동 회수할 때 사용한다. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	bool bTrackUntilAbilityEnds = false;
 };

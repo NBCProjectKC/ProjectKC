@@ -10,10 +10,10 @@ struct PROJECTKC_API FKCSetByCallerValueStruct
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	FGameplayTag DataTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Ability|Effect")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	float Magnitude = 0.0f;
 
 	bool Validate(FString& OutError) const;

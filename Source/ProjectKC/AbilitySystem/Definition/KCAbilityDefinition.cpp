@@ -1,8 +1,8 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 
 #include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
-#include "ProjectKC/AbilitySystem/Config/KCActionConfig.h"
-#include "ProjectKC/AbilitySystem/Presentation/KCActionMontageConfig.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
+#include "ProjectKC/AbilitySystem/Timing/KCActionTiming.h"
 
 const FKCActionHookStruct* UKCAbilityDefinition::FindActionHook(
 	FGameplayTag HookTag) const
@@ -38,32 +38,34 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		return false;
 	}
 
-	if (ActionMontage)
+	if (ActionTiming)
 	{
-		FString MontageError;
-		if (!ActionMontage->Validate(MontageError))
+		FString TimingError;
+		if (!ActionTiming->Validate(TimingError))
 		{
 			OutError = FString::Printf(
-				TEXT("ActionMontage가 유효하지 않습니다: %s"),
-				*MontageError);
+				TEXT("ActionTiming이 유효하지 않습니다: %s"),
+				*TimingError);
 			return false;
 		}
 	}
 
-	if (ActionConfig)
+	if (!ActionTargeting)
 	{
-		FString ConfigError;
-		if (!ActionConfig->Validate(ConfigError))
-		{
-			OutError = FString::Printf(
-				TEXT("ActionConfig가 유효하지 않습니다: %s"),
-				*ConfigError);
-			return false;
-		}
+		OutError = TEXT("ActionTargeting이 비어 있습니다. 대상 수집 방식을 지정해야 합니다.");
+		return false;
+	}
+
+	FString TargetingError;
+	if (!ActionTargeting->Validate(TargetingError))
+	{
+		OutError = FString::Printf(
+			TEXT("ActionTargeting이 유효하지 않습니다: %s"),
+			*TargetingError);
+		return false;
 	}
 
 	TSet<FGameplayTag> SeenHooks;
-	TSet<FGameplayTag> SeenSetByCallerTags;
 	for (int32 Index = 0; Index < ActionHooks.Num(); ++Index)
 	{
 		const FKCActionHookStruct& Hook = ActionHooks[Index];
@@ -86,22 +88,6 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		}
 		SeenHooks.Add(Hook.HookTag);
 
-		for (const UKCActionFragment* Fragment : Hook.Fragments)
-		{
-			FGameplayTagContainer FragmentTags;
-			Fragment->AppendDeclaredSetByCallerTags(FragmentTags);
-			for (const FGameplayTag& DataTag : FragmentTags)
-			{
-				if (SeenSetByCallerTags.Contains(DataTag))
-				{
-					OutError = FString::Printf(
-						TEXT("SetByCaller 태그 '%s'가 Definition 전체에서 중복됩니다."),
-						*DataTag.ToString());
-					return false;
-				}
-				SeenSetByCallerTags.Add(DataTag);
-			}
-		}
 	}
 
 	return true;

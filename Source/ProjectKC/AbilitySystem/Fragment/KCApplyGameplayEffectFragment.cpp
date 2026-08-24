@@ -57,7 +57,7 @@ bool UKCApplyGameplayEffectFragment::CanExecute(
 {
 	OutError.Reset();
 	if (!Context.Ability || !Context.SourceAbilitySystem ||
-		!Context.TargetAbilitySystem)
+		!Context.ResolveScopedAbilitySystem(ApplicationScope))
 	{
 		OutError = TEXT("Gameplay Effect를 적용할 Source 또는 Target ASC가 없습니다.");
 		return false;
@@ -78,5 +78,6 @@ bool UKCApplyGameplayEffectFragment::Execute(
 	return Context.Ability && Context.Ability->ApplyGameplayEffectRecipe(
 		EffectRecipe,
 		Context,
+		Context.ResolveScopedAbilitySystem(ApplicationScope),
 		bTrackUntilAbilityEnds);
 }
