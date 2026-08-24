@@ -1,6 +1,6 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Timing/KCActionTiming.h"
 
@@ -100,11 +100,11 @@ bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 		return false;
 	}
 
-	const UKCGameplayAbility* AbilityCDO =
-		ActionClass->GetDefaultObject<UKCGameplayAbility>();
+	const UKCGA_Base* AbilityCDO =
+		ActionClass->GetDefaultObject<UKCGA_Base>();
 	if (!AbilityCDO)
 	{
-		OutError = TEXT("ActionClass의 UKCGameplayAbility CDO를 읽을 수 없습니다.");
+		OutError = TEXT("ActionClass의 UKCGA_Base CDO를 읽을 수 없습니다.");
 		return false;
 	}
 

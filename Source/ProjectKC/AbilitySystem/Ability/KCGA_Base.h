@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
 #include "GameplayEffectTypes.h"
-#include "KCGameplayAbility.generated.h"
+#include "KCGA_Base.generated.h"
 
 class AActor;
 class UAbilitySystemComponent;
@@ -12,13 +12,13 @@ struct FKCActionExecutionContext;
 struct FKCGameplayEffectRecipeStruct;
 
 /** Definition의 Action Hook을 실행하는 소스 독립적인 GA 기반 클래스다. */
-UCLASS(Abstract, Blueprintable)
-class PROJECTKC_API UKCGameplayAbility : public UGameplayAbility
+UCLASS(Abstract, Blueprintable, meta = (DisplayName = "KCGA_Base"))
+class PROJECTKC_API UKCGA_Base : public UGameplayAbility
 {
 	GENERATED_BODY()
 
 public:
-	UKCGameplayAbility();
+	UKCGA_Base();
 
 	bool ValidateDefinitionContract(
 		const UKCAbilityDefinition& Definition,
