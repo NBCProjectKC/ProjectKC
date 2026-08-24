@@ -83,6 +83,7 @@ public:
 	/**
 	 * 이 컴포넌트에 직접 저작하는 Action Definition이다.
 	 * 아이템처럼 상위 데이터에서 런타임에 주입하는 소스는 비워 둔다.
+	 * 배치 인스턴스는 이 복제본이 아니라 Owner 클래스 기본값을 사용한다.
 	 */
 	UPROPERTY(
 		EditDefaultsOnly,
@@ -91,12 +92,24 @@ public:
 		Category = "KC|Ability")
 	TObjectPtr<UKCAbilityDefinition> ActionDefinition;
 
+	/**
+	 * 배치 인스턴스 하나만 다른 행동을 써야 할 때 지정한다.
+	 * 비어 있으면 BP 클래스 기본 ActionDefinition을 계속 따라간다.
+	 */
+	UPROPERTY(
+		EditInstanceOnly,
+		Instanced,
+		BlueprintReadOnly,
+		Category = "KC|Ability|Instance Override")
+	TObjectPtr<UKCAbilityDefinition> InstanceActionDefinition;
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
+	UKCAbilityDefinition* ResolveAuthoredActionDefinition() const;
 	bool TryActivateWithTargetInternal(
 		AActor* TargetActor,
 		const FHitResult* HitResult);

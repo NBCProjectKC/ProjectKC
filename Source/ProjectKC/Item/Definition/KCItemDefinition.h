@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "ProjectKC/Item/Struct/KCItemPresentationStruct.h"
 #include "KCItemDefinition.generated.h"
 
@@ -18,6 +19,15 @@ public:
 	virtual EDataValidationResult IsDataValid(
 		FDataValidationContext& Context) const override;
 #endif
+
+	/** 세이브, 레시피, 드롭 테이블 등에서 사용하는 안정적인 아이템 종류 식별자다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		AssetRegistrySearchable,
+		Category = "Item",
+		meta = (Categories = "Item.Id"))
+	FGameplayTag ItemId;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	FText DisplayName;

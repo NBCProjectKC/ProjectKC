@@ -20,12 +20,47 @@ bool UKCAbilitySourceComponent::ResolveAbilityDefinition(
 	const UKCAbilityDefinition*& OutDefinition) const
 {
 	// 런타임 주입값이 있으면 우선하고, 없으면 컴포넌트에 저작된 값을 쓴다.
-	OutDefinition = AbilityDefinition ? AbilityDefinition.Get() : ActionDefinition.Get();
+	OutDefinition = AbilityDefinition
+		? AbilityDefinition.Get()
+		: ResolveAuthoredActionDefinition();
 	return IsValid(OutDefinition);
 }
 
 UKCAbilityDefinition* UKCAbilitySourceComponent::GetActionDefinition() const
 {
+	return ResolveAuthoredActionDefinition();
+}
+
+UKCAbilityDefinition*
+UKCAbilitySourceComponent::ResolveAuthoredActionDefinition() const
+{
+	// 명시적인 배치 인스턴스 Override만 클래스 기본값보다 우선한다.
+	if (IsValid(InstanceActionDefinition))
+	{
+		return InstanceActionDefinition;
+	}
+
+	// Instanced 중첩 UObject는 레벨 Actor에 복제되어 BP 기본값 변경 뒤에도
+	// 예전 복제본이 남을 수 있다. 런타임에는 가장 최신 Owner CDO의
+	// 같은 이름 컴포넌트가 가진 Definition을 기준값으로 사용한다.
+	AActor* Owner = GetOwner();
+	const AActor* OwnerClassDefault = Owner
+		? Owner->GetClass()->GetDefaultObject<AActor>()
+		: nullptr;
+	if (OwnerClassDefault && OwnerClassDefault != Owner)
+	{
+		TInlineComponentArray<UKCAbilitySourceComponent*> DefaultSources;
+		OwnerClassDefault->GetComponents(DefaultSources);
+		for (const UKCAbilitySourceComponent* DefaultSource : DefaultSources)
+		{
+			if (DefaultSource && DefaultSource->GetFName() == GetFName())
+			{
+				return DefaultSource->ActionDefinition;
+			}
+		}
+	}
+
+	// CDO·컴포넌트 템플릿·독립 테스트 오브젝트는 자기 저작값을 쓴다.
 	return ActionDefinition;
 }
 
@@ -120,8 +155,13 @@ bool UKCAbilitySourceComponent::TryActivate()
 	}
 
 	// Target이 필요한 방식을 Target 없이 발동하면 조용히 실패하므로 원인을 남긴다.
-	const UKCActionTargeting* Targeting =
-		AbilityDefinition ? AbilityDefinition->ActionTargeting : nullptr;
+	const UKCAbilityDefinition* Definition = nullptr;
+	if (!ResolveAbilityDefinition(Definition))
+	{
+		return false;
+	}
+
+	const UKCActionTargeting* Targeting = Definition->ActionTargeting;
 	if (Targeting && Targeting->RequiresActivationTarget())
 	{
 		UE_LOG(
@@ -233,7 +273,8 @@ FGameplayAbilitySpecHandle UKCAbilitySourceComponent::GetGrantedAbilityHandle() 
 
 bool UKCAbilitySourceComponent::HasAbilityDefinition() const
 {
-	return IsValid(AbilityDefinition);
+	const UKCAbilityDefinition* Definition = nullptr;
+	return ResolveAbilityDefinition(Definition);
 }
 
 void UKCAbilitySourceComponent::EndPlay(

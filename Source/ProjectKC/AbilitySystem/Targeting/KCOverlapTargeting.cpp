@@ -74,21 +74,11 @@ void UKCOverlapTargeting::GatherTargets(
 			continue;
 		}
 
-		// 겹침만으로는 캡슐 크기만큼 넓어지므로 중심이 볼륨 안인지 확인한다.
-		FVector ClosestPoint = FVector::ZeroVector;
-		const float Distance = Volume->GetDistanceToCollision(
-			Candidate->GetActorLocation(),
-			ClosestPoint);
-		if (Distance < 0.0f)
-		{
-			// 판정할 수 없는 지오메트리다. 겹침 결과를 그대로 신뢰한다.
-			UE_LOG(
-				LogKCOverlapTargeting,
-				Verbose,
-				TEXT("볼륨 '%s'에서 중심 포함을 판정할 수 없어 겹침 결과를 사용합니다."),
-				*Volume->GetName());
-		}
-		else if (!FMath::IsNearlyZero(Distance))
+		// Actor 단위 Overlap에는 상호작용 Sphere 같은 보조 컴포넌트도
+		// 포함된다. 실제 몸체인 Root Primitive가 겹친 경우만 대상으로 삼는다.
+		UPrimitiveComponent* CandidateRoot =
+			Cast<UPrimitiveComponent>(Candidate->GetRootComponent());
+		if (!CandidateRoot || !Volume->IsOverlappingComponent(CandidateRoot))
 		{
 			continue;
 		}

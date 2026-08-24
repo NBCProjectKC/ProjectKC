@@ -237,6 +237,9 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	UKCAbilityDefinition* SourceDefinition =
 		MakeDefinition(UKCSelfTargeting::StaticClass());
 	Source->ConfigureAbilityDefinition(SourceDefinition);
+	TestTrue(
+		TEXT("런타임에 주입한 Definition을 공용 Source가 보유한 것으로 판정한다."),
+		Source->HasAbilityDefinition());
 	const UKCAbilityDefinition* Resolved = nullptr;
 	TestTrue(
 		TEXT("공용 Source 컴포넌트에서 Definition을 복원할 수 있다."),
@@ -245,6 +248,47 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("복원한 Definition은 Source가 참조한 정확한 자산이다."),
 		Resolved == SourceDefinition);
+
+	UKCAbilitySourceComponent* AuthoredSource =
+		NewObject<UKCAbilitySourceComponent>();
+	UKCAbilityDefinition* AuthoredDefinition =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AuthoredSource->ActionDefinition = AuthoredDefinition;
+	TestTrue(
+		TEXT("컴포넌트에 직접 저작한 ActionDefinition도 Source가 보유한 것으로 판정한다."),
+		AuthoredSource->HasAbilityDefinition());
+
+	Resolved = nullptr;
+	TestTrue(
+		TEXT("공용 Source에서 직접 저작한 ActionDefinition을 복원할 수 있다."),
+		AuthoredSource->ResolveAbilityDefinition(Resolved));
+	TestTrue(
+		TEXT("복원한 Definition은 Source에 직접 저작한 정확한 오브젝트다."),
+		Resolved == AuthoredDefinition);
+
+	UKCAbilityDefinition* InstanceDefinition =
+		MakeDefinition(UKCEventTargeting::StaticClass());
+	AuthoredSource->InstanceActionDefinition = InstanceDefinition;
+	Resolved = nullptr;
+	TestTrue(
+		TEXT("배치 인스턴스 Definition Override를 복원할 수 있다."),
+		AuthoredSource->ResolveAbilityDefinition(Resolved));
+	TestTrue(
+		TEXT("인스턴스 Override는 컴포넌트 기본 Definition보다 우선한다."),
+		Resolved == InstanceDefinition);
+
+	UKCAbilityDefinition* RuntimeDefinition =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	TestTrue(
+		TEXT("Grant 전에는 런타임 Definition을 주입할 수 있다."),
+		AuthoredSource->ConfigureAbilityDefinition(RuntimeDefinition));
+	Resolved = nullptr;
+	TestTrue(
+		TEXT("런타임 주입 Definition을 복원할 수 있다."),
+		AuthoredSource->ResolveAbilityDefinition(Resolved));
+	TestTrue(
+		TEXT("런타임 주입값은 인스턴스 Definition Override보다 우선한다."),
+		Resolved == RuntimeDefinition);
 
 	return true;
 }

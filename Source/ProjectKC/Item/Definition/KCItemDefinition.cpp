@@ -29,6 +29,12 @@ bool UKCItemDefinition::IsUsable() const
 bool UKCItemDefinition::Validate(FString& OutError) const
 {
 	OutError.Reset();
+	if (!ItemId.IsValid())
+	{
+		OutError = TEXT("ItemId가 비어 있습니다.");
+		return false;
+	}
+
 	if (DisplayName.IsEmptyOrWhitespace())
 	{
 		OutError = TEXT("DisplayName이 비어 있습니다.");

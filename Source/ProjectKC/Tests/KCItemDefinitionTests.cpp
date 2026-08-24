@@ -19,6 +19,8 @@ namespace KCItemDefinitionTests
 	UKCItemDefinition* MakeCarryOnlyItem()
 	{
 		UKCItemDefinition* Definition = NewObject<UKCItemDefinition>();
+		Definition->ItemId = FGameplayTag::RequestGameplayTag(
+			TEXT("Item.Id.FryingPan"));
 		Definition->DisplayName = FText::FromString(TEXT("Carry Item"));
 		Definition->Presentation.StaticMesh =
 			NewObject<UStaticMesh>(Definition);
@@ -59,6 +61,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 {
 	FString Error;
+	UKCItemDefinition* MissingIdItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	MissingIdItem->ItemId = FGameplayTag();
+	TestFalse(
+		TEXT("ItemId가 없는 아이템 Definition은 거부한다."),
+		MissingIdItem->Validate(Error));
+
 	UKCItemDefinition* CarryOnlyItem =
 		KCItemDefinitionTests::MakeCarryOnlyItem();
 	TestTrue(
@@ -123,6 +132,8 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 		MissingMontageItem->Validate(Error));
 
 	UKCItemDefinition* MissingMeshItem = NewObject<UKCItemDefinition>();
+	MissingMeshItem->ItemId = FGameplayTag::RequestGameplayTag(
+		TEXT("Item.Id.FryingPan"));
 	MissingMeshItem->DisplayName = FText::FromString(TEXT("No Mesh"));
 	TestFalse(
 		TEXT("표현 Mesh가 없는 아이템 Definition은 거부한다."),
