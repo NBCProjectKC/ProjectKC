@@ -1,17 +1,12 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Class.h"
 #include "KCRecipeTierType.generated.h"
 
-/**
- * 
- */
-UCLASS()
-class PROJECTKC_API UKCRecipeTierType : public UEnum
+UENUM(BlueprintType)
+enum class EKCRecipeTierType : uint8
 {
-	GENERATED_BODY()
-	
+	Low		UMETA(DisplayName = "하급"),   // 재료 2개, 2점
+	Medium	UMETA(DisplayName = "중급"),   // 재료 3개, 3점
+	High	UMETA(DisplayName = "상급")    // 재료 4개, 4점
 };
