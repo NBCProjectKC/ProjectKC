@@ -305,3 +305,12 @@ void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName
 
 	ProcessIngredientSubmission(TeamId, IngredientTag);
 }
+
+void AKCGameMode::Debug_FinishDish(int32 TeamId, FName RecipeRowName)
+{
+	FKCDishFinishedStruct FakeMessage;
+	FakeMessage.TeamId = TeamId;
+	FakeMessage.RecipeRowName = RecipeRowName;
+
+	OnDishFinished(KCGameplayTags::Message_Dish_Finished, FakeMessage);
+}

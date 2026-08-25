@@ -30,6 +30,9 @@ public:
 	// Debuging Method : "Debug_SubmitIngredient 0 Item.Id.xxx"
 	UFUNCTION(Exec)
 	void Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName);
+	// Debuging Method : "Debug_FinishDish 0 Recipe_Simple"
+	UFUNCTION(Exec)
+	void Debug_FinishDish(int32 TeamId, FName RecipeRowName);
 	
 protected:
 	// GameMode Methods
