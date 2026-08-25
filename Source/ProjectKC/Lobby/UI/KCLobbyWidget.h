@@ -1,0 +1,80 @@
+/**
+ * @file KCLobbyWidget.h
+ * @brief 로비 레벨의 메인 UI 위젯 클래스 정의 (레디 토글, 소셜 메뉴 열기, 게임 시작, 시작 애니메이션)
+ */
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "KCLobbyWidget.generated.h"
+
+class UButton;
+class UTextBlock;
+class UKCFriendListWidget;
+class UWidgetAnimation;
+
+/**
+ * @class UKCLobbyWidget
+ * @brief 기존 WBP_LobbyUI 위젯을 1:1 매핑한 C++ 위젯 클래스
+ */
+UCLASS()
+class PROJECTKC_API UKCLobbyWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	/** @brief 매치 시작 애니메이션을 정방향 재생하고 입력을 비활성화합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
+	void PlayMatchStartAnim();
+
+	/** @brief StartGame 버튼의 활성화(클릭 가능) 여부를 설정합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
+	void SetStartGameButtonEnabled(bool bEnabled);
+
+protected:
+	//~UUserWidget interface
+	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	//~End of UUserWidget interface
+
+	/** @brief 친구 목록 열기/닫기 토글 버튼 바인딩 */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UButton> Button_Socials;
+
+	/** @brief 준비 상태 토글(READY / CANCEL READY) 버튼 바인딩 */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UButton> Button_Ready;
+
+	/** @brief 방장 전용 게임 시작 버튼 바인딩 */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UButton> Button_StartGame;
+
+	/** @brief 준비 버튼 내부의 텍스트 블록 바인딩 */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UTextBlock> Text_Ready;
+
+	/** @brief 내부 임베드된 친구 목록 서브 위젯 */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UKCFriendListWidget> WBP_FriendList;
+
+	/** @brief 게임 시작 시 재생할 위젯 애니메이션 */
+	UPROPERTY(Transient, meta = (BindWidgetAnimOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UWidgetAnimation> MatchStartAnim;
+
+	/** @brief 소셜 버튼 클릭 핸들러 */
+	UFUNCTION()
+	virtual void OnSocialsClicked();
+
+	/** @brief 준비 버튼 클릭 핸들러 */
+	UFUNCTION()
+	virtual void OnReadyClicked();
+
+	/** @brief 게임 시작 버튼 클릭 핸들러 */
+	UFUNCTION()
+	virtual void OnStartGameClicked();
+
+	/** @brief 플레이어 레디 상태 변경 시 UI 텍스트를 갱신하는 콜백 핸들러 */
+	UFUNCTION()
+	virtual void OnReadyStatusUpdated(bool bIsReady);
+};
