@@ -30,7 +30,14 @@ namespace KCGameplayTags
 	 * ========================================================================= */
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Game_PhaseChanged, "Message.Game.PhaseChanged", "게임 진행 단계(대기/진행/종료)가 바뀔 때 브로드캐스트되는 메시지 채널입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Game_ScoreChanged, "Message.Game.ScoreChanged", "팀 점수가 변경될 때 브로드캐스트되는 메시지 채널입니다.");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Ingredient_Submitted, "Message.Ingredient.Submitted", "냄비에 재료가 투입될 때 서버에서 브로드캐스트되는 메시지 채널입니다. (반드시 서버에서만 Broadcast 되어야 함)");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Ingredient_Submitted, "Message.Ingredient.Submitted", "냄비에 재료가 투입될 때 서버에서 브로드캐스트되는 메시지 채널입니다.");
+	
+	/* =========================================================================
+	 *  Recipe Completed or Ruind Messages
+	 * ========================================================================= */
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Recipe_Completed, "Message.Recipe.Completed", "재료가 다 모여 요리가 시작될 때 서버에서 브로드캐스트되는 메시지 채널입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Dish_Finished, "Message.Dish.Finished", "요리 진행도 100% 도달 시 냄비에서 브로드캐스트되는 메시지 채널입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Dish_Ruined, "Message.Dish.Ruined", "잘못된 재료 투입으로 요리가 망했을 때 서버에서 브로드캐스트되는 메시지 채널입니다.");
 	
 	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString)
 	{
