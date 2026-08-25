@@ -32,8 +32,8 @@ struct PROJECTKC_API FKCActionTargetingContext
 };
 
 /**
- * 행동이 "누구를" 대상으로 삼는지 정하는 방식이다.
- * 언제(ActionTiming), 무엇을(Fragment)과 독립적인 축이다.
+ * 행동이 "누구를" 대상으로 삼는지 정하는 공통 데이터 기반이다.
+ * 실제 수집 프로토콜은 Instant와 TraceWindow 파생 계약이 각각 소유한다.
  *
  * Definition에 인라인으로 담기는 불변 데이터이므로 실행 상태를 갖지 않는다.
  */
@@ -48,9 +48,54 @@ public:
 	/** 활성화가 이벤트로 대상을 넘겨줘야 하는 방식인지 알려 준다. */
 	virtual bool RequiresActivationTarget() const { return false; }
 
+};
+
+/** 한 시점의 Context만으로 대상을 수집할 수 있는 Targeting 계약이다. */
+UCLASS(Abstract)
+class PROJECTKC_API UKCInstantActionTargeting : public UKCActionTargeting
+{
+	GENERATED_BODY()
+
+public:
+
 	/** 대상이 없을 수도 있다. 빗나간 행동도 정상 실행이다. */
 	virtual void GatherTargets(
 		const FKCActionTargetingContext& Context,
 		TArray<FKCActionTarget>& OutTargets) const
-		PURE_VIRTUAL(UKCActionTargeting::GatherTargets, );
+		PURE_VIRTUAL(UKCInstantActionTargeting::GatherTargets, );
+};
+
+/** NotifyState 구간의 이전/현재 Trace 선분으로 대상을 수집하는 Targeting 계약이다. */
+UCLASS(Abstract)
+class PROJECTKC_API UKCTraceWindowTargeting : public UKCActionTargeting
+{
+	GENERATED_BODY()
+
+public:
+	/** 활성화 중 추적할 실제 런타임 Source를 해석한다. */
+	virtual bool ResolveTraceSource(
+		const FKCActionTargetingContext& Context,
+		UObject*& OutTraceSource,
+		FString* OutError = nullptr) const
+		PURE_VIRTUAL(UKCTraceWindowTargeting::ResolveTraceSource, return false;);
+
+	/** Source의 현재 Trace 시작점과 끝점을 월드 좌표로 구한다. */
+	virtual bool GetTraceSegment(
+		const UObject& TraceSource,
+		FVector& OutStart,
+		FVector& OutEnd) const
+		PURE_VIRTUAL(UKCTraceWindowTargeting::GetTraceSegment, return false;);
+
+	/** 이전 프레임과 현재 프레임 사이에서 이번 Tick의 대상을 수집한다. */
+	virtual void GatherTraceTargets(
+		const FKCActionTargetingContext& Context,
+		const FVector& PreviousStart,
+		const FVector& PreviousEnd,
+		const FVector& CurrentStart,
+		const FVector& CurrentEnd,
+		TArray<FKCActionTarget>& OutTargets) const
+		PURE_VIRTUAL(UKCTraceWindowTargeting::GatherTraceTargets, );
+
+	virtual int32 GetMaxTargets() const
+		PURE_VIRTUAL(UKCTraceWindowTargeting::GetMaxTargets, return 0;);
 };

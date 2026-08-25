@@ -24,7 +24,7 @@ bool UKCGA_Base::ValidateDefinitionContract(
 		if (!SupportedActionHooks.HasTagExact(Hook.HookTag))
 		{
 			OutError = FString::Printf(
-				TEXT("ActionClass '%s'가 Action Hook '%s'를 지원하지 않습니다."),
+				TEXT("Ability '%s'가 Action Hook '%s'를 지원하지 않습니다."),
 				*GetClass()->GetName(),
 				*Hook.HookTag.ToString());
 			return false;
@@ -36,7 +36,7 @@ bool UKCGA_Base::ValidateDefinitionContract(
 		if (!Definition.FindActionHook(RequiredHook))
 		{
 			OutError = FString::Printf(
-				TEXT("ActionClass '%s'에 필요한 Action Hook '%s'가 없습니다."),
+				TEXT("Ability '%s'에 필요한 Action Hook '%s'가 없습니다."),
 				*GetClass()->GetName(),
 				*RequiredHook.ToString());
 			return false;
@@ -280,11 +280,11 @@ bool UKCGA_Base::ResolveDefinitionForSpec(
 		return false;
 	}
 
-	if (OutDefinition->ActionClass != GetClass())
+	if (OutDefinition->GetAbilityClass() != GetClass())
 	{
 		if (OutError)
 		{
-			*OutError = TEXT("Definition의 ActionClass와 실행 중인 Ability 클래스가 다릅니다.");
+			*OutError = TEXT("Definition에 고정된 Ability와 실행 중인 Ability 클래스가 다릅니다.");
 		}
 		return false;
 	}

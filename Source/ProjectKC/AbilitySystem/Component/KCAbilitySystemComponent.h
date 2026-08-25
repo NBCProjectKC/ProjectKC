@@ -45,6 +45,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Ability")
 	bool TryActivateGrantedAbility(FGameplayAbilitySpecHandle AbilityHandle);
 
+	/** 정확한 SpecHandle의 입력을 누르고, 비활성 상태면 같은 요청에서 활성화한다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Ability|Input")
+	bool PressAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
+	/** Press 때 사용한 정확한 SpecHandle의 입력을 놓는다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Ability|Input")
+	bool ReleaseAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
 	bool TryActivateGrantedAbilityWithEvent(
 		FGameplayAbilitySpecHandle AbilityHandle,
 		FGameplayTag EventTag,
@@ -59,28 +67,81 @@ public:
 		const UObject* SourceObject) const;
 
 	/**
-	 * 조종 중인 원격 클라이언트에게 연출용 Action Montage를 보낸다.
+	 * 조종 중인 원격 클라이언트의 선재생 Action Montage를 승인하거나 재생한다.
 	 * ASC의 몽타주 복제는 OnRep_ReplicatedAnimMontage에서 자기 자신을 건너뛰므로,
 	 * ServerOnly Ability로 실행한 사용 동작을 정작 사용한 본인이 볼 수 없다.
-	 * 판정은 서버가 단독으로 확정하고 이 경로는 표현만 담당한다.
+	 * 판정은 서버가 단독으로 확정하며 요청 번호는 표현 중복과 늦은 응답만 막는다.
 	 */
 	void PlayActionMontageForRemoteOwner(
+		FGameplayAbilitySpecHandle AbilityHandle,
 		UAnimMontage* Montage,
 		float PlayRate,
 		FName StartSection);
 
-	void StopActionMontageForRemoteOwner(UAnimMontage* Montage);
+	void StopActionMontageForRemoteOwner(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		UAnimMontage* Montage);
 
 protected:
+	UFUNCTION(Server, Reliable)
+	void ServerPressAbilityInputByHandle(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		uint32 ActionRequestId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerReleaseAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
 	UFUNCTION(Client, Reliable)
 	void ClientPlayActionMontage(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		uint32 ActionRequestId,
 		UAnimMontage* Montage,
 		float PlayRate,
 		FName StartSection);
 
 	UFUNCTION(Client, Reliable)
-	void ClientStopActionMontage(UAnimMontage* Montage);
+	void ClientStopActionMontage(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		uint32 ActionRequestId,
+		UAnimMontage* Montage);
+
+	UFUNCTION(Client, Reliable)
+	void ClientRejectActionMontage(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		uint32 ActionRequestId);
 
 private:
+	bool ProcessAbilityInputPressed(FGameplayAbilitySpecHandle AbilityHandle);
+	bool ProcessAbilityInputReleased(FGameplayAbilitySpecHandle AbilityHandle);
 	bool IsRemoteOwnerMontageTarget() const;
+	uint32 BeginLocalActionMontagePrediction(
+		FGameplayAbilitySpecHandle AbilityHandle);
+	bool PlayActionMontageLocally(
+		UAnimMontage* Montage,
+		float PlayRate,
+		FName StartSection);
+	void StopLocalActionMontagePrediction(bool bResetState);
+	void ResetLocalActionMontagePrediction();
+	bool MatchesLocalActionRequest(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		uint32 ActionRequestId) const;
+	bool ResolveLocalActionMontage(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		UAnimMontage*& OutMontage,
+		float& OutPlayRate,
+		FName& OutStartSection,
+		bool& bOutStopOnRelease) const;
+
+	uint32 LastLocalActionRequestId = 0;
+	FGameplayAbilitySpecHandle LocalActionAbilityHandle;
+	uint32 LocalActionRequestId = 0;
+	TWeakObjectPtr<UAnimMontage> LocalActionMontage;
+	float LocalActionPlayRate = 1.0f;
+	FName LocalActionStartSection = NAME_None;
+	bool bLocalActionStopOnRelease = false;
+	bool bLocalActionInputReleased = false;
+	bool bLocalActionMontagePlayed = false;
+
+	TMap<FGameplayAbilitySpecHandle, uint32> PendingServerActionRequests;
+	TMap<FGameplayAbilitySpecHandle, uint32> ActiveServerActionRequests;
 };

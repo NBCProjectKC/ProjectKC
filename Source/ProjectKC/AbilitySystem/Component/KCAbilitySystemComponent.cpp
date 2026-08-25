@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
 #include "GameplayAbilitySpec.h"
 
@@ -119,7 +120,7 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::GrantAbilityDefinition(
 
 		const bool bSameGrant =
 			ExistingSpec.Ability &&
-			ExistingSpec.Ability->GetClass() == Definition->ActionClass &&
+			ExistingSpec.Ability->GetClass() == Definition->GetAbilityClass() &&
 			ExistingSpec.Level == Definition->AbilityLevel &&
 			ExistingSpec.InputID == InputId;
 		if (bSameGrant)
@@ -136,7 +137,7 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::GrantAbilityDefinition(
 	}
 
 	return GiveAbility(FGameplayAbilitySpec(
-		Definition->ActionClass,
+		Definition->GetAbilityClass(),
 		Definition->AbilityLevel,
 		InputId,
 		SourceObject));
@@ -146,6 +147,102 @@ bool UKCAbilitySystemComponent::TryActivateGrantedAbility(
 	FGameplayAbilitySpecHandle AbilityHandle)
 {
 	return AbilityHandle.IsValid() && TryActivateAbility(AbilityHandle);
+}
+
+bool UKCAbilitySystemComponent::PressAbilityInputByHandle(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	if (!AbilityHandle.IsValid())
+	{
+		return false;
+	}
+
+	if (IsOwnerActorAuthoritative())
+	{
+		return ProcessAbilityInputPressed(AbilityHandle);
+	}
+
+	const uint32 ActionRequestId =
+		BeginLocalActionMontagePrediction(AbilityHandle);
+	ServerPressAbilityInputByHandle(AbilityHandle, ActionRequestId);
+	return true;
+}
+
+bool UKCAbilitySystemComponent::ReleaseAbilityInputByHandle(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	if (!AbilityHandle.IsValid())
+	{
+		return false;
+	}
+
+	if (IsOwnerActorAuthoritative())
+	{
+		return ProcessAbilityInputReleased(AbilityHandle);
+	}
+
+	if (LocalActionAbilityHandle == AbilityHandle)
+	{
+		bLocalActionInputReleased = true;
+		if (bLocalActionStopOnRelease)
+		{
+			// Channel은 서버 왕복을 기다리지 않고 소유자 연출부터 멈춘다.
+			StopLocalActionMontagePrediction(false);
+		}
+	}
+
+	ServerReleaseAbilityInputByHandle(AbilityHandle);
+	return true;
+}
+
+void UKCAbilitySystemComponent::ServerPressAbilityInputByHandle_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	uint32 ActionRequestId)
+{
+	PendingServerActionRequests.Add(AbilityHandle, ActionRequestId);
+	const bool bProcessed = ProcessAbilityInputPressed(AbilityHandle);
+	PendingServerActionRequests.Remove(AbilityHandle);
+
+	const uint32* ActiveRequestId =
+		ActiveServerActionRequests.Find(AbilityHandle);
+	if (!bProcessed || !ActiveRequestId ||
+		*ActiveRequestId != ActionRequestId)
+	{
+		// 이미 활성인 Spec에 다시 들어온 Press와 활성화 거부 모두 예측 연출을 회수한다.
+		ClientRejectActionMontage(AbilityHandle, ActionRequestId);
+	}
+}
+
+void UKCAbilitySystemComponent::ServerReleaseAbilityInputByHandle_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	ProcessAbilityInputReleased(AbilityHandle);
+}
+
+bool UKCAbilitySystemComponent::ProcessAbilityInputPressed(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	if (!IsOwnerActorAuthoritative() || !Spec)
+	{
+		return false;
+	}
+
+	AbilitySpecInputPressed(*Spec);
+	return Spec->IsActive() || TryActivateAbility(AbilityHandle);
+}
+
+bool UKCAbilitySystemComponent::ProcessAbilityInputReleased(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	if (!IsOwnerActorAuthoritative() || !Spec)
+	{
+		return false;
+	}
+
+	AbilitySpecInputReleased(*Spec);
+	return true;
 }
 
 bool UKCAbilitySystemComponent::TryActivateGrantedAbilityWithEvent(
@@ -204,30 +301,49 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::FindGrantedAbilityBySource
 }
 
 void UKCAbilitySystemComponent::PlayActionMontageForRemoteOwner(
+	FGameplayAbilitySpecHandle AbilityHandle,
 	UAnimMontage* Montage,
 	float PlayRate,
 	FName StartSection)
 {
-	if (!IsValid(Montage) || !IsRemoteOwnerMontageTarget())
+	if (!AbilityHandle.IsValid() || !IsValid(Montage) ||
+		!IsRemoteOwnerMontageTarget())
 	{
 		return;
 	}
 
-	ClientPlayActionMontage(Montage, PlayRate, StartSection);
+	const uint32* PendingRequestId =
+		PendingServerActionRequests.Find(AbilityHandle);
+	const uint32 ActionRequestId = PendingRequestId ? *PendingRequestId : 0;
+	ActiveServerActionRequests.Add(AbilityHandle, ActionRequestId);
+	ClientPlayActionMontage(
+		AbilityHandle,
+		ActionRequestId,
+		Montage,
+		PlayRate,
+		StartSection);
 }
 
 void UKCAbilitySystemComponent::StopActionMontageForRemoteOwner(
+	FGameplayAbilitySpecHandle AbilityHandle,
 	UAnimMontage* Montage)
 {
-	if (!IsValid(Montage) || !IsRemoteOwnerMontageTarget())
+	if (!AbilityHandle.IsValid() || !IsValid(Montage) ||
+		!IsRemoteOwnerMontageTarget())
 	{
 		return;
 	}
 
-	ClientStopActionMontage(Montage);
+	const uint32* ActiveRequestId =
+		ActiveServerActionRequests.Find(AbilityHandle);
+	const uint32 ActionRequestId = ActiveRequestId ? *ActiveRequestId : 0;
+	ClientStopActionMontage(AbilityHandle, ActionRequestId, Montage);
+	ActiveServerActionRequests.Remove(AbilityHandle);
 }
 
 void UKCAbilitySystemComponent::ClientPlayActionMontage_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	uint32 ActionRequestId,
 	UAnimMontage* Montage,
 	float PlayRate,
 	FName StartSection)
@@ -238,9 +354,144 @@ void UKCAbilitySystemComponent::ClientPlayActionMontage_Implementation(
 		return;
 	}
 
-	if (PlayMontageSimulated(Montage, PlayRate) <= 0.0f)
+	if (MatchesLocalActionRequest(AbilityHandle, ActionRequestId))
+	{
+		const bool bSamePlayback =
+			LocalActionMontage.Get() == Montage &&
+			FMath::IsNearlyEqual(LocalActionPlayRate, PlayRate) &&
+			LocalActionStartSection == StartSection;
+		if (bSamePlayback && bLocalActionMontagePlayed)
+		{
+			// 로컬 선재생이 자연 종료됐더라도 서버 승인 시 다시 시작하지 않는다.
+			return;
+		}
+
+		StopLocalActionMontagePrediction(false);
+		LocalActionMontage = Montage;
+		LocalActionPlayRate = PlayRate;
+		LocalActionStartSection = StartSection;
+		if (bLocalActionInputReleased && bLocalActionStopOnRelease)
+		{
+			return;
+		}
+
+		bLocalActionMontagePlayed =
+			PlayActionMontageLocally(Montage, PlayRate, StartSection);
+		return;
+	}
+
+	if (ActionRequestId != 0 && LocalActionRequestId != 0 &&
+		static_cast<int32>(ActionRequestId - LocalActionRequestId) < 0)
+	{
+		// 이전 Press의 늦은 승인이 더 최신 로컬 연출을 덮어쓰지 않는다.
+		return;
+	}
+
+	StopLocalActionMontagePrediction(true);
+	LocalActionAbilityHandle = AbilityHandle;
+	LocalActionRequestId = ActionRequestId;
+	LocalActionMontage = Montage;
+	LocalActionPlayRate = PlayRate;
+	LocalActionStartSection = StartSection;
+	UAnimMontage* ResolvedMontage = nullptr;
+	float ResolvedPlayRate = 1.0f;
+	FName ResolvedStartSection = NAME_None;
+	ResolveLocalActionMontage(
+		AbilityHandle,
+		ResolvedMontage,
+		ResolvedPlayRate,
+		ResolvedStartSection,
+		bLocalActionStopOnRelease);
+	bLocalActionMontagePlayed =
+		PlayActionMontageLocally(Montage, PlayRate, StartSection);
+}
+
+void UKCAbilitySystemComponent::ClientStopActionMontage_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	uint32 ActionRequestId,
+	UAnimMontage* Montage)
+{
+	if (!IsValid(Montage) || !AbilityActorInfo.IsValid() ||
+		!AbilityActorInfo->IsLocallyControlled())
 	{
 		return;
+	}
+
+	if (ActionRequestId != 0 &&
+		!MatchesLocalActionRequest(AbilityHandle, ActionRequestId))
+	{
+		return;
+	}
+
+	if (ActionRequestId == 0 && LocalActionRequestId != 0)
+	{
+		return;
+	}
+
+	StopMontageIfCurrent(*Montage);
+	ResetLocalActionMontagePrediction();
+}
+
+void UKCAbilitySystemComponent::ClientRejectActionMontage_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	uint32 ActionRequestId)
+{
+	if (MatchesLocalActionRequest(AbilityHandle, ActionRequestId))
+	{
+		StopLocalActionMontagePrediction(true);
+	}
+}
+
+bool UKCAbilitySystemComponent::IsRemoteOwnerMontageTarget() const
+{
+	// 리슨 서버 호스트는 서버에서 이미 재생하므로 중복 재생을 막는다.
+	return IsOwnerActorAuthoritative() && AbilityActorInfo.IsValid() &&
+		!AbilityActorInfo->IsLocallyControlled();
+}
+
+uint32 UKCAbilitySystemComponent::BeginLocalActionMontagePrediction(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	do
+	{
+		++LastLocalActionRequestId;
+	}
+	while (LastLocalActionRequestId == 0);
+
+	StopLocalActionMontagePrediction(true);
+	LocalActionAbilityHandle = AbilityHandle;
+	LocalActionRequestId = LastLocalActionRequestId;
+
+	UAnimMontage* Montage = nullptr;
+	if (!ResolveLocalActionMontage(
+		AbilityHandle,
+		Montage,
+		LocalActionPlayRate,
+		LocalActionStartSection,
+		bLocalActionStopOnRelease) ||
+		!IsValid(Montage))
+	{
+		return LocalActionRequestId;
+	}
+
+	LocalActionMontage = Montage;
+	bLocalActionMontagePlayed = PlayActionMontageLocally(
+		Montage,
+		LocalActionPlayRate,
+		LocalActionStartSection);
+	return LocalActionRequestId;
+}
+
+bool UKCAbilitySystemComponent::PlayActionMontageLocally(
+	UAnimMontage* Montage,
+	float PlayRate,
+	FName StartSection)
+{
+	if (!IsValid(Montage) || !AbilityActorInfo.IsValid() ||
+		!AbilityActorInfo->IsLocallyControlled() ||
+		PlayMontageSimulated(Montage, PlayRate) <= 0.0f)
+	{
+		return false;
 	}
 
 	// PlayMontageSimulated는 StartSection을 사용하지 않으므로 직접 이동한다.
@@ -251,21 +502,67 @@ void UKCAbilitySystemComponent::ClientPlayActionMontage_Implementation(
 			AnimInstance->Montage_JumpToSection(StartSection, Montage);
 		}
 	}
+	return true;
 }
 
-void UKCAbilitySystemComponent::ClientStopActionMontage_Implementation(
-	UAnimMontage* Montage)
+void UKCAbilitySystemComponent::StopLocalActionMontagePrediction(
+	bool bResetState)
 {
-	if (IsValid(Montage) && AbilityActorInfo.IsValid() &&
-		AbilityActorInfo->IsLocallyControlled())
+	if (UAnimMontage* Montage = LocalActionMontage.Get())
 	{
 		StopMontageIfCurrent(*Montage);
 	}
+	bLocalActionMontagePlayed = false;
+
+	if (bResetState)
+	{
+		ResetLocalActionMontagePrediction();
+	}
 }
 
-bool UKCAbilitySystemComponent::IsRemoteOwnerMontageTarget() const
+void UKCAbilitySystemComponent::ResetLocalActionMontagePrediction()
 {
-	// 리슨 서버 호스트는 서버에서 이미 재생하므로 중복 재생을 막는다.
-	return IsOwnerActorAuthoritative() && AbilityActorInfo.IsValid() &&
-		!AbilityActorInfo->IsLocallyControlled();
+	LocalActionAbilityHandle = FGameplayAbilitySpecHandle();
+	LocalActionRequestId = 0;
+	LocalActionMontage = nullptr;
+	LocalActionPlayRate = 1.0f;
+	LocalActionStartSection = NAME_None;
+	bLocalActionStopOnRelease = false;
+	bLocalActionInputReleased = false;
+	bLocalActionMontagePlayed = false;
+}
+
+bool UKCAbilitySystemComponent::MatchesLocalActionRequest(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	uint32 ActionRequestId) const
+{
+	return LocalActionAbilityHandle == AbilityHandle &&
+		LocalActionRequestId == ActionRequestId;
+}
+
+bool UKCAbilitySystemComponent::ResolveLocalActionMontage(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	UAnimMontage*& OutMontage,
+	float& OutPlayRate,
+	FName& OutStartSection,
+	bool& bOutStopOnRelease) const
+{
+	OutMontage = nullptr;
+	OutPlayRate = 1.0f;
+	OutStartSection = NAME_None;
+	bOutStopOnRelease = false;
+
+	const FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	const UKCAbilityDefinition* Definition = nullptr;
+	if (!Spec || !GetDefinitionFromSource(
+		Spec->SourceObject.Get(), Definition) || !Definition)
+	{
+		return false;
+	}
+
+	OutMontage = Definition->ActionMontage.Montage;
+	OutPlayRate = Definition->ActionMontage.PlayRate;
+	OutStartSection = Definition->ActionMontage.StartSection;
+	bOutStopOnRelease = Definition->IsA<UKCChannelActionDefinition>();
+	return IsValid(OutMontage);
 }

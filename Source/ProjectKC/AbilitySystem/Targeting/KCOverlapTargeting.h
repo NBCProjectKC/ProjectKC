@@ -17,7 +17,7 @@ class UPrimitiveComponent;
  * 전방 개념이 없는 지면 함정에 쓴다.
  */
 UCLASS(meta = (DisplayName = "Overlap Targeting"))
-class PROJECTKC_API UKCOverlapTargeting : public UKCActionTargeting
+class PROJECTKC_API UKCOverlapTargeting : public UKCInstantActionTargeting
 {
 	GENERATED_BODY()
 

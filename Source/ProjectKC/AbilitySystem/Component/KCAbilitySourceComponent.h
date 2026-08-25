@@ -61,6 +61,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Ability")
 	bool TryActivate();
 
+	bool PressInput(FGameplayAbilitySpecHandle& OutPressedHandle);
+
+	bool ReleaseInput(FGameplayAbilitySpecHandle PressedHandle);
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Ability")
 	bool TryActivateWithTarget(AActor* TargetActor);
 
@@ -113,6 +117,7 @@ private:
 	bool TryActivateWithTargetInternal(
 		AActor* TargetActor,
 		const FHitResult* HitResult);
+	bool CanActivateWithoutTarget() const;
 	UKCAbilitySystemComponent* GetGrantedAbilitySystem() const;
 
 	UPROPERTY(Transient)

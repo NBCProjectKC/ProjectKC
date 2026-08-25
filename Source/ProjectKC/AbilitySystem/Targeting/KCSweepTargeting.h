@@ -5,9 +5,16 @@
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "KCSweepTargeting.generated.h"
 
-/** 소스 전방을 Sweep해 대상을 수집한다. 근접 공격이 사용한다. */
+UENUM(BlueprintType)
+enum class EKCSweepShape : uint8
+{
+	Sphere UMETA(DisplayName = "Sphere"),
+	Box UMETA(DisplayName = "Box")
+};
+
+/** 소스 전방을 Sphere 또는 Box로 Sweep해 대상을 수집한다. */
 UCLASS(meta = (DisplayName = "Sweep Targeting"))
-class PROJECTKC_API UKCSweepTargeting : public UKCActionTargeting
+class PROJECTKC_API UKCSweepTargeting : public UKCInstantActionTargeting
 {
 	GENERATED_BODY()
 
@@ -19,6 +26,9 @@ public:
 	virtual void GatherTargets(
 		const FKCActionTargetingContext& Context,
 		TArray<FKCActionTarget>& OutTargets) const override;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shape")
+	EKCSweepShape Shape = EKCSweepShape::Sphere;
 
 	/** Sweep 시작점부터 전방으로 검사할 거리다. */
 	UPROPERTY(
@@ -32,8 +42,36 @@ public:
 		EditDefaultsOnly,
 		BlueprintReadOnly,
 		Category = "Shape",
-		meta = (ClampMin = "0.0", UIMin = "0.0", Units = "cm"))
+		meta = (
+			EditCondition = "Shape == EKCSweepShape::Sphere",
+			EditConditionHides,
+			ClampMin = "0.0",
+			UIMin = "0.0",
+			Units = "cm"))
 	float SweepRadius = 60.0f;
+
+	/** Box의 로컬 X/Y/Z 반경이다. X축이 Sweep 진행 방향을 향한다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Shape",
+		meta = (
+			EditCondition = "Shape == EKCSweepShape::Box",
+			EditConditionHides,
+			ClampMin = "0.1",
+			UIMin = "0.1",
+			Units = "cm"))
+	FVector BoxHalfExtent = FVector(45.0f, 60.0f, 45.0f);
+
+	/** 진행 방향을 기준으로 Box에 더할 회전이다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Shape",
+		meta = (
+			EditCondition = "Shape == EKCSweepShape::Box",
+			EditConditionHides))
+	FRotator BoxRotationOffset = FRotator::ZeroRotator;
 
 	/** Avatar 원점에서 전방으로 떨어진 Sweep 시작 위치다. */
 	UPROPERTY(
@@ -99,6 +137,7 @@ private:
 		const UWorld& World,
 		const FVector& Start,
 		const FVector& End,
+		const FQuat& ShapeRotation,
 		const TArray<FKCActionTarget>& Targets) const;
 
 	bool IsPathUnobstructed(
