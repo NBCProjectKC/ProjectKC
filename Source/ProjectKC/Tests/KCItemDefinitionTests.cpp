@@ -6,10 +6,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "GameplayEffect.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
-#include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
-#include "ProjectKC/AbilitySystem/Timing/KCMontageActionTiming.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
@@ -31,16 +29,12 @@ namespace KCItemDefinitionTests
 		return Definition;
 	}
 
-	UKCAbilityDefinition* MakeValidUseAbility(UObject* Outer)
+	UKCSingleActionDefinition* MakeValidUseAbility(UObject* Outer)
 	{
-		UKCAbilityDefinition* Definition =
-			NewObject<UKCAbilityDefinition>(Outer);
-		Definition->ActionClass = UKCGA_Action::StaticClass();
+		UKCSingleActionDefinition* Definition =
+			NewObject<UKCSingleActionDefinition>(Outer);
 		Definition->ActionTargeting = NewObject<UKCSelfTargeting>(Definition);
-		UKCMontageActionTiming* Timing =
-			NewObject<UKCMontageActionTiming>(Definition);
-		Timing->Montage = NewObject<UAnimMontage>(Timing);
-		Definition->ActionTiming = Timing;
+		Definition->ActionMontage.Montage = NewObject<UAnimMontage>(Definition);
 
 		FKCActionHookStruct Hook;
 		Hook.HookTag = TAG_KC_ActionHook_OnExecute;
@@ -114,7 +108,7 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 	UKCItemDefinition* InvalidUseItem =
 		KCItemDefinitionTests::MakeCarryOnlyItem();
 	InvalidUseItem->UseAction =
-		NewObject<UKCAbilityDefinition>(InvalidUseItem);
+		NewObject<UKCSingleActionDefinition>(InvalidUseItem);
 	TestFalse(
 		TEXT("잘못된 사용 Ability를 가진 아이템 Definition은 거부한다."),
 		InvalidUseItem->Validate(Error));
@@ -123,12 +117,12 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 		KCItemDefinitionTests::MakeCarryOnlyItem();
 	MissingMontageItem->UseAction =
 		KCItemDefinitionTests::MakeValidUseAbility(MissingMontageItem);
-	MissingMontageItem->UseAction->ActionTiming = nullptr;
+	MissingMontageItem->UseAction->ActionMontage.Montage = nullptr;
 	TestTrue(
-		TEXT("Timing이 없어도 사용 Ability 자체의 계약은 유효하다."),
+		TEXT("Single Action은 Montage가 없어도 계약이 유효하다."),
 		MissingMontageItem->UseAction->ValidateWithActionContract(Error));
 	TestTrue(
-		TEXT("Timing 없는 사용 아이템도 유효하다. 활성화 즉시 실행된다."),
+		TEXT("Montage 없는 Single Action 아이템도 유효하며 즉시 실행된다."),
 		MissingMontageItem->Validate(Error));
 
 	UKCItemDefinition* MissingMeshItem = NewObject<UKCItemDefinition>();

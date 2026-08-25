@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h"
+#include "GameplayAbilitySpecHandle.h"
 #include "KCHeldItemComponent.generated.h"
 
 class AKCWorldItemActor;
@@ -31,6 +32,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Item")
 	void TryDropHeldItem();
 
+	/** 서버에서 컴포넌트 설정을 사용하고 추가 Impulse를 더해 현재 아이템을 드롭한다. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
+	bool DropHeldItemUsingSettings(FVector AdditionalImpulse);
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool TryPickUp(AKCWorldItemActor* Item);
 
@@ -40,7 +45,10 @@ public:
 		FVector DropImpulse = FVector::ZeroVector);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|Item")
-	bool UseHeldItem();
+	bool PressHeldItemUse();
+
+	UFUNCTION(BlueprintCallable, Category = "KC|Item")
+	bool ReleaseHeldItemUse();
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool UseHeldItemWithTarget(AActor* TargetActor);
@@ -111,7 +119,6 @@ private:
 	friend class AKCWorldItemActor;
 
 	USceneComponent* ResolveAttachmentComponent() const;
-	void DropHeldItemAuthority();
 	FTransform MakeHeldItemDropTransform() const;
 	void BroadcastHeldItemChanged();
 
@@ -120,4 +127,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USceneComponent> RuntimeAttachmentComponent;
+
+	/** Press 당시의 아이템이다. Release가 이후에 든 다른 아이템으로 새지 않게 한다. */
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AKCWorldItemActor> InputPressedItem;
+
+	FGameplayAbilitySpecHandle InputPressedAbilityHandle;
 };

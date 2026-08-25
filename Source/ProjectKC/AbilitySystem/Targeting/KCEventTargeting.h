@@ -9,7 +9,7 @@
  * 함정처럼 소스가 대상을 이미 알고 있는 경우에 쓴다.
  */
 UCLASS(meta = (DisplayName = "Event Targeting"))
-class PROJECTKC_API UKCEventTargeting : public UKCActionTargeting
+class PROJECTKC_API UKCEventTargeting : public UKCInstantActionTargeting
 {
 	GENERATED_BODY()
 

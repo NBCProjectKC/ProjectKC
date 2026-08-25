@@ -180,7 +180,7 @@ bool AKCWorldItemActor::ExitHeldState(
 	}
 
 	// 회수에 실패해도 드롭은 진행한다. 아이템이 손에 갇히는 쪽이 더 나쁘다.
-	// 남은 Spec은 Held 상태가 아니면 ActivateUse()가 막고, 재획득 시 재사용된다.
+	// 남은 Spec은 Held 상태가 아니면 PressUse()가 막고, 재획득 시 재사용된다.
 	if (!AbilitySourceComponent->Revoke(true))
 	{
 		UE_LOG(
@@ -206,11 +206,17 @@ bool AKCWorldItemActor::ExitHeldState(
 	return true;
 }
 
-bool AKCWorldItemActor::ActivateUse()
+bool AKCWorldItemActor::PressUse(
+	FGameplayAbilitySpecHandle& OutPressedHandle)
 {
 	return RuntimeState.State == EKCWorldItemState::Held &&
 		IsUsable() &&
-		AbilitySourceComponent->TryActivate();
+		AbilitySourceComponent->PressInput(OutPressedHandle);
+}
+
+bool AKCWorldItemActor::ReleaseUse(FGameplayAbilitySpecHandle PressedHandle)
+{
+	return IsUsable() && AbilitySourceComponent->ReleaseInput(PressedHandle);
 }
 
 bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
