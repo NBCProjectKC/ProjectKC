@@ -34,4 +34,11 @@ namespace KCGameplayTags
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_PhaseChanged);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_ScoreChanged);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Ingredient_Submitted);
+	
+	/* =========================================================================
+	 *  Recipe Completed or Ruind Messages
+	 * ========================================================================= */
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Recipe_Completed);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Dish_Finished);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Dish_Ruined);
 }
