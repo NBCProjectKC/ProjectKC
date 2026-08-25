@@ -1,11 +1,17 @@
 #include "KCGameMode.h"
+
+#include "Engine/DataTable.h"
 #include "KCGameState.h"
+#include "KCGamePhaseType.h"
+#include "Recipe/KCRecipeStruct.h"
+#include "Recipe/KCRecipeCompletedStruct.h"
+#include "Recipe/KCDishFinishedStruct.h"
+#include "Recipe/KCDishRuinedStruct.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
-#include "KCGamePhaseType.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
-#include "GameFramework/GameplayMessageSubsystem.h"
+
 
 AKCGameMode::AKCGameMode()
 {
@@ -13,35 +19,29 @@ AKCGameMode::AKCGameMode()
 	PlayerControllerClass = AKCPlayerController::StaticClass();
 }
 
-void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, int32 Count)
-{
-	FKCIngredientSubmittedStruct FakeMessage;
-	FakeMessage.TeamId = TeamId;
-	FakeMessage.SubmittedCount = Count;
-
-	OnIngredientSubmitted(KCGameplayTags::Message_Ingredient_Submitted, FakeMessage);
-}
-
+// 매치 흐름
 bool AKCGameMode::ReadyToStartMatch_Implementation()
 {
+	// 인원 재확인
 	return GetNumPlayers() >= GetRequiredPlayerCount();
 }
 
 void AKCGameMode::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
-	
+
 	KCGameState = GetGameState<AKCGameState>();
 
 	IngredientSubmittedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCIngredientSubmittedStruct>(
-		KCGameplayTags::Message_Ingredient_Submitted,
-		this,
-		&AKCGameMode::OnIngredientSubmitted
-	);
+		KCGameplayTags::Message_Ingredient_Submitted, this, &AKCGameMode::OnIngredientSubmitted);
+
+	DishFinishedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCDishFinishedStruct>(
+		KCGameplayTags::Message_Dish_Finished, this, &AKCGameMode::OnDishFinished);
 
 	if (KCGameState)
 	{
 		KCGameState->InitializeTeamCount(TeamCount);
+		KCGameState->SetActiveRecipes(SelectActiveRecipes());
 		KCGameState->SetGamePhase(EKCGamePhaseType::Playing);
 	}
 }
@@ -49,10 +49,48 @@ void AKCGameMode::HandleMatchHasStarted()
 void AKCGameMode::HandleMatchHasEnded()
 {
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(IngredientSubmittedListenerHandle);
+	UGameplayMessageSubsystem::Get(this).UnregisterListener(DishFinishedListenerHandle);
 
 	Super::HandleMatchHasEnded();
 }
 
+// 레시피 선정 로직
+TArray<FName> AKCGameMode::SelectActiveRecipes() const
+{
+	TArray<FName> Result;
+
+	if (!RecipeDataTable)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: RecipeDataTable이 설정되지 않았습니다."));
+		return Result;
+	}
+
+	TArray<FName> Candidates = RecipeDataTable->GetRowNames();
+	if (Candidates.Num() == 0)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: RecipeDataTable이 비어있습니다."));
+		return Result;
+	}
+	
+	// Debug
+	const int32 Seed = bUseFixedRecipeSeed
+		? FixedRecipeSeed
+		: static_cast<int32>(FDateTime::Now().GetTicks());
+	FRandomStream RandomStream(Seed);
+	
+	// random
+	const int32 PickCount = FMath::Min(ActiveRecipeCount, Candidates.Num());
+	for (int32 i = 0; i < PickCount; ++i)
+	{
+		const int32 RandomIndex = FMath::RandRange(0, Candidates.Num() - 1);
+		Result.Add(Candidates[RandomIndex]);
+		Candidates.RemoveAtSwap(RandomIndex);
+	}
+
+	return Result;
+}
+
+// 재료 투입 시 판정(요리시작/대기/망)
 void AKCGameMode::OnIngredientSubmitted(FGameplayTag Channel, const FKCIngredientSubmittedStruct& Message)
 {
 	if (!IsMatchInProgress())
@@ -60,23 +98,154 @@ void AKCGameMode::OnIngredientSubmitted(FGameplayTag Channel, const FKCIngredien
 		return;
 	}
 
+	ProcessIngredientSubmission(Message.TeamId, Message.IngredientId);
+}
+
+void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& IngredientId)
+{
 	if (!KCGameState)
 	{
 		return;
 	}
 
-	const int32 CurrentScore = KCGameState->GetTeamScore(Message.TeamId);
-	const int32 NewScore = CurrentScore + Message.SubmittedCount;
-
-	KCGameState->SetTeamScore(Message.TeamId, NewScore);
+	// 지금까지 투입된 재료에 이번 재료를 투입
+	FGameplayTagContainer CurrentIngredients = KCGameState->GetPotIngredients(TeamId);
+	CurrentIngredients.AddTag(IngredientId);
 	
-	SubmittedIngredientCount += Message.SubmittedCount;
+	// 1. 일치할 수 있는 레시피가 없으면 망한요리
+	if (!HasAnyViableRecipe(CurrentIngredients))
+	{
+		KCGameState->SetPotIngredients(TeamId, FGameplayTagContainer());
 
+		// TODO: 페널티(점수 차감 등) 확장 시 여기서
+
+		FKCDishRuinedStruct RuinedMessage;
+		RuinedMessage.TeamId = TeamId;
+		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, RuinedMessage);
+
+		UE_LOG(LogTemp, Log, TEXT("Team %d: 요리 실패 (유효한 레시피 없음)"), TeamId);
+		return;
+	}
+
+	// 2. 완성되는 레시피가 있으면 -> 냄비에 요리 시작 Broadcast
+	FName CompletedRecipeRowName;
+	if (FindCompletedRecipe(CurrentIngredients, CompletedRecipeRowName))
+	{
+		KCGameState->SetPotIngredients(TeamId, FGameplayTagContainer());
+
+		FKCRecipeCompletedStruct CompletedMessage;
+		CompletedMessage.TeamId = TeamId;
+		CompletedMessage.RecipeRowName = CompletedRecipeRowName;
+		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, CompletedMessage);
+
+		UE_LOG(LogTemp, Log, TEXT("Team %d: 레시피 '%s' 완성, 조리 시작"), TeamId, *CompletedRecipeRowName.ToString());
+		return;
+	}
+
+	// 3. 그 외 -> 재료 유지하고 계속 대기
+	KCGameState->SetPotIngredients(TeamId, CurrentIngredients);
+}
+
+// 요리 망했는지 체크
+bool AKCGameMode::HasAnyViableRecipe(const FGameplayTagContainer& CurrentIngredients) const
+{
+	if (!KCGameState)
+	{
+		return false;
+	}
+
+	for (const FName& RowName : KCGameState->GetActiveRecipes())
+	{
+		const FKCRecipeStruct* Recipe = FindRecipeByRowName(RowName);
+		if (!Recipe)
+		{
+			continue;
+		}
+
+		FGameplayTagContainer RequiredTags;
+		for (const FGameplayTag& Tag : Recipe->RequiredIngredients)
+		{
+			RequiredTags.AddTag(Tag);
+		}
+
+		if (RequiredTags.HasAll(CurrentIngredients))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+// 이번에 투입된 재료로 완성되는 레시피가 무엇인지 체크
+bool AKCGameMode::FindCompletedRecipe(const FGameplayTagContainer& CurrentIngredients, FName& OutRecipeRowName) const
+{
+	if (!KCGameState)
+	{
+		return false;
+	}
+
+	for (const FName& RowName : KCGameState->GetActiveRecipes())
+	{
+		const FKCRecipeStruct* Recipe = FindRecipeByRowName(RowName);
+		if (!Recipe)
+		{
+			continue;
+		}
+
+		// 재료는 종류당 1개씩이라는 사실로부터 거름망
+		if (Recipe->RequiredIngredients.Num() != CurrentIngredients.Num())
+		{
+			continue;
+		}
+
+		FGameplayTagContainer RequiredTags;
+		for (const FGameplayTag& Tag : Recipe->RequiredIngredients)
+		{
+			RequiredTags.AddTag(Tag);
+		}
+
+		if (CurrentIngredients.HasAll(RequiredTags))
+		{
+			OutRecipeRowName = RowName;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+// 요리 완성 이벤트 받아서 점수 반영
+void AKCGameMode::OnDishFinished(FGameplayTag Channel, const FKCDishFinishedStruct& Message)
+{
+	if (!IsMatchInProgress() || !KCGameState)
+	{
+		return;
+	}
+
+	const FKCRecipeStruct* Recipe = FindRecipeByRowName(Message.RecipeRowName);
+	if (!Recipe)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("OnDishFinished: 레시피 '%s'를 찾을 수 없습니다."), *Message.RecipeRowName.ToString());
+		return;
+	}
+
+	const int32 NewScore = KCGameState->GetTeamScore(Message.TeamId) + Recipe->GetScoreValue();
+	KCGameState->SetTeamScore(Message.TeamId, NewScore);
+
+	UE_LOG(LogTemp, Log, TEXT("Team %d: 요리 완성 (+%d점, 총 %d점)"), Message.TeamId, Recipe->GetScoreValue(), NewScore);
+	// 승리 체크
 	CheckWinCondition();
 }
 
+// 승리 체크
 bool AKCGameMode::IsTargetScoreReached(int32& OutWinningTeamId) const
 {
+	if (!KCGameState)
+	{
+		return false;
+	}
+
 	for (int32 TeamId = 0; TeamId < TeamCount; ++TeamId)
 	{
 		if (KCGameState->GetTeamScore(TeamId) >= TargetScore)
@@ -89,62 +258,15 @@ bool AKCGameMode::IsTargetScoreReached(int32& OutWinningTeamId) const
 	return false;
 }
 
-bool AKCGameMode::IsColdGameTriggered(int32& OutWinningTeamId) const
-{
-	if (TeamCount < 2)
-	{
-		return false;
-	}
-
-	const int32 RemainingIngredientCount = TotalIngredientCount - SubmittedIngredientCount;
-	
-	int32 FirstPlaceTeamId = INDEX_NONE;
-	int32 FirstPlaceScore = -1;
-	int32 SecondPlaceScore = -1;
-
-	for (int32 TeamId = 0; TeamId < TeamCount; ++TeamId)
-	{
-		const int32 Score = KCGameState->GetTeamScore(TeamId);
-		if (Score > FirstPlaceScore)
-		{
-			SecondPlaceScore = FirstPlaceScore;
-			FirstPlaceScore = Score;
-			FirstPlaceTeamId = TeamId;
-		}
-		else if (Score > SecondPlaceScore)
-		{
-			SecondPlaceScore = Score;
-		}
-	}
-	
-	if (FirstPlaceScore - SecondPlaceScore > RemainingIngredientCount)
-	{
-		OutWinningTeamId = FirstPlaceTeamId;
-		return true;
-	}
-
-	return false;
-}
-
 void AKCGameMode::CheckWinCondition()
 {
-	if (!KCGameState)
-	{
-		return;
-	}
+	// TODO: 콜드게임 조건이 애매해짐
 
 	int32 WinningTeamId = INDEX_NONE;
-	
+
 	if (IsTargetScoreReached(WinningTeamId))
 	{
 		EndGame(WinningTeamId);
-		return;
-	}
-	
-	if (IsColdGameTriggered(WinningTeamId))
-	{
-		EndGame(WinningTeamId);
-		return;
 	}
 }
 
@@ -155,8 +277,40 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 		KCGameState->SetGamePhase(EKCGamePhaseType::Ended);
 	}
 
-	// TODO: 게임 종료 후 처리
+	// TODO: 게임 종료 후 처리(결과 화면, 로비 복귀)
 	UE_LOG(LogTemp, Log, TEXT("Game Ended. Winning Team: %d"), WinningTeamId);
-	
+
 	EndMatch();
+}
+
+
+const FKCRecipeStruct* AKCGameMode::FindRecipeByRowName(FName RowName) const
+{
+	if (!RecipeDataTable)
+	{
+		return nullptr;
+	}
+
+	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
+}
+
+void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName)
+{
+	const FGameplayTag IngredientTag = FGameplayTag::RequestGameplayTag(FName(*IngredientTagName), false);
+	if (!IngredientTag.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Debug_SubmitIngredient: '%s'는 유효한 태그가 아닙니다."), *IngredientTagName);
+		return;
+	}
+
+	ProcessIngredientSubmission(TeamId, IngredientTag);
+}
+
+void AKCGameMode::Debug_FinishDish(int32 TeamId, FName RecipeRowName)
+{
+	FKCDishFinishedStruct FakeMessage;
+	FakeMessage.TeamId = TeamId;
+	FakeMessage.RecipeRowName = RecipeRowName;
+
+	OnDishFinished(KCGameplayTags::Message_Dish_Finished, FakeMessage);
 }
