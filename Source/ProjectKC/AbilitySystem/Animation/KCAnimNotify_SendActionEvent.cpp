@@ -1,6 +1,7 @@
 #include "ProjectKC/AbilitySystem/Animation/KCAnimNotify_SendActionEvent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -41,10 +42,22 @@ void UKCAnimNotify_SendActionEvent::Notify(
 		return;
 	}
 
+	UAbilitySystemComponent* AbilitySystem =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
+	UGameplayAbility* AnimatingAbility = AbilitySystem
+		? AbilitySystem->GetAnimatingAbility()
+		: nullptr;
+	if (!IsValid(AnimatingAbility))
+	{
+		return;
+	}
+
 	FGameplayEventData EventData;
 	EventData.EventTag = ActionEventTag;
 	EventData.Instigator = OwnerActor;
 	EventData.Target = OwnerActor;
+	// 같은 ASC에서 기다리는 다른 Action이 이 Notify를 소비하지 못하게 한다.
+	EventData.OptionalObject = AnimatingAbility;
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
 		OwnerActor,
 		ActionEventTag,

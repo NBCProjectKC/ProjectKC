@@ -55,9 +55,20 @@ bool UKCSweepTargeting::Validate(FString& OutError) const
 		return false;
 	}
 
-	if (!FMath::IsFinite(SweepRadius) || SweepRadius <= 0.0f)
+	if (Shape == EKCSweepShape::Sphere &&
+		(!FMath::IsFinite(SweepRadius) || SweepRadius <= 0.0f))
 	{
 		OutError = TEXT("SweepRadius는 0보다 큰 유한한 수여야 합니다.");
+		return false;
+	}
+
+	if (Shape == EKCSweepShape::Box &&
+		(BoxHalfExtent.ContainsNaN() ||
+			BoxHalfExtent.X <= 0.0f ||
+			BoxHalfExtent.Y <= 0.0f ||
+			BoxHalfExtent.Z <= 0.0f))
+	{
+		OutError = TEXT("BoxHalfExtent의 각 축은 0보다 큰 유한한 수여야 합니다.");
 		return false;
 	}
 
@@ -137,6 +148,13 @@ void UKCSweepTargeting::GatherTargets(
 		Forward * StartForwardOffset +
 		FVector::UpVector * HeightOffset;
 	const FVector End = Start + Forward * SweepDistance;
+	const FQuat ShapeRotation = Shape == EKCSweepShape::Box
+		? FRotationMatrix::MakeFromXZ(Forward, FVector::UpVector).ToQuat() *
+			BoxRotationOffset.Quaternion()
+		: FQuat::Identity;
+	const FCollisionShape CollisionShape = Shape == EKCSweepShape::Box
+		? FCollisionShape::MakeBox(BoxHalfExtent)
+		: FCollisionShape::MakeSphere(SweepRadius);
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(KCSweepTargeting), false);
 	KCSweepTargeting::AddIgnoredSourceActors(
@@ -150,9 +168,9 @@ void UKCSweepTargeting::GatherTargets(
 		RawHits,
 		Start,
 		End,
-		FQuat::Identity,
+		ShapeRotation,
 		ObjectQuery,
-		FCollisionShape::MakeSphere(SweepRadius),
+		CollisionShape,
 		QueryParams);
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
@@ -203,7 +221,7 @@ void UKCSweepTargeting::GatherTargets(
 
 	if (bDrawDebugSweep)
 	{
-		DrawDebugSweep(*World, Start, End, OutTargets);
+		DrawDebugSweep(*World, Start, End, ShapeRotation, OutTargets);
 	}
 }
 
@@ -211,22 +229,52 @@ void UKCSweepTargeting::DrawDebugSweep(
 	const UWorld& World,
 	const FVector& Start,
 	const FVector& End,
+	const FQuat& ShapeRotation,
 	const TArray<FKCActionTarget>& Targets) const
 {
 #if ENABLE_DRAW_DEBUG
 	const FVector Axis = End - Start;
-	const float AxisLength = Axis.Size();
-
-	// 구를 쓸어간 형태는 캡슐과 같다. 반지름만큼 양 끝이 늘어난다.
-	::DrawDebugCapsule(
-		&World,
-		Start + Axis * 0.5f,
-		AxisLength * 0.5f + SweepRadius,
-		SweepRadius,
-		FRotationMatrix::MakeFromZ(Axis.GetSafeNormal()).ToQuat(),
-		Targets.IsEmpty() ? FColor::Silver : FColor::Green,
-		false,
-		DebugDrawDuration);
+	const FColor ShapeColor = Targets.IsEmpty() ? FColor::Silver : FColor::Green;
+	if (Shape == EKCSweepShape::Sphere)
+	{
+		const float AxisLength = Axis.Size();
+		// 구를 쓸어간 형태는 캡슐과 같다. 반지름만큼 양 끝이 늘어난다.
+		::DrawDebugCapsule(
+			&World,
+			Start + Axis * 0.5f,
+			AxisLength * 0.5f + SweepRadius,
+			SweepRadius,
+			FRotationMatrix::MakeFromZ(Axis.GetSafeNormal()).ToQuat(),
+			ShapeColor,
+			false,
+			DebugDrawDuration);
+	}
+	else
+	{
+		::DrawDebugBox(
+			&World,
+			Start,
+			BoxHalfExtent,
+			ShapeRotation,
+			ShapeColor,
+			false,
+			DebugDrawDuration);
+		::DrawDebugBox(
+			&World,
+			End,
+			BoxHalfExtent,
+			ShapeRotation,
+			ShapeColor,
+			false,
+			DebugDrawDuration);
+		::DrawDebugLine(
+			&World,
+			Start,
+			End,
+			ShapeColor,
+			false,
+			DebugDrawDuration);
+	}
 
 	for (const FKCActionTarget& Target : Targets)
 	{

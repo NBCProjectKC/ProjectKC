@@ -5,18 +5,20 @@
 #include "Animation/AnimMontage.h"
 #include "GameplayEffect.h"
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_ChannelAction.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
-#include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCEventTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCItemSocketTrailTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCOverlapTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSweepTargeting.h"
-#include "ProjectKC/AbilitySystem/Timing/KCMontageActionTiming.h"
 
 #include <limits>
 
@@ -36,11 +38,11 @@ namespace KCAbilityDefinitionTests
 	}
 
 	/** 대상 수집 방식만 다르고 나머지는 같은 최소 Definition이다. */
-	UKCAbilityDefinition* MakeDefinition(
+	UKCSingleActionDefinition* MakeDefinition(
 		TSubclassOf<UKCActionTargeting> TargetingClass)
 	{
-		UKCAbilityDefinition* Definition = NewObject<UKCAbilityDefinition>();
-		Definition->ActionClass = UKCGA_Action::StaticClass();
+		UKCSingleActionDefinition* Definition =
+			NewObject<UKCSingleActionDefinition>();
 		Definition->ActionTargeting =
 			NewObject<UKCActionTargeting>(Definition, TargetingClass);
 
@@ -51,13 +53,25 @@ namespace KCAbilityDefinitionTests
 		return Definition;
 	}
 
-	UKCMontageActionTiming* AddMontageTiming(UKCAbilityDefinition* Definition)
+	UKCChannelActionDefinition* MakeChannelDefinition(
+		TSubclassOf<UKCActionTargeting> TargetingClass)
 	{
-		UKCMontageActionTiming* Timing =
-			NewObject<UKCMontageActionTiming>(Definition);
-		Timing->Montage = NewObject<UAnimMontage>(Timing);
-		Definition->ActionTiming = Timing;
-		return Timing;
+		UKCChannelActionDefinition* Definition =
+			NewObject<UKCChannelActionDefinition>();
+		Definition->ActionTargeting =
+			NewObject<UKCActionTargeting>(Definition, TargetingClass);
+
+		FKCActionHookStruct Hook;
+		Hook.HookTag = TAG_KC_ActionHook_OnExecute;
+		AddEffectFragment(Definition, Hook);
+		Definition->ActionHooks.Add(MoveTemp(Hook));
+		return Definition;
+	}
+
+	UAnimMontage* AddMontage(UKCAbilityDefinition* Definition)
+	{
+		Definition->ActionMontage.Montage = NewObject<UAnimMontage>(Definition);
+		return Definition->ActionMontage.Montage;
 	}
 }
 
@@ -89,6 +103,19 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Sweep 대상 Definition은 유효하다."),
 		MakeDefinition(UKCSweepTargeting::StaticClass())
 			->ValidateWithActionContract(Error));
+	UKCAbilityDefinition* SocketTrailWithoutMontage =
+		MakeDefinition(UKCItemSocketTrailTargeting::StaticClass());
+	TestFalse(
+		TEXT("Socket Trail 방식은 NotifyState를 담을 Montage 없이 사용할 수 없다."),
+		SocketTrailWithoutMontage->ValidateWithActionContract(Error));
+	AddMontage(SocketTrailWithoutMontage);
+	TestTrue(
+		TEXT("Montage를 가진 Socket Trail Definition은 유효하다."),
+		SocketTrailWithoutMontage->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Socket Trail 방식은 TraceWindow Targeting 계약을 구현한다."),
+		SocketTrailWithoutMontage->ActionTargeting->IsA<
+			UKCTraceWindowTargeting>());
 	TestTrue(
 		TEXT("Overlap 대상 Definition은 유효하다."),
 		MakeDefinition(UKCOverlapTargeting::StaticClass())
@@ -114,36 +141,56 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("Sweep 방식은 활성화 Target을 요구하지 않는다."),
 		GetDefault<UKCSweepTargeting>()->RequiresActivationTarget());
+	TestTrue(
+		TEXT("Sweep 방식은 Instant Targeting 계약을 구현한다."),
+		GetDefault<UKCSweepTargeting>()->IsA<UKCInstantActionTargeting>());
 
-	// ── 실행 시점 축 ───────────────────────────────────────
+	// ── 수명주기 Definition과 GA는 코드로 고정된다 ─────────
+	UKCSingleActionDefinition* ImmediateSingle =
+		MakeDefinition(UKCEventTargeting::StaticClass());
 	TestNull(
-		TEXT("타이밍이 필요 없는 소스는 Timing 오브젝트를 갖지 않는다."),
-		MakeDefinition(UKCEventTargeting::StaticClass())->ActionTiming.Get());
+		TEXT("몽타주가 없는 Single Action은 별도 Timing 오브젝트를 만들지 않는다."),
+		ImmediateSingle->ActionMontage.Montage.Get());
+	TestTrue(
+		TEXT("Single Action은 KCGA_Action에 고정된다."),
+		ImmediateSingle->GetAbilityClass() == UKCGA_Action::StaticClass());
+	TestTrue(
+		TEXT("몽타주 없는 Single Action은 즉시 실행 계약으로 유효하다."),
+		ImmediateSingle->ValidateWithActionContract(Error));
 
 	UKCAbilityDefinition* MontageDefinition =
 		MakeDefinition(UKCSweepTargeting::StaticClass());
-	AddMontageTiming(MontageDefinition);
+	AddMontage(MontageDefinition);
 	TestTrue(
-		TEXT("몽타주 타이밍을 조립한 Definition은 유효하다."),
+		TEXT("몽타주를 가진 Single Action은 유효하다."),
 		MontageDefinition->ValidateWithActionContract(Error));
 
-	UKCAbilityDefinition* EmptyMontage =
-		MakeDefinition(UKCSweepTargeting::StaticClass());
-	AddMontageTiming(EmptyMontage)->Montage = nullptr;
+	UKCChannelActionDefinition* ChannelDefinition =
+		MakeChannelDefinition(UKCOverlapTargeting::StaticClass());
 	TestFalse(
-		TEXT("몽타주 타이밍인데 Montage가 비면 거부한다."),
-		EmptyMontage->Validate(Error));
+		TEXT("Channel Action은 반복 실행 시점을 제공할 Montage가 필수다."),
+		ChannelDefinition->Validate(Error));
+	AddMontage(ChannelDefinition);
+	TestTrue(
+		TEXT("Montage를 가진 Channel Action은 유효하다."),
+		ChannelDefinition->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Channel Action은 KCGA_ChannelAction에 고정된다."),
+		ChannelDefinition->GetAbilityClass() ==
+			UKCGA_ChannelAction::StaticClass());
 
 	UKCAbilityDefinition* ZeroPlayRate =
 		MakeDefinition(UKCSweepTargeting::StaticClass());
-	AddMontageTiming(ZeroPlayRate)->PlayRate = 0.0f;
+	AddMontage(ZeroPlayRate);
+	ZeroPlayRate->ActionMontage.PlayRate = 0.0f;
 	TestFalse(
 		TEXT("PlayRate가 0 이하면 거부한다."),
 		ZeroPlayRate->Validate(Error));
 
 	UKCAbilityDefinition* NaNPlayRate =
 		MakeDefinition(UKCSweepTargeting::StaticClass());
-	AddMontageTiming(NaNPlayRate)->PlayRate =
+	AddMontage(NaNPlayRate);
+	NaNPlayRate->ActionMontage.PlayRate =
 		std::numeric_limits<float>::quiet_NaN();
 	TestFalse(
 		TEXT("유한하지 않은 PlayRate는 거부한다."),
@@ -151,7 +198,8 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 
 	UKCAbilityDefinition* MissingSection =
 		MakeDefinition(UKCSweepTargeting::StaticClass());
-	AddMontageTiming(MissingSection)->StartSection =
+	AddMontage(MissingSection);
+	MissingSection->ActionMontage.StartSection =
 		TEXT("KCTestMissingSection");
 	TestFalse(
 		TEXT("Montage에 없는 StartSection은 거부한다."),
@@ -207,9 +255,10 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		DuplicateHook->Validate(Error));
 
 	// ── 기존 계약 회귀 ─────────────────────────────────────
-	UKCAbilityDefinition* EmptyDefinition = NewObject<UKCAbilityDefinition>();
+	UKCAbilityDefinition* EmptyDefinition =
+		NewObject<UKCSingleActionDefinition>();
 	TestFalse(
-		TEXT("ActionClass가 없는 Definition은 거부한다."),
+		TEXT("Targeting이 없는 구체 Definition은 거부한다."),
 		EmptyDefinition->Validate(Error));
 
 	UKCAbilityDefinition* KnockbackOnly =

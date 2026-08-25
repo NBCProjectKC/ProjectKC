@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameplayAbilitySpecHandle.h"
 #include "ProjectKC/Interaction/Interface/KCInteractableInterface.h"
 #include "KCWorldItemActor.generated.h"
 
@@ -120,7 +121,8 @@ private:
 	bool ExitHeldState(
 		const FTransform& DropTransform,
 		const FVector& DropImpulse);
-	bool ActivateUse();
+	bool PressUse(FGameplayAbilitySpecHandle& OutPressedHandle);
+	bool ReleaseUse(FGameplayAbilitySpecHandle PressedHandle);
 	bool ActivateUseWithTarget(AActor* TargetActor);
 	bool RefreshDefinition(FString* OutError = nullptr);
 	void AlignGripToAttachmentSocket();

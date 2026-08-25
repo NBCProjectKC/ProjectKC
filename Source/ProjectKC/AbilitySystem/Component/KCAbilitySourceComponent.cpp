@@ -149,12 +149,44 @@ bool UKCAbilitySourceComponent::GrantToAbilitySystem(
 bool UKCAbilitySourceComponent::TryActivate()
 {
 	UKCAbilitySystemComponent* AbilitySystem = GetGrantedAbilitySystem();
-	if (!AbilitySystem)
+	if (!AbilitySystem || !CanActivateWithoutTarget())
 	{
 		return false;
 	}
 
-	// Target이 필요한 방식을 Target 없이 발동하면 조용히 실패하므로 원인을 남긴다.
+	return AbilitySystem->TryActivateGrantedAbility(BindingState.AbilityHandle);
+}
+
+bool UKCAbilitySourceComponent::PressInput(
+	FGameplayAbilitySpecHandle& OutPressedHandle)
+{
+	OutPressedHandle = FGameplayAbilitySpecHandle();
+	UKCAbilitySystemComponent* AbilitySystem = GetGrantedAbilitySystem();
+	if (!AbilitySystem || !CanActivateWithoutTarget())
+	{
+		return false;
+	}
+
+	const FGameplayAbilitySpecHandle PressedHandle = BindingState.AbilityHandle;
+	if (!AbilitySystem->PressAbilityInputByHandle(PressedHandle))
+	{
+		return false;
+	}
+
+	OutPressedHandle = PressedHandle;
+	return true;
+}
+
+bool UKCAbilitySourceComponent::ReleaseInput(
+	FGameplayAbilitySpecHandle PressedHandle)
+{
+	UKCAbilitySystemComponent* AbilitySystem = GetGrantedAbilitySystem();
+	return AbilitySystem &&
+		AbilitySystem->ReleaseAbilityInputByHandle(PressedHandle);
+}
+
+bool UKCAbilitySourceComponent::CanActivateWithoutTarget() const
+{
 	const UKCAbilityDefinition* Definition = nullptr;
 	if (!ResolveAbilityDefinition(Definition))
 	{
@@ -174,7 +206,7 @@ bool UKCAbilitySourceComponent::TryActivate()
 		return false;
 	}
 
-	return AbilitySystem->TryActivateGrantedAbility(BindingState.AbilityHandle);
+	return true;
 }
 
 bool UKCAbilitySourceComponent::TryActivateWithTarget(AActor* TargetActor)

@@ -35,7 +35,8 @@ public:
 
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
-	bool TryUseHeldItem();
+	bool BeginUseHeldItem();
+	void EndUseHeldItem();
 	void RequestInteract();
 	void RequestDropHeldItem();
 
