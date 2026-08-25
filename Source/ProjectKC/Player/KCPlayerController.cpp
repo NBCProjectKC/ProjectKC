@@ -91,6 +91,19 @@ void AKCPlayerController::Dash(const FInputActionValue& InputValue)
 	}
 }
 
+void AKCPlayerController::Emote(const FInputActionValue& InputValue)
+{
+	if (!InputValue.Get<bool>())
+	{
+		return;
+	}
+
+	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->RequestPlayEmote(0);
+	}
+}
+
 void AKCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -109,6 +122,15 @@ void AKCPlayerController::SetupInputComponent()
 			ETriggerEvent::Started,
 			this,
 			&AKCPlayerController::Dash);
+	}
+
+	if (EmoteAction)
+	{
+		EnhancedInputComponent->BindAction(
+			EmoteAction,
+			ETriggerEvent::Started,
+			this,
+			&AKCPlayerController::Emote);
 	}
 
 	if (AttackAction)

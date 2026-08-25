@@ -14,9 +14,11 @@
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCKnockbackComponent.h"
+#include "ProjectKC/AbilitySystem/Effect/KCGE_StaminaRegen.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/Player/Component/KCEmoteComponent.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -123,6 +125,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		CreateDefaultSubobject<UKCCharacterAttributeSet>(TEXT("CharacterAttributes"));
 	CharacterMovementComponent->MaxWalkSpeed = CharacterAttributes->GetMoveSpeed();
 	DashAbilityClass = UKCGA_PlayerDash::StaticClass();
+	StaminaRegenEffectClass = UKCGE_StaminaRegen::StaticClass();
+	EmoteComponent = CreateDefaultSubobject<UKCEmoteComponent>(TEXT("Emote"));
 
 	HeldItemComponent =
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
@@ -233,6 +237,11 @@ UKCAbilitySystemComponent* AKCPlayerCharacter::GetKCAbilitySystemComponent() con
 UKCCharacterAttributeSet* AKCPlayerCharacter::GetCharacterAttributes() const
 {
 	return CharacterAttributes;
+}
+
+UKCEmoteComponent* AKCPlayerCharacter::GetEmoteComponent() const
+{
+	return EmoteComponent;
 }
 
 UKCHeldItemComponent* AKCPlayerCharacter::GetHeldItemComponent() const
@@ -346,6 +355,7 @@ void AKCPlayerCharacter::InitializeAbilityActorInfo()
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);
 	BindAttributeDelegates();
 	GrantDefaultAbilities();
+	EnsureStaminaRegenEffect();
 }
 
 void AKCPlayerCharacter::GrantDefaultAbilities()
@@ -361,6 +371,35 @@ void AKCPlayerCharacter::GrantDefaultAbilities()
 		1,
 		INDEX_NONE,
 		this));
+}
+
+void AKCPlayerCharacter::EnsureStaminaRegenEffect()
+{
+	if (!HasAuthority() || !AbilitySystemComponent ||
+		!StaminaRegenEffectClass)
+	{
+		return;
+	}
+
+	if (StaminaRegenEffectHandle.IsValid() &&
+		AbilitySystemComponent->GetActiveGameplayEffect(
+			StaminaRegenEffectHandle))
+	{
+		return;
+	}
+
+	const UGameplayEffect* RegenEffect =
+		StaminaRegenEffectClass->GetDefaultObject<UGameplayEffect>();
+	if (!RegenEffect)
+	{
+		return;
+	}
+
+	StaminaRegenEffectHandle =
+		AbilitySystemComponent->ApplyGameplayEffectToSelf(
+			RegenEffect,
+			1.0f,
+			AbilitySystemComponent->MakeEffectContext());
 }
 
 void AKCPlayerCharacter::BindAttributeDelegates()
@@ -441,6 +480,19 @@ bool AKCPlayerCharacter::RequestDash()
 		DashSpec->Handle,
 		TAG_KC_GameplayEvent_Player_Dash,
 		EventData);
+}
+
+bool AKCPlayerCharacter::RequestPlayEmote(const int32 EmoteIndex)
+{
+	return EmoteComponent && EmoteComponent->RequestPlayEmote(EmoteIndex);
+}
+
+void AKCPlayerCharacter::RequestStopEmote(const float BlendOutTime)
+{
+	if (EmoteComponent)
+	{
+		EmoteComponent->RequestStopEmote(BlendOutTime);
+	}
 }
 
 void AKCPlayerCharacter::UpdateFacingDirection(const FVector& WorldDirection, const float DeltaSeconds)

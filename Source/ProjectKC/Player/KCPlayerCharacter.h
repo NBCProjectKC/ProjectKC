@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "GameplayEffectTypes.h"
 #include "GameFramework/Character.h"
 #include "TimerManager.h"
 #include "KCPlayerCharacter.generated.h"
@@ -9,8 +10,10 @@
 class UAbilitySystemComponent;
 class UCameraComponent;
 class UGameplayAbility;
+class UGameplayEffect;
 class UKCAbilitySystemComponent;
 class UKCCharacterAttributeSet;
+class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
@@ -39,6 +42,8 @@ public:
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
 	bool RequestDash();
+	bool RequestPlayEmote(int32 EmoteIndex = 0);
+	void RequestStopEmote(float BlendOutTime = 0.2f);
 	bool BeginUseHeldItem();
 	void EndUseHeldItem();
 	void RequestInteract();
@@ -49,6 +54,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Attributes")
 	UKCCharacterAttributeSet* GetCharacterAttributes() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Emote")
+	UKCEmoteComponent* GetEmoteComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	UKCHeldItemComponent* GetHeldItemComponent() const;
@@ -78,6 +86,7 @@ private:
 	void ConfigureDriverMesh();
 	void InitializeAbilityActorInfo();
 	void GrantDefaultAbilities();
+	void EnsureStaminaRegenEffect();
 	void BindAttributeDelegates();
 	void HandleMoveSpeedChanged(const FOnAttributeChangeData& ChangeData);
 	void ApplyMoveSpeed(float MoveSpeed);
@@ -106,6 +115,13 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Dash")
 	TSubclassOf<UGameplayAbility> DashAbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Attributes")
+	TSubclassOf<UGameplayEffect> StaminaRegenEffectClass;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Emote",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCEmoteComponent> EmoteComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item",
 		meta = (AllowPrivateAccess = "true"))
@@ -161,4 +177,5 @@ private:
 	bool bHasPendingServerFacingYaw = false;
 	FTimerHandle ServerFacingUpdateTimer;
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
+	FActiveGameplayEffectHandle StaminaRegenEffectHandle;
 };
