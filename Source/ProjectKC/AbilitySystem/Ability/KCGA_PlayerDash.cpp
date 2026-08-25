@@ -1,6 +1,8 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_PlayerDash.h"
 
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Animation/AnimMontage.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Dash.h"
@@ -23,6 +25,16 @@ UKCGA_PlayerDash::UKCGA_PlayerDash()
 	AssetTags.AddTag(TAG_KC_Ability_Player_Dash);
 	SetAssetTags(AssetTags);
 	ActivationOwnedTags.AddTag(TAG_KC_State_Dashing);
+}
+
+UAnimMontage* UKCGA_PlayerDash::GetDashMontage() const
+{
+	return DashMontage;
+}
+
+float UKCGA_PlayerDash::GetDashMontagePlayRate() const
+{
+	return DashMontagePlayRate;
 }
 
 const FGameplayTagContainer* UKCGA_PlayerDash::GetCooldownTags() const
@@ -140,6 +152,7 @@ void UKCGA_PlayerDash::ActivateAbility(
 		this,
 		&UKCGA_PlayerDash::HandleDashFinished);
 	ActiveDashTask->ReadyForActivation();
+	StartDashMontage();
 }
 
 void UKCGA_PlayerDash::EndAbility(
@@ -150,12 +163,35 @@ void UKCGA_PlayerDash::EndAbility(
 	const bool bWasCancelled)
 {
 	ActiveDashTask = nullptr;
+	ActiveDashMontageTask = nullptr;
 	Super::EndAbility(
 		Handle,
 		ActorInfo,
 		ActivationInfo,
 		bReplicateEndAbility,
 		bWasCancelled);
+}
+
+void UKCGA_PlayerDash::StartDashMontage()
+{
+	if (!DashMontage || DashMontagePlayRate <= 0.0f)
+	{
+		return;
+	}
+
+	ActiveDashMontageTask =
+		UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+			this,
+			TEXT("DashMontage"),
+			DashMontage,
+			DashMontagePlayRate,
+			DashMontageStartSection,
+			true,
+			0.0f);
+	if (ActiveDashMontageTask)
+	{
+		ActiveDashMontageTask->ReadyForActivation();
+	}
 }
 
 void UKCGA_PlayerDash::HandleDashFinished()

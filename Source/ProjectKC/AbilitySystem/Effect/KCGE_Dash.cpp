@@ -1,6 +1,8 @@
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Dash.h"
 
+#include "GameplayEffectComponents/TargetTagsGameplayEffectComponent.h"
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 namespace KCDashEffect
 {
@@ -19,9 +21,19 @@ UKCGE_DashCost::UKCGE_DashCost()
 		FScalableFloat(-KCDashEffect::StaminaCost));
 }
 
-UKCGE_DashCooldown::UKCGE_DashCooldown()
+UKCGE_DashCooldown::UKCGE_DashCooldown(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	DurationPolicy = EGameplayEffectDurationType::HasDuration;
 	DurationMagnitude = FGameplayEffectModifierMagnitude(
 		FScalableFloat(KCDashEffect::CooldownDuration));
+
+	UTargetTagsGameplayEffectComponent* TargetTagsComponent =
+		ObjectInitializer.CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(
+			this, TEXT("DashCooldownTargetTags"));
+
+	FInheritedTagContainer GrantedTags;
+	GrantedTags.AddTag(TAG_KC_Cooldown_Ability_Dash);
+	TargetTagsComponent->SetAndApplyTargetTagChanges(GrantedTags);
+	GEComponents.Add(TargetTagsComponent);
 }

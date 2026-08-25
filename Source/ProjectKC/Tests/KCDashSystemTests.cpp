@@ -59,6 +59,10 @@ bool FKCDashSystemContractTest::RunTest(const FString& Parameters)
 			1.0f,
 			CooldownDuration));
 	TestEqual(TEXT("대시 쿨다운은 0.8초다."), CooldownDuration, 0.8f);
+	TestTrue(
+		TEXT("대시 쿨다운 GE가 대시 Cooldown 태그를 부여한다."),
+		CooldownEffect->GetGrantedTags().HasTagExact(
+			TAG_KC_Cooldown_Ability_Dash));
 	const UKCGA_PlayerDash* DashAbility = GetDefault<UKCGA_PlayerDash>();
 	TestTrue(
 		TEXT("대시 Ability가 Cooldown 태그를 검사한다."),
@@ -78,6 +82,10 @@ bool FKCDashSystemContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("대시 Ability가 Cooldown GE를 사용한다."),
 		DashAbility->GetCooldownGameplayEffect()->IsA<UKCGE_DashCooldown>());
+	TestEqual(
+		TEXT("대시 몽타주의 기본 재생 속도는 1이다."),
+		DashAbility->GetDashMontagePlayRate(),
+		1.0f);
 
 	return true;
 }

@@ -14,12 +14,12 @@ public:
 	UKCGE_DashCost();
 };
 
-/** 대시 재사용 대기시간을 제공한다. Cooldown 태그는 Ability가 예측 스펙에 추가한다. */
+/** 대시 재사용 대기시간과 Cooldown 태그를 제공한다. */
 UCLASS(meta = (DisplayName = "KCGE_DashCooldown"))
 class PROJECTKC_API UKCGE_DashCooldown : public UGameplayEffect
 {
 	GENERATED_BODY()
 
 public:
-	UKCGE_DashCooldown();
+	UKCGE_DashCooldown(const FObjectInitializer& ObjectInitializer);
 };
