@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
+#include "TimerManager.h"
 #include "KCPlayerCharacter.generated.h"
 
 class UAbilitySystemComponent;
@@ -69,6 +70,10 @@ private:
 	void ConfigureDriverMesh();
 	void InitializeAbilityActorInfo();
 	void ApplyFacingYaw(float FacingYaw);
+	void ApplyAcceptedServerFacingYaw(
+		float FacingYaw,
+		double CurrentTimeSeconds);
+	void FlushPendingServerFacingYaw();
 
 	UFUNCTION(Server, Unreliable)
 	void ServerSetFacingYaw(float FacingYaw);
@@ -132,4 +137,8 @@ private:
 
 	float FacingReplicationElapsed = 0.0f;
 	float LastSentFacingYaw = 0.0f;
+	double LastServerFacingUpdateTimeSeconds = -1.0;
+	float PendingServerFacingYaw = 0.0f;
+	bool bHasPendingServerFacingYaw = false;
+	FTimerHandle ServerFacingUpdateTimer;
 };

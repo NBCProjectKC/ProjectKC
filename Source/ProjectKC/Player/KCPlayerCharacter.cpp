@@ -6,6 +6,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
@@ -19,6 +20,16 @@ namespace
 {
 	constexpr float FacingReplicationInterval = 1.0f / 30.0f;
 	constexpr float MinimumFacingReplicationAngle = 0.5f;
+	constexpr double MinimumServerFacingUpdateInterval = 1.0 / 60.0;
+	constexpr float MinimumFacingYaw = -180.0f;
+	constexpr float MaximumFacingYaw = 180.0f;
+
+	bool IsValidFacingYaw(const float FacingYaw)
+	{
+		return FMath::IsFinite(FacingYaw) &&
+			FacingYaw >= MinimumFacingYaw &&
+			FacingYaw <= MaximumFacingYaw;
+	}
 
 	void ConfigureAvatarPart(UStaticMeshComponent* Component, UStaticMesh* Mesh)
 	{
@@ -350,10 +361,78 @@ void AKCPlayerCharacter::UpdateFacingDirection(const FVector& WorldDirection, co
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)
 {
+	if (!IsValidFacingYaw(FacingYaw))
+	{
+		return;
+	}
+
 	SetActorRotation(FRotator(0.0f, FMath::UnwindDegrees(FacingYaw), 0.0f));
 }
 
 void AKCPlayerCharacter::ServerSetFacingYaw_Implementation(const float FacingYaw)
 {
+	if (!IsValidFacingYaw(FacingYaw))
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	const double ElapsedSinceLastUpdate =
+		CurrentTimeSeconds - LastServerFacingUpdateTimeSeconds;
+	if (LastServerFacingUpdateTimeSeconds < 0.0 ||
+		CurrentTimeSeconds < LastServerFacingUpdateTimeSeconds ||
+		ElapsedSinceLastUpdate >= MinimumServerFacingUpdateInterval)
+	{
+		GetWorldTimerManager().ClearTimer(ServerFacingUpdateTimer);
+		bHasPendingServerFacingYaw = false;
+		ApplyAcceptedServerFacingYaw(FacingYaw, CurrentTimeSeconds);
+		return;
+	}
+
+	// 지연으로 같은 서버 틱에 RPC가 몰리면 오래된 중간값은 버리고
+	// 제한 구간에서 받은 가장 최신 방향 하나만 다음 슬롯에 적용한다.
+	PendingServerFacingYaw = FacingYaw;
+	bHasPendingServerFacingYaw = true;
+	if (!GetWorldTimerManager().IsTimerActive(ServerFacingUpdateTimer))
+	{
+		GetWorldTimerManager().SetTimer(
+			ServerFacingUpdateTimer,
+			this,
+			&AKCPlayerCharacter::FlushPendingServerFacingYaw,
+			MinimumServerFacingUpdateInterval - ElapsedSinceLastUpdate,
+			false);
+	}
+}
+
+void AKCPlayerCharacter::ApplyAcceptedServerFacingYaw(
+	const float FacingYaw,
+	const double CurrentTimeSeconds)
+{
+	LastServerFacingUpdateTimeSeconds = CurrentTimeSeconds;
 	ApplyFacingYaw(FacingYaw);
+}
+
+void AKCPlayerCharacter::FlushPendingServerFacingYaw()
+{
+	if (!HasAuthority() || !bHasPendingServerFacingYaw)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		bHasPendingServerFacingYaw = false;
+		return;
+	}
+
+	const float FacingYaw = PendingServerFacingYaw;
+	bHasPendingServerFacingYaw = false;
+	ApplyAcceptedServerFacingYaw(FacingYaw, World->GetTimeSeconds());
 }
