@@ -7,10 +7,14 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "GameplayAbilitySpec.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_PlayerDash.h"
+#include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCKnockbackComponent.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
@@ -110,12 +114,15 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement();
 	CharacterMovementComponent->bOrientRotationToMovement = false;
 	CharacterMovementComponent->bUseControllerDesiredRotation = false;
-	CharacterMovementComponent->MaxWalkSpeed = 600.0f;
 
 	AbilitySystemComponent =
 		CreateDefaultSubobject<UKCAbilitySystemComponent>(TEXT("AbilitySystem"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+	CharacterAttributes =
+		CreateDefaultSubobject<UKCCharacterAttributeSet>(TEXT("CharacterAttributes"));
+	CharacterMovementComponent->MaxWalkSpeed = CharacterAttributes->GetMoveSpeed();
+	DashAbilityClass = UKCGA_PlayerDash::StaticClass();
 
 	HeldItemComponent =
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
@@ -223,6 +230,11 @@ UKCAbilitySystemComponent* AKCPlayerCharacter::GetKCAbilitySystemComponent() con
 	return AbilitySystemComponent;
 }
 
+UKCCharacterAttributeSet* AKCPlayerCharacter::GetCharacterAttributes() const
+{
+	return CharacterAttributes;
+}
+
 UKCHeldItemComponent* AKCPlayerCharacter::GetHeldItemComponent() const
 {
 	return HeldItemComponent;
@@ -326,9 +338,65 @@ void AKCPlayerCharacter::PawnClientRestart()
 
 void AKCPlayerCharacter::InitializeAbilityActorInfo()
 {
-	if (AbilitySystemComponent)
+	if (!AbilitySystemComponent)
 	{
-		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+		return;
+	}
+
+	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+	BindAttributeDelegates();
+	GrantDefaultAbilities();
+}
+
+void AKCPlayerCharacter::GrantDefaultAbilities()
+{
+	if (!HasAuthority() || !AbilitySystemComponent || !DashAbilityClass ||
+		AbilitySystemComponent->FindAbilitySpecFromClass(DashAbilityClass))
+	{
+		return;
+	}
+
+	AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(
+		DashAbilityClass,
+		1,
+		INDEX_NONE,
+		this));
+}
+
+void AKCPlayerCharacter::BindAttributeDelegates()
+{
+	if (!AbilitySystemComponent || !CharacterAttributes)
+	{
+		return;
+	}
+
+	FOnGameplayAttributeValueChange& MoveSpeedDelegate =
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+			UKCCharacterAttributeSet::GetMoveSpeedAttribute());
+	if (MoveSpeedChangedDelegateHandle.IsValid())
+	{
+		MoveSpeedDelegate.Remove(MoveSpeedChangedDelegateHandle);
+		MoveSpeedChangedDelegateHandle.Reset();
+	}
+	MoveSpeedChangedDelegateHandle = MoveSpeedDelegate.AddUObject(
+		this,
+		&AKCPlayerCharacter::HandleMoveSpeedChanged);
+	ApplyMoveSpeed(CharacterAttributes->GetMoveSpeed());
+}
+
+void AKCPlayerCharacter::HandleMoveSpeedChanged(
+	const FOnAttributeChangeData& ChangeData)
+{
+	ApplyMoveSpeed(ChangeData.NewValue);
+}
+
+void AKCPlayerCharacter::ApplyMoveSpeed(const float MoveSpeed)
+{
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->MaxWalkSpeed = FMath::IsFinite(MoveSpeed)
+			? FMath::Max(MoveSpeed, 0.0f)
+			: 0.0f;
 	}
 }
 
@@ -338,6 +406,41 @@ void AKCPlayerCharacter::MoveInWorldDirection(const FVector& WorldDirection, con
 	{
 		AddMovementInput(WorldDirection, ScaleValue);
 	}
+}
+
+bool AKCPlayerCharacter::RequestDash()
+{
+	if (!IsLocallyControlled() || !AbilitySystemComponent || !DashAbilityClass)
+	{
+		return false;
+	}
+
+	FGameplayAbilitySpec* DashSpec =
+		AbilitySystemComponent->FindAbilitySpecFromClass(DashAbilityClass);
+	if (!DashSpec)
+	{
+		return false;
+	}
+
+	FVector DashDirection = GetLastMovementInputVector().GetSafeNormal2D();
+	if (DashDirection.IsNearlyZero())
+	{
+		DashDirection = GetActorForwardVector().GetSafeNormal2D();
+	}
+	if (DashDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	FGameplayEventData EventData;
+	EventData.Instigator = this;
+	EventData.Target = this;
+	EventData.EventMagnitude = FMath::UnwindDegrees(
+		DashDirection.Rotation().Yaw);
+	return AbilitySystemComponent->TryActivateGrantedAbilityWithEvent(
+		DashSpec->Handle,
+		TAG_KC_GameplayEvent_Player_Dash,
+		EventData);
 }
 
 void AKCPlayerCharacter::UpdateFacingDirection(const FVector& WorldDirection, const float DeltaSeconds)

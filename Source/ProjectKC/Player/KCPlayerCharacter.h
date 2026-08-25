@@ -8,7 +8,9 @@
 
 class UAbilitySystemComponent;
 class UCameraComponent;
+class UGameplayAbility;
 class UKCAbilitySystemComponent;
+class UKCCharacterAttributeSet;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
@@ -19,6 +21,7 @@ class UStaticMeshComponent;
 #if WITH_EDITOR
 struct FPropertyChangedEvent;
 #endif
+struct FOnAttributeChangeData;
 
 UCLASS()
 class PROJECTKC_API AKCPlayerCharacter
@@ -35,6 +38,7 @@ public:
 
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
+	bool RequestDash();
 	bool BeginUseHeldItem();
 	void EndUseHeldItem();
 	void RequestInteract();
@@ -42,6 +46,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Ability")
 	UKCAbilitySystemComponent* GetKCAbilitySystemComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Attributes")
+	UKCCharacterAttributeSet* GetCharacterAttributes() const;
 
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	UKCHeldItemComponent* GetHeldItemComponent() const;
@@ -70,6 +77,10 @@ protected:
 private:
 	void ConfigureDriverMesh();
 	void InitializeAbilityActorInfo();
+	void GrantDefaultAbilities();
+	void BindAttributeDelegates();
+	void HandleMoveSpeedChanged(const FOnAttributeChangeData& ChangeData);
+	void ApplyMoveSpeed(float MoveSpeed);
 	void ApplyFacingYaw(float FacingYaw);
 	void ApplyAcceptedServerFacingYaw(
 		float FacingYaw,
@@ -88,6 +99,13 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Attributes",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCCharacterAttributeSet> CharacterAttributes;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Dash")
+	TSubclassOf<UGameplayAbility> DashAbilityClass;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item",
 		meta = (AllowPrivateAccess = "true"))
@@ -142,4 +160,5 @@ private:
 	float PendingServerFacingYaw = 0.0f;
 	bool bHasPendingServerFacingYaw = false;
 	FTimerHandle ServerFacingUpdateTimer;
+	FDelegateHandle MoveSpeedChangedDelegateHandle;
 };
