@@ -23,7 +23,7 @@
 DECLARE_LOG_CATEGORY_EXTERN(AdvancedFriendsLog, Log, All);
 
 UCLASS()
-class UAdvancedFriendsLibrary : public UBlueprintFunctionLibrary
+class ADVANCEDSESSIONS_API UAdvancedFriendsLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 public:
