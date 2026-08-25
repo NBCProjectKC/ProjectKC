@@ -5,7 +5,7 @@
 
 class AActor;
 class UAbilitySystemComponent;
-class UKCGameplayAbility;
+class UKCGA_Base;
 
 /** Fragment가 결과를 누구에게 적용할지 정한다. */
 UENUM(BlueprintType)
@@ -21,7 +21,7 @@ enum class EKCActionScope : uint8
 /** Action Hook의 Fragment들이 공유하는 한 번의 실행 문맥이다. */
 struct PROJECTKC_API FKCActionExecutionContext
 {
-	UKCGameplayAbility* Ability = nullptr;
+	UKCGA_Base* Ability = nullptr;
 	UAbilitySystemComponent* SourceAbilitySystem = nullptr;
 	UAbilitySystemComponent* TargetAbilitySystem = nullptr;
 	AActor* SourceActor = nullptr;

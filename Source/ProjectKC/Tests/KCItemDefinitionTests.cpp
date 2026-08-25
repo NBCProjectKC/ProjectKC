@@ -6,7 +6,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "GameplayEffect.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGAAction.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
 #include "ProjectKC/AbilitySystem/Timing/KCMontageActionTiming.h"
@@ -35,7 +35,7 @@ namespace KCItemDefinitionTests
 	{
 		UKCAbilityDefinition* Definition =
 			NewObject<UKCAbilityDefinition>(Outer);
-		Definition->ActionClass = UKCGAAction::StaticClass();
+		Definition->ActionClass = UKCGA_Action::StaticClass();
 		Definition->ActionTargeting = NewObject<UKCSelfTargeting>(Definition);
 		UKCMontageActionTiming* Timing =
 			NewObject<UKCMontageActionTiming>(Definition);
