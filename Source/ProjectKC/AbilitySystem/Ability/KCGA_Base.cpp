@@ -1,4 +1,4 @@
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 
 #include "AbilitySystemComponent.h"
 #include "GameplayAbilitySpec.h"
@@ -9,12 +9,12 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
 #include "ProjectKC/AbilitySystem/Struct/KCGameplayEffectRecipeStruct.h"
 
-UKCGameplayAbility::UKCGameplayAbility()
+UKCGA_Base::UKCGA_Base()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
 
-bool UKCGameplayAbility::ValidateDefinitionContract(
+bool UKCGA_Base::ValidateDefinitionContract(
 	const UKCAbilityDefinition& Definition,
 	FString& OutError) const
 {
@@ -46,7 +46,7 @@ bool UKCGameplayAbility::ValidateDefinitionContract(
 	return true;
 }
 
-bool UKCGameplayAbility::CanActivateAbility(
+bool UKCGA_Base::CanActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayTagContainer* SourceTags,
@@ -67,7 +67,7 @@ bool UKCGameplayAbility::CanActivateAbility(
 		OptionalRelevantTags);
 }
 
-void UKCGameplayAbility::ActivateAbility(
+void UKCGA_Base::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -86,7 +86,7 @@ void UKCGameplayAbility::ActivateAbility(
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 }
 
-void UKCGameplayAbility::EndAbility(
+void UKCGA_Base::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -118,7 +118,7 @@ void UKCGameplayAbility::EndAbility(
 		bWasCancelled);
 }
 
-void UKCGameplayAbility::AddSupportedActionHook(FGameplayTag HookTag)
+void UKCGA_Base::AddSupportedActionHook(FGameplayTag HookTag)
 {
 	if (HookTag.IsValid())
 	{
@@ -126,7 +126,7 @@ void UKCGameplayAbility::AddSupportedActionHook(FGameplayTag HookTag)
 	}
 }
 
-void UKCGameplayAbility::AddRequiredActionHook(FGameplayTag HookTag)
+void UKCGA_Base::AddRequiredActionHook(FGameplayTag HookTag)
 {
 	if (HookTag.IsValid())
 	{
@@ -135,7 +135,7 @@ void UKCGameplayAbility::AddRequiredActionHook(FGameplayTag HookTag)
 	}
 }
 
-bool UKCGameplayAbility::ExecuteActionHook(
+bool UKCGA_Base::ExecuteActionHook(
 	FGameplayTag HookTag,
 	UAbilitySystemComponent* TargetAbilitySystem,
 	AActor* TargetActor,
@@ -193,12 +193,12 @@ bool UKCGameplayAbility::ExecuteActionHook(
 	return true;
 }
 
-const UKCAbilityDefinition* UKCGameplayAbility::GetActiveDefinition() const
+const UKCAbilityDefinition* UKCGA_Base::GetActiveDefinition() const
 {
 	return ActiveDefinition;
 }
 
-bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
+bool UKCGA_Base::ApplyGameplayEffectRecipe(
 	const FKCGameplayEffectRecipeStruct& Recipe,
 	const FKCActionExecutionContext& Context,
 	UAbilitySystemComponent* TargetAbilitySystem,
@@ -244,7 +244,7 @@ bool UKCGameplayAbility::ApplyGameplayEffectRecipe(
 	return true;
 }
 
-bool UKCGameplayAbility::ResolveDefinitionForSpec(
+bool UKCGA_Base::ResolveDefinitionForSpec(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const UKCAbilityDefinition*& OutDefinition,
@@ -292,7 +292,7 @@ bool UKCGameplayAbility::ResolveDefinitionForSpec(
 	return true;
 }
 
-FGameplayEffectSpecHandle UKCGameplayAbility::MakeEffectSpec(
+FGameplayEffectSpecHandle UKCGA_Base::MakeEffectSpec(
 	const FKCGameplayEffectRecipeStruct& Recipe) const
 {
 	UAbilitySystemComponent* AbilitySystem =

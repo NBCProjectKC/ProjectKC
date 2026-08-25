@@ -27,7 +27,7 @@ public class ProjectKC : ModuleRules
 			
 			// Online & Steam Sessions
 			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam",
-			"AdvancedSessions", "AdvancedSteamSessions"
+			"AdvancedSessions", "AdvancedSteamSessions", "CoreOnline"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

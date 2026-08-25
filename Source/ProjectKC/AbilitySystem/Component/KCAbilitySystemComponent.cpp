@@ -3,7 +3,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
 #include "GameplayAbilitySpec.h"

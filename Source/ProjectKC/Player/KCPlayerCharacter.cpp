@@ -2,8 +2,10 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
@@ -11,11 +13,26 @@
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
 	constexpr float FacingReplicationInterval = 1.0f / 30.0f;
 	constexpr float MinimumFacingReplicationAngle = 0.5f;
+
+	void ConfigureAvatarPart(UStaticMeshComponent* Component, UStaticMesh* Mesh)
+	{
+		if (!Component)
+		{
+			return;
+		}
+
+		Component->SetStaticMesh(Mesh);
+		Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Component->SetGenerateOverlapEvents(false);
+		Component->SetCanEverAffectNavigation(false);
+		Component->SetReceivesDecals(false);
+	}
 }
 
 AKCPlayerCharacter::AKCPlayerCharacter()
@@ -27,10 +44,57 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	bUseControllerRotationRoll = false;
 
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
-	GetMesh()->VisibilityBasedAnimTickOption =
-		EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
 	GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
 	GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMeshFinder(
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	UStaticMesh* SphereMesh = SphereMeshFinder.Succeeded()
+		? SphereMeshFinder.Object
+		: nullptr;
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PillBodyMeshFinder(
+		TEXT("/Game/KC/Player/Avatar/SM_PillBody.SM_PillBody"));
+	UStaticMesh* PillBodyMesh = SphereMesh;
+	if (PillBodyMeshFinder.Succeeded())
+	{
+		PillBodyMesh = PillBodyMeshFinder.Object;
+	}
+
+	AvatarBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarBody"));
+	AvatarBody->SetupAttachment(GetMesh(), TEXT("pelvis"));
+	AvatarBody->SetRelativeRotation(FRotator(-22.8f, 92.5f, -91.4f));
+	AvatarBody->SetRelativeScale3D(FVector(1.0f, 1.0f, 0.86f));
+	ConfigureAvatarPart(AvatarBody, PillBodyMesh);
+
+	AvatarHandLeft = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarHandLeft"));
+	AvatarHandLeft->SetupAttachment(GetMesh(), TEXT("hand_l"));
+	AvatarHandLeft->SetRelativeLocation(FVector(0.0f, 30.0f, 0.0f));
+	AvatarHandLeft->SetRelativeScale3D(FVector(0.26f));
+	ConfigureAvatarPart(AvatarHandLeft, SphereMesh);
+
+	AvatarHandRight = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarHandRight"));
+	AvatarHandRight->SetupAttachment(GetMesh(), TEXT("hand_r"));
+	AvatarHandRight->SetRelativeLocation(FVector(0.0f, -25.0f, 0.0f));
+	AvatarHandRight->SetRelativeScale3D(FVector(0.26f));
+	ConfigureAvatarPart(AvatarHandRight, SphereMesh);
+
+	AvatarFootLeft = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarFootLeft"));
+	AvatarFootLeft->SetupAttachment(GetMesh(), TEXT("foot_l"));
+	AvatarFootLeft->SetRelativeLocation(FVector(0.0f, -12.0f, -14.0f));
+	AvatarFootLeft->SetRelativeScale3D(FVector(0.30f));
+	ConfigureAvatarPart(AvatarFootLeft, SphereMesh);
+
+	AvatarFootRight = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarFootRight"));
+	AvatarFootRight->SetupAttachment(GetMesh(), TEXT("foot_r"));
+	AvatarFootRight->SetRelativeLocation(FVector(0.0f, -28.0f, -2.0f));
+	AvatarFootRight->SetRelativeScale3D(FVector(0.30f));
+	ConfigureAvatarPart(AvatarFootRight, SphereMesh);
+
+	FaceAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("FaceAnchor"));
+	FaceAnchor->SetupAttachment(AvatarBody);
+	FaceAnchor->SetRelativeLocation(FVector(49.0f, 0.0f, 25.0f));
+
+	ConfigureDriverMesh();
 
 	UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement();
 	CharacterMovementComponent->bOrientRotationToMovement = false;
@@ -91,7 +155,23 @@ UAbilitySystemComponent* AKCPlayerCharacter::GetAbilitySystemComponent() const
 void AKCPlayerCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	ConfigureDriverMesh();
 	RefreshHeldItemPreview();
+}
+
+void AKCPlayerCharacter::ConfigureDriverMesh()
+{
+	USkeletalMeshComponent* DriverMesh = GetMesh();
+	if (!DriverMesh)
+	{
+		return;
+	}
+
+	DriverMesh->VisibilityBasedAnimTickOption =
+		EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	DriverMesh->SetVisibility(false, false);
+	DriverMesh->SetHiddenInGame(true, false);
+	DriverMesh->SetCastShadow(false);
 }
 
 bool AKCPlayerCharacter::TryUseHeldItem()

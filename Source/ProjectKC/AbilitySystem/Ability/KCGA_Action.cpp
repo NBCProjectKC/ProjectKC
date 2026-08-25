@@ -1,4 +1,4 @@
-#include "ProjectKC/AbilitySystem/Ability/KCGAAction.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -10,7 +10,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCAction, Log, All);
 
-UKCGAAction::UKCGAAction()
+UKCGA_Action::UKCGA_Action()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	AddSupportedActionHook(TAG_KC_ActionHook_OnStart);
@@ -18,7 +18,7 @@ UKCGAAction::UKCGAAction()
 	AddSupportedActionHook(TAG_KC_ActionHook_OnComplete);
 }
 
-void UKCGAAction::ActivateAbility(
+void UKCGA_Action::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -98,7 +98,7 @@ void UKCGAAction::ActivateAbility(
 	}
 }
 
-void UKCGAAction::EndAbility(
+void UKCGA_Action::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -129,7 +129,7 @@ void UKCGAAction::EndAbility(
 		bWasCancelled);
 }
 
-void UKCGAAction::HandleTimingExecuteEvent(FGameplayEventData Payload)
+void UKCGA_Action::HandleTimingExecuteEvent(FGameplayEventData Payload)
 {
 	if (bFinishingAction || bExecuteAttempted)
 	{
@@ -139,7 +139,7 @@ void UKCGAAction::HandleTimingExecuteEvent(FGameplayEventData Payload)
 	RunExecuteOnce();
 }
 
-void UKCGAAction::HandleTimingCompleted()
+void UKCGA_Action::HandleTimingCompleted()
 {
 	if (bFinishingAction)
 	{
@@ -160,12 +160,12 @@ void UKCGAAction::HandleTimingCompleted()
 	FinishAction(false);
 }
 
-void UKCGAAction::HandleTimingAborted()
+void UKCGA_Action::HandleTimingAborted()
 {
 	FinishAction(true);
 }
 
-void UKCGAAction::RunExecuteOnce()
+void UKCGA_Action::RunExecuteOnce()
 {
 	// Execute 신호가 중복 도착해도 같은 활성화에서 결과는 한 번만 만든다.
 	if (bExecuteAttempted)
@@ -211,7 +211,7 @@ void UKCGAAction::RunExecuteOnce()
 	}
 }
 
-void UKCGAAction::ExecuteSourceHook(FGameplayTag HookTag)
+void UKCGA_Action::ExecuteSourceHook(FGameplayTag HookTag)
 {
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
 	if (!Definition || !Definition->FindActionHook(HookTag))
@@ -227,7 +227,7 @@ void UKCGAAction::ExecuteSourceHook(FGameplayTag HookTag)
 		GetAvatarActorFromActorInfo());
 }
 
-void UKCGAAction::FinishAction(bool bWasCancelled)
+void UKCGA_Action::FinishAction(bool bWasCancelled)
 {
 	if (bFinishingAction)
 	{

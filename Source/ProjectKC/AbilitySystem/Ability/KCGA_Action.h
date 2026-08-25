@@ -2,8 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbilityTypes.h"
-#include "ProjectKC/AbilitySystem/Ability/KCGameplayAbility.h"
-#include "KCGAAction.generated.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
+#include "KCGA_Action.generated.h"
 
 class UKCActionTiming;
 
@@ -17,13 +17,13 @@ class UKCActionTiming;
  * 아이템·함정·AI·캐릭터 내재 능력이 모두 이 경로를 공유하고,
  * 차이는 GA 클래스가 아니라 데이터 조합으로만 표현한다.
  */
-UCLASS(Blueprintable)
-class PROJECTKC_API UKCGAAction : public UKCGameplayAbility
+UCLASS(Blueprintable, meta = (DisplayName = "KCGA_Action"))
+class PROJECTKC_API UKCGA_Action : public UKCGA_Base
 {
 	GENERATED_BODY()
 
 public:
-	UKCGAAction();
+	UKCGA_Action();
 
 	/** ActionTiming이 실행 시점을 알릴 때 호출한다. */
 	UFUNCTION()
