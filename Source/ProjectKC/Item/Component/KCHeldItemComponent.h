@@ -32,6 +32,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Item")
 	void TryDropHeldItem();
 
+	/** 서버에서 컴포넌트 설정을 사용하고 추가 Impulse를 더해 현재 아이템을 드롭한다. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
+	bool DropHeldItemUsingSettings(FVector AdditionalImpulse);
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool TryPickUp(AKCWorldItemActor* Item);
 
@@ -115,7 +119,6 @@ private:
 	friend class AKCWorldItemActor;
 
 	USceneComponent* ResolveAttachmentComponent() const;
-	void DropHeldItemAuthority();
 	FTransform MakeHeldItemDropTransform() const;
 	void BroadcastHeldItemChanged();
 

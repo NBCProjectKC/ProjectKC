@@ -40,12 +40,27 @@ void UKCHeldItemComponent::TryDropHeldItem()
 
 	if (Holder->HasAuthority())
 	{
-		DropHeldItemAuthority();
+		DropHeldItemUsingSettings(FVector::ZeroVector);
 	}
 	else
 	{
 		ServerDropHeldItem();
 	}
+}
+
+bool UKCHeldItemComponent::DropHeldItemUsingSettings(
+	FVector AdditionalImpulse)
+{
+	AActor* Holder = GetOwner();
+	if (!Holder || !Holder->HasAuthority() || !HasHeldItem())
+	{
+		return false;
+	}
+
+	return DropHeldItem(
+		MakeHeldItemDropTransform(),
+		Holder->GetActorForwardVector() * DropForwardImpulse +
+			AdditionalImpulse);
 }
 
 bool UKCHeldItemComponent::TryPickUp(AKCWorldItemActor* Item)
@@ -203,7 +218,7 @@ void UKCHeldItemComponent::OnRep_HeldItem()
 
 void UKCHeldItemComponent::ServerDropHeldItem_Implementation()
 {
-	DropHeldItemAuthority();
+	DropHeldItemUsingSettings(FVector::ZeroVector);
 }
 
 USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
@@ -252,19 +267,6 @@ USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
 	}
 
 	return nullptr;
-}
-
-void UKCHeldItemComponent::DropHeldItemAuthority()
-{
-	AActor* Holder = GetOwner();
-	if (!Holder || !Holder->HasAuthority() || !HasHeldItem())
-	{
-		return;
-	}
-
-	DropHeldItem(
-		MakeHeldItemDropTransform(),
-		Holder->GetActorForwardVector() * DropForwardImpulse);
 }
 
 FTransform UKCHeldItemComponent::MakeHeldItemDropTransform() const
