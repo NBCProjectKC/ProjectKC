@@ -16,6 +16,9 @@ UKCAbilityTask_PlayActionMontage* UKCAbilityTask_PlayActionMontage::Create(
 		NewAbilityTask<UKCAbilityTask_PlayActionMontage>(OwningAbility);
 	if (Task)
 	{
+		Task->AbilityHandle = OwningAbility
+			? OwningAbility->GetCurrentAbilitySpecHandle()
+			: FGameplayAbilitySpecHandle();
 		Task->Montage = MontageConfig.Montage;
 		Task->PlayRate = MontageConfig.PlayRate;
 		Task->StartSection = MontageConfig.StartSection;
@@ -85,6 +88,7 @@ void UKCAbilityTask_PlayActionMontage::Activate()
 			Ability->GetAbilitySystemComponentFromActorInfo()))
 	{
 		AbilitySystem->PlayActionMontageForRemoteOwner(
+			AbilityHandle,
 			Montage,
 			PlayRate,
 			StartSection);
@@ -122,7 +126,9 @@ void UKCAbilityTask_PlayActionMontage::OnDestroy(bool bAbilityEnded)
 	if (UKCAbilitySystemComponent* KCAbilitySystem =
 		Cast<UKCAbilitySystemComponent>(AbilitySystem))
 	{
-		KCAbilitySystem->StopActionMontageForRemoteOwner(Montage);
+		KCAbilitySystem->StopActionMontageForRemoteOwner(
+			AbilityHandle,
+			Montage);
 	}
 
 	EventTask = nullptr;

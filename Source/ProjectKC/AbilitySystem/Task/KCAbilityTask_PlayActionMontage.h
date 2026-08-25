@@ -65,6 +65,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> MontageTask;
 
+	FGameplayAbilitySpecHandle AbilityHandle;
 	float PlayRate = 1.0f;
 	FName StartSection = NAME_None;
 	bool bTerminal = false;
