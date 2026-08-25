@@ -61,7 +61,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	}
 
 	AvatarBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarBody"));
-	AvatarBody->SetupAttachment(GetCapsuleComponent());
+	AvatarBody->SetupAttachment(GetMesh(), TEXT("pelvis"));
+	AvatarBody->SetRelativeRotation(FRotator(-22.8f, 92.5f, -91.4f));
 	AvatarBody->SetRelativeScale3D(FVector(1.0f, 1.0f, 0.86f));
 	ConfigureAvatarPart(AvatarBody, PillBodyMesh);
 
