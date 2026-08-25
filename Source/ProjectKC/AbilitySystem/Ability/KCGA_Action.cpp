@@ -2,6 +2,7 @@
 
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Task/KCAbilityTask_PlayActionMontage.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCSingleAction, Log, All);
@@ -35,14 +36,15 @@ void UKCGA_Action::ActivateAbility(
 
 	if (!IsValid(Definition->ActionMontage.Montage))
 	{
-		ExecuteOnce();
-		FinishAction(false, true);
+		ExecutePulse();
+		FinishAction(!bExecuteAttempted, bExecuteAttempted);
 		return;
 	}
 
 	ActiveMontageTask = UKCAbilityTask_PlayActionMontage::Create(
 		this,
-		Definition->ActionMontage);
+		Definition->ActionMontage,
+		Definition->ActionTargeting->IsA<UKCInstantActionTargeting>());
 	if (!ActiveMontageTask)
 	{
 		FinishAction(true, false);
@@ -63,7 +65,7 @@ void UKCGA_Action::ActivateAbility(
 
 void UKCGA_Action::HandleExecuteEvent(FGameplayEventData Payload)
 {
-	ExecuteOnce();
+	ExecutePulse();
 }
 
 void UKCGA_Action::HandleMontageCompleted()
@@ -75,11 +77,17 @@ void UKCGA_Action::HandleMontageCompleted()
 
 	if (!bExecuteAttempted)
 	{
+		const UKCAbilityDefinition* Definition = GetActiveDefinition();
+		const bool bTraceWindowExpected = Definition &&
+			Definition->ActionTargeting &&
+			Definition->ActionTargeting->IsA<UKCTraceWindowTargeting>();
 		UE_LOG(
 			LogKCSingleAction,
 			Warning,
-			TEXT("몽타주가 끝날 때까지 '%s'가 도착하지 않아 Action을 취소했습니다."),
-			*TAG_KC_GameplayEvent_Action_Execute.GetTag().ToString());
+			TEXT("몽타주가 끝날 때까지 %s가 실행되지 않아 Action을 취소했습니다."),
+			bTraceWindowExpected
+				? TEXT("KC Action Socket Trace Window")
+				: *TAG_KC_GameplayEvent_Action_Execute.GetTag().ToString());
 		FinishAction(true, false);
 		return;
 	}
@@ -92,13 +100,13 @@ void UKCGA_Action::HandleMontageInterrupted()
 	FinishAction(true, false);
 }
 
-void UKCGA_Action::ExecuteOnce()
+bool UKCGA_Action::TryBeginExecutionWindow()
 {
 	if (IsFinishingAction() || bExecuteAttempted)
 	{
-		return;
+		return false;
 	}
 
 	bExecuteAttempted = true;
-	ExecutePulse();
+	return true;
 }

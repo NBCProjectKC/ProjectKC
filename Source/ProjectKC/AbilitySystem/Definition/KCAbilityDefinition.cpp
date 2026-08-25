@@ -111,6 +111,13 @@ bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 		return false;
 	}
 
+	if (!ActionTargeting->IsA<UKCInstantActionTargeting>() &&
+		!ActionTargeting->IsA<UKCTraceWindowTargeting>())
+	{
+		OutError = TEXT("ActionTargeting이 Instant 또는 TraceWindow 수집 계약을 구현하지 않습니다.");
+		return false;
+	}
+
 	return AbilityCDO->ValidateDefinitionContract(*this, OutError);
 }
 

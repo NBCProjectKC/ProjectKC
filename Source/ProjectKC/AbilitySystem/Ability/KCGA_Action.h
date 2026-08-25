@@ -9,7 +9,7 @@ class UKCAbilityTask_PlayActionMontage;
 
 /**
  * Press 한 번에 OnExecute를 최대 한 번 실행하는 ServerOnly Action이다.
- * 몽타주가 없으면 즉시 실행하고, 있으면 자기 몽타주의 Execute Event를 기다린다.
+ * 몽타주가 없으면 즉시 실행하고, 있으면 자기 몽타주의 첫 Event 또는 TraceWindow를 받는다.
  */
 UCLASS(Blueprintable, meta = (DisplayName = "KCGA_Action"))
 class PROJECTKC_API UKCGA_Action : public UKCGA_ActionRuntimeBase
@@ -35,9 +35,9 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
-private:
-	void ExecuteOnce();
+	virtual bool TryBeginExecutionWindow() override;
 
+private:
 	bool bExecuteAttempted = false;
 
 	UPROPERTY(Transient)

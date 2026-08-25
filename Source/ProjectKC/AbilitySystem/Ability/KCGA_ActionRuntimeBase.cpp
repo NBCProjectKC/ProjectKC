@@ -6,6 +6,7 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
+#include "ProjectKC/AbilitySystem/Task/KCAbilityTask_ActionTraceWindow.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCActionRuntime, Log, All);
 
@@ -26,6 +27,7 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	bFinishingAction = false;
+	ActiveTraceTask = nullptr;
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	if (!IsActive())
@@ -68,11 +70,60 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 		return;
 	}
 
+	const UKCInstantActionTargeting* InstantTargeting =
+		Cast<UKCInstantActionTargeting>(Targeting);
+	const UKCTraceWindowTargeting* TraceWindowTargeting =
+		Cast<UKCTraceWindowTargeting>(Targeting);
+	if (!InstantTargeting && !TraceWindowTargeting)
+	{
+		UE_LOG(
+			LogKCActionRuntime,
+			Warning,
+			TEXT("Targeting '%s'가 Instant 또는 TraceWindow 계약을 구현하지 않습니다."),
+			*Targeting->GetClass()->GetName());
+		FinishAction(true, false);
+		return;
+	}
+
+	if (TraceWindowTargeting)
+	{
+		UObject* TraceSource = nullptr;
+		FString TraceSourceError;
+		if (!TraceWindowTargeting->ResolveTraceSource(
+			BuildTargetingContext(), TraceSource, &TraceSourceError) ||
+			!IsValid(TraceSource))
+		{
+			if (TraceSourceError.IsEmpty())
+			{
+				TraceSourceError = TEXT("유효한 런타임 Trace Source를 반환하지 않았습니다.");
+			}
+			UE_LOG(
+				LogKCActionRuntime,
+				Warning,
+				TEXT("TraceWindow Targeting을 시작할 수 없습니다: %s"),
+				*TraceSourceError);
+			FinishAction(true, false);
+			return;
+		}
+	}
+
 	// 명중 횟수와 무관하게 한 번의 활성화에 Cost/Cooldown을 한 번만 확정한다.
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		FinishAction(true, false);
 		return;
+	}
+
+	if (TraceWindowTargeting)
+	{
+		ActiveTraceTask = UKCAbilityTask_ActionTraceWindow::Create(
+			this, TraceWindowTargeting);
+		if (!ActiveTraceTask)
+		{
+			FinishAction(true, false);
+			return;
+		}
+		ActiveTraceTask->ReadyForActivation();
 	}
 
 	ExecuteSourceHook(TAG_KC_ActionHook_OnStart);
@@ -89,6 +140,8 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	ActivationTarget = nullptr;
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
+	// Ability 종료 중에는 GAS가 Task 배열을 순회해 직접 정리한다.
+	ActiveTraceTask = nullptr;
 
 	Super::EndAbility(
 		Handle,
@@ -100,24 +153,33 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 
 void UKCGA_ActionRuntimeBase::ExecutePulse()
 {
-	AActor* SourceActor = GetAvatarActorFromActorInfo();
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
-	const UKCActionTargeting* Targeting =
-		Definition ? Definition->ActionTargeting : nullptr;
-	if (!SourceActor || !Targeting)
+	const UKCInstantActionTargeting* Targeting = Cast<UKCInstantActionTargeting>(
+		Definition ? Definition->ActionTargeting : nullptr);
+	if (!Targeting || !TryBeginExecutionWindow())
 	{
 		return;
 	}
 
-	FKCActionTargetingContext TargetingContext;
-	TargetingContext.SourceActor = SourceActor;
-	TargetingContext.SourceObject = GetCurrentSourceObject();
-	TargetingContext.ActivationTarget = ActivationTarget.Get();
-	TargetingContext.ActivationHitResult = ActivationHitResult;
-	TargetingContext.bHasActivationHitResult = bHasActivationHitResult;
-
 	TArray<FKCActionTarget> Targets;
-	Targeting->GatherTargets(TargetingContext, Targets);
+	Targeting->GatherTargets(BuildTargetingContext(), Targets);
+	ExecuteTargets(Targets);
+}
+
+FKCActionTargetingContext UKCGA_ActionRuntimeBase::BuildTargetingContext() const
+{
+	FKCActionTargetingContext Context;
+	Context.SourceActor = GetAvatarActorFromActorInfo();
+	Context.SourceObject = GetCurrentSourceObject();
+	Context.ActivationTarget = ActivationTarget.Get();
+	Context.ActivationHitResult = ActivationHitResult;
+	Context.bHasActivationHitResult = bHasActivationHitResult;
+	return Context;
+}
+
+void UKCGA_ActionRuntimeBase::ExecuteTargets(
+	const TArray<FKCActionTarget>& Targets)
+{
 	for (const FKCActionTarget& Target : Targets)
 	{
 		if (!IsValid(Target.Actor))
@@ -132,6 +194,30 @@ void UKCGA_ActionRuntimeBase::ExecutePulse()
 			TargetAbilitySystem,
 			Target.Actor,
 			Target.bHasHitResult ? &Target.HitResult : nullptr);
+	}
+}
+
+void UKCGA_ActionRuntimeBase::NotifySocketTraceWindowBegin()
+{
+	if (ActiveTraceTask)
+	{
+		ActiveTraceTask->BeginTraceWindow();
+	}
+}
+
+void UKCGA_ActionRuntimeBase::NotifySocketTraceWindowTick()
+{
+	if (ActiveTraceTask)
+	{
+		ActiveTraceTask->TickTraceWindow();
+	}
+}
+
+void UKCGA_ActionRuntimeBase::NotifySocketTraceWindowEnd()
+{
+	if (ActiveTraceTask)
+	{
+		ActiveTraceTask->EndTraceWindow();
 	}
 }
 

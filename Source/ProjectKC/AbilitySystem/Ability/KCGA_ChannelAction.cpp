@@ -1,6 +1,7 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_ChannelAction.h"
 
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Task/KCAbilityTask_PlayActionMontage.h"
 
 UKCGA_ChannelAction::UKCGA_ChannelAction()
@@ -31,7 +32,8 @@ void UKCGA_ChannelAction::ActivateAbility(
 
 	ActiveMontageTask = UKCAbilityTask_PlayActionMontage::Create(
 		this,
-		Definition->ActionMontage);
+		Definition->ActionMontage,
+		Definition->ActionTargeting->IsA<UKCInstantActionTargeting>());
 	if (!ActiveMontageTask)
 	{
 		FinishAction(true, false);
@@ -71,4 +73,9 @@ void UKCGA_ChannelAction::HandleMontageEnded()
 {
 	// Channel은 Release가 정상 종료다. 재생 완료·중단은 모두 비정상 종료다.
 	FinishAction(true, false);
+}
+
+bool UKCGA_ChannelAction::TryBeginExecutionWindow()
+{
+	return !IsFinishingAction();
 }

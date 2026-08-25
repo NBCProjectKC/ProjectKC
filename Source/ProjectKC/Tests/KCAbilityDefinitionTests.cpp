@@ -15,6 +15,7 @@
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCEventTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCItemSocketTrailTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCOverlapTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCSweepTargeting.h"
@@ -102,6 +103,19 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Sweep 대상 Definition은 유효하다."),
 		MakeDefinition(UKCSweepTargeting::StaticClass())
 			->ValidateWithActionContract(Error));
+	UKCAbilityDefinition* SocketTrailWithoutMontage =
+		MakeDefinition(UKCItemSocketTrailTargeting::StaticClass());
+	TestFalse(
+		TEXT("Socket Trail 방식은 NotifyState를 담을 Montage 없이 사용할 수 없다."),
+		SocketTrailWithoutMontage->ValidateWithActionContract(Error));
+	AddMontage(SocketTrailWithoutMontage);
+	TestTrue(
+		TEXT("Montage를 가진 Socket Trail Definition은 유효하다."),
+		SocketTrailWithoutMontage->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("Socket Trail 방식은 TraceWindow Targeting 계약을 구현한다."),
+		SocketTrailWithoutMontage->ActionTargeting->IsA<
+			UKCTraceWindowTargeting>());
 	TestTrue(
 		TEXT("Overlap 대상 Definition은 유효하다."),
 		MakeDefinition(UKCOverlapTargeting::StaticClass())
@@ -127,6 +141,9 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("Sweep 방식은 활성화 Target을 요구하지 않는다."),
 		GetDefault<UKCSweepTargeting>()->RequiresActivationTarget());
+	TestTrue(
+		TEXT("Sweep 방식은 Instant Targeting 계약을 구현한다."),
+		GetDefault<UKCSweepTargeting>()->IsA<UKCInstantActionTargeting>());
 
 	// ── 수명주기 Definition과 GA는 코드로 고정된다 ─────────
 	UKCSingleActionDefinition* ImmediateSingle =

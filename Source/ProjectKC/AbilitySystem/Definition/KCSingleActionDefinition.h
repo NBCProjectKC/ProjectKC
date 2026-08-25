@@ -16,4 +16,7 @@ class PROJECTKC_API UKCSingleActionDefinition : public UKCAbilityDefinition
 
 public:
 	virtual TSubclassOf<UKCGA_Base> GetAbilityClass() const override;
+
+protected:
+	virtual bool ValidateLifecycle(FString& OutError) const override;
 };

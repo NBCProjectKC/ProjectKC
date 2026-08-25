@@ -7,7 +7,7 @@
 
 class UKCAbilityTask_PlayActionMontage;
 
-/** Press부터 Release까지 유지되고 Execute Event마다 결과를 만드는 ServerOnly Action이다. */
+/** Press부터 Release까지 유지되고 각 Event 또는 TraceWindow마다 결과를 만드는 ServerOnly Action이다. */
 UCLASS(Blueprintable, meta = (DisplayName = "KCGA_ChannelAction"))
 class PROJECTKC_API UKCGA_ChannelAction : public UKCGA_ActionRuntimeBase
 {
@@ -33,6 +33,8 @@ protected:
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo) override;
+
+	virtual bool TryBeginExecutionWindow() override;
 
 private:
 	UPROPERTY(Transient)

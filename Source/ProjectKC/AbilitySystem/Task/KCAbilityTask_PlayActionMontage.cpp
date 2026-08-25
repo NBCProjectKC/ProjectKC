@@ -9,7 +9,8 @@
 
 UKCAbilityTask_PlayActionMontage* UKCAbilityTask_PlayActionMontage::Create(
 	UGameplayAbility* OwningAbility,
-	const FKCActionMontageConfigStruct& MontageConfig)
+	const FKCActionMontageConfigStruct& MontageConfig,
+	bool bInListenForExecuteEvent)
 {
 	UKCAbilityTask_PlayActionMontage* Task =
 		NewAbilityTask<UKCAbilityTask_PlayActionMontage>(OwningAbility);
@@ -18,6 +19,7 @@ UKCAbilityTask_PlayActionMontage* UKCAbilityTask_PlayActionMontage::Create(
 		Task->Montage = MontageConfig.Montage;
 		Task->PlayRate = MontageConfig.PlayRate;
 		Task->StartSection = MontageConfig.StartSection;
+		Task->bListenForExecuteEvent = bInListenForExecuteEvent;
 	}
 	return Task;
 }
@@ -30,22 +32,25 @@ void UKCAbilityTask_PlayActionMontage::Activate()
 		return;
 	}
 
-	// 첫 프레임 Notify도 놓치지 않도록 Event 대기를 몽타주보다 먼저 등록한다.
-	EventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-		Ability,
-		TAG_KC_GameplayEvent_Action_Execute,
-		nullptr,
-		false,
-		true);
-	if (!EventTask)
+	if (bListenForExecuteEvent)
 	{
-		FinishTask(true);
-		return;
+		// 첫 프레임 Notify도 놓치지 않도록 Event 대기를 몽타주보다 먼저 등록한다.
+		EventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+			Ability,
+			TAG_KC_GameplayEvent_Action_Execute,
+			nullptr,
+			false,
+			true);
+		if (!EventTask)
+		{
+			FinishTask(true);
+			return;
+		}
+		EventTask->EventReceived.AddDynamic(
+			this,
+			&UKCAbilityTask_PlayActionMontage::HandleGameplayEvent);
+		EventTask->ReadyForActivation();
 	}
-	EventTask->EventReceived.AddDynamic(
-		this,
-		&UKCAbilityTask_PlayActionMontage::HandleGameplayEvent);
-	EventTask->ReadyForActivation();
 
 	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		Ability,

@@ -16,8 +16,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FKCActionMontageTerminalDelegate);
 
 /**
- * Action 몽타주와 Execute Event 대기를 한 수명주기로 묶는다.
- * Event payload가 이 태스크의 Ability를 가리킬 때만 Execute를 전달한다.
+ * Action 몽타주 재생과 선택적인 Execute Event 대기를 한 수명주기로 묶는다.
+ * Event 방식에서는 payload가 이 태스크의 Ability를 가리킬 때만 Execute를 전달한다.
  */
 UCLASS()
 class PROJECTKC_API UKCAbilityTask_PlayActionMontage : public UAbilityTask
@@ -27,7 +27,8 @@ class PROJECTKC_API UKCAbilityTask_PlayActionMontage : public UAbilityTask
 public:
 	static UKCAbilityTask_PlayActionMontage* Create(
 		UGameplayAbility* OwningAbility,
-		const FKCActionMontageConfigStruct& MontageConfig);
+		const FKCActionMontageConfigStruct& MontageConfig,
+		bool bInListenForExecuteEvent);
 
 	UPROPERTY(BlueprintAssignable)
 	FKCActionMontageExecuteDelegate OnExecute;
@@ -68,4 +69,5 @@ private:
 	FName StartSection = NAME_None;
 	bool bTerminal = false;
 	bool bCleaningUp = false;
+	bool bListenForExecuteEvent = true;
 };

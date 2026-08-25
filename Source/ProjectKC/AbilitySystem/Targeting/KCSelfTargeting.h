@@ -6,7 +6,7 @@
 
 /** 행동을 수행하는 Avatar 자신을 대상으로 삼는다. */
 UCLASS(meta = (DisplayName = "Self Targeting"))
-class PROJECTKC_API UKCSelfTargeting : public UKCActionTargeting
+class PROJECTKC_API UKCSelfTargeting : public UKCInstantActionTargeting
 {
 	GENERATED_BODY()
 
