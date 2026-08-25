@@ -45,6 +45,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Ability")
 	bool TryActivateGrantedAbility(FGameplayAbilitySpecHandle AbilityHandle);
 
+	/** 정확한 SpecHandle의 입력을 누르고, 비활성 상태면 같은 요청에서 활성화한다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Ability|Input")
+	bool PressAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
+	/** Press 때 사용한 정확한 SpecHandle의 입력을 놓는다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Ability|Input")
+	bool ReleaseAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
 	bool TryActivateGrantedAbilityWithEvent(
 		FGameplayAbilitySpecHandle AbilityHandle,
 		FGameplayTag EventTag,
@@ -72,6 +80,12 @@ public:
 	void StopActionMontageForRemoteOwner(UAnimMontage* Montage);
 
 protected:
+	UFUNCTION(Server, Reliable)
+	void ServerPressAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
+	UFUNCTION(Server, Reliable)
+	void ServerReleaseAbilityInputByHandle(FGameplayAbilitySpecHandle AbilityHandle);
+
 	UFUNCTION(Client, Reliable)
 	void ClientPlayActionMontage(
 		UAnimMontage* Montage,
@@ -82,5 +96,7 @@ protected:
 	void ClientStopActionMontage(UAnimMontage* Montage);
 
 private:
+	bool ProcessAbilityInputPressed(FGameplayAbilitySpecHandle AbilityHandle);
+	bool ProcessAbilityInputReleased(FGameplayAbilitySpecHandle AbilityHandle);
 	bool IsRemoteOwnerMontageTarget() const;
 };

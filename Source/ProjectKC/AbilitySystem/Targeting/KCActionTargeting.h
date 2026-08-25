@@ -33,7 +33,7 @@ struct PROJECTKC_API FKCActionTargetingContext
 
 /**
  * 행동이 "누구를" 대상으로 삼는지 정하는 방식이다.
- * 언제(ActionTiming), 무엇을(Fragment)과 독립적인 축이다.
+ * 언제 실행되는지(Action 수명주기), 무엇을 하는지(Fragment)와 독립적인 축이다.
  *
  * Definition에 인라인으로 담기는 불변 데이터이므로 실행 상태를 갖지 않는다.
  */

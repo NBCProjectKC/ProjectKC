@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h"
+#include "GameplayAbilitySpecHandle.h"
 #include "KCHeldItemComponent.generated.h"
 
 class AKCWorldItemActor;
@@ -40,7 +41,10 @@ public:
 		FVector DropImpulse = FVector::ZeroVector);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|Item")
-	bool UseHeldItem();
+	bool PressHeldItemUse();
+
+	UFUNCTION(BlueprintCallable, Category = "KC|Item")
+	bool ReleaseHeldItemUse();
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool UseHeldItemWithTarget(AActor* TargetActor);
@@ -120,4 +124,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USceneComponent> RuntimeAttachmentComponent;
+
+	/** Press 당시의 아이템이다. Release가 이후에 든 다른 아이템으로 새지 않게 한다. */
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AKCWorldItemActor> InputPressedItem;
+
+	FGameplayAbilitySpecHandle InputPressedAbilityHandle;
 };

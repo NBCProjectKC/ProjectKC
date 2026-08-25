@@ -99,9 +99,31 @@ bool UKCHeldItemComponent::DropHeldItem(
 	return true;
 }
 
-bool UKCHeldItemComponent::UseHeldItem()
+bool UKCHeldItemComponent::PressHeldItemUse()
 {
-	return IsValid(HeldItem) && HeldItem->ActivateUse();
+	if (InputPressedItem.IsValid() || !IsValid(HeldItem))
+	{
+		return false;
+	}
+
+	InputPressedItem = HeldItem;
+	if (!HeldItem->PressUse(InputPressedAbilityHandle))
+	{
+		InputPressedItem = nullptr;
+		InputPressedAbilityHandle = FGameplayAbilitySpecHandle();
+		return false;
+	}
+
+	return true;
+}
+
+bool UKCHeldItemComponent::ReleaseHeldItemUse()
+{
+	AKCWorldItemActor* PressedItem = InputPressedItem.Get();
+	const FGameplayAbilitySpecHandle PressedHandle = InputPressedAbilityHandle;
+	InputPressedItem = nullptr;
+	InputPressedAbilityHandle = FGameplayAbilitySpecHandle();
+	return IsValid(PressedItem) && PressedItem->ReleaseUse(PressedHandle);
 }
 
 bool UKCHeldItemComponent::UseHeldItemWithTarget(AActor* TargetActor)

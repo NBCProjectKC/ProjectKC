@@ -173,10 +173,18 @@ void AKCPlayerCharacter::ConfigureDriverMesh()
 	DriverMesh->SetCastShadow(false);
 }
 
-bool AKCPlayerCharacter::TryUseHeldItem()
+bool AKCPlayerCharacter::BeginUseHeldItem()
 {
 	return IsLocallyControlled() && HeldItemComponent &&
-		HeldItemComponent->UseHeldItem();
+		HeldItemComponent->PressHeldItemUse();
+}
+
+void AKCPlayerCharacter::EndUseHeldItem()
+{
+	if (IsLocallyControlled() && HeldItemComponent)
+	{
+		HeldItemComponent->ReleaseHeldItemUse();
+	}
 }
 
 void AKCPlayerCharacter::RequestInteract()

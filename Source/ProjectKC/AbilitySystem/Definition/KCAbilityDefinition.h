@@ -2,27 +2,24 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/AbilitySystem/Struct/KCActionHookStruct.h"
+#include "ProjectKC/AbilitySystem/Struct/KCActionMontageConfigStruct.h"
 #include "UObject/Object.h"
 #include "KCAbilityDefinition.generated.h"
 
 class UKCActionTargeting;
-class UKCActionTiming;
 class UKCGA_Base;
 
 /**
- * 소스의 상위 Definition 안에 인라인으로 조립되는 불변 Action 정의다.
- * 아이템·함정·AI·캐릭터 내재 능력이 모두 이 타입 하나를 공유하고,
- * 서로 다른 점은 인라인 축(Config / Timing / Fragment)의 조합으로 표현한다.
+ * Action 수명주기와 GA의 고정 대응 관계가 공유하는 불변 데이터다.
+ * 구체 Definition은 자기 수명주기에 맞는 GA 클래스를 코드로 고정한다.
+ * HideDropDown은 기존 직렬화 인스턴스의 로드는 허용하면서 새 저작 선택지에서는 숨긴다.
  */
-UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced, HideDropDown)
 class PROJECTKC_API UKCAbilityDefinition : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
-	TSubclassOf<UKCGA_Base> ActionClass;
-
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
@@ -38,22 +35,22 @@ public:
 		Category = "Action")
 	TObjectPtr<UKCActionTargeting> ActionTargeting;
 
-	/**
-	 * 결과를 언제 실행할지 정한다. 비어 있으면 활성화 즉시 실행한다.
-	 * 아바타 애니메이션이 없는 소스는 비워 두므로 데이터를 갖지 않는다.
-	 */
 	UPROPERTY(
 		EditDefaultsOnly,
-		Instanced,
 		BlueprintReadOnly,
-		Category = "Action")
-	TObjectPtr<UKCActionTiming> ActionTiming;
+		Category = "Action",
+		meta = (ShowOnlyInnerProperties))
+	FKCActionMontageConfigStruct ActionMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
 	TArray<FKCActionHookStruct> ActionHooks;
 
 	const FKCActionHookStruct* FindActionHook(FGameplayTag HookTag) const;
 	bool DeclaresSetByCallerTag(FGameplayTag DataTag) const;
+	virtual TSubclassOf<UKCGA_Base> GetAbilityClass() const;
 	bool Validate(FString& OutError) const;
 	bool ValidateWithActionContract(FString& OutError) const;
+
+protected:
+	virtual bool ValidateLifecycle(FString& OutError) const;
 };

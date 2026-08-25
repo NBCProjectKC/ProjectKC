@@ -2,7 +2,6 @@
 
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
-#include "ProjectKC/AbilitySystem/Timing/KCActionTiming.h"
 
 const FKCActionHookStruct* UKCAbilityDefinition::FindActionHook(
 	FGameplayTag HookTag) const
@@ -23,12 +22,17 @@ bool UKCAbilityDefinition::DeclaresSetByCallerTag(FGameplayTag DataTag) const
 		});
 }
 
+TSubclassOf<UKCGA_Base> UKCAbilityDefinition::GetAbilityClass() const
+{
+	return nullptr;
+}
+
 bool UKCAbilityDefinition::Validate(FString& OutError) const
 {
 	OutError.Reset();
-	if (!ActionClass)
+	if (!GetAbilityClass())
 	{
-		OutError = TEXT("ActionClass가 비어 있습니다.");
+		OutError = TEXT("Definition에 대응하는 Ability 클래스가 없습니다.");
 		return false;
 	}
 
@@ -38,16 +42,13 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		return false;
 	}
 
-	if (ActionTiming)
+	FString MontageError;
+	if (!ActionMontage.Validate(MontageError))
 	{
-		FString TimingError;
-		if (!ActionTiming->Validate(TimingError))
-		{
-			OutError = FString::Printf(
-				TEXT("ActionTiming이 유효하지 않습니다: %s"),
-				*TimingError);
-			return false;
-		}
+		OutError = FString::Printf(
+			TEXT("ActionMontage가 유효하지 않습니다: %s"),
+			*MontageError);
+		return false;
 	}
 
 	if (!ActionTargeting)
@@ -90,7 +91,7 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 
 	}
 
-	return true;
+	return ValidateLifecycle(OutError);
 }
 
 bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
@@ -100,13 +101,20 @@ bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 		return false;
 	}
 
-	const UKCGA_Base* AbilityCDO =
-		ActionClass->GetDefaultObject<UKCGA_Base>();
+	const TSubclassOf<UKCGA_Base> AbilityClass = GetAbilityClass();
+	const UKCGA_Base* AbilityCDO = AbilityClass
+		? AbilityClass->GetDefaultObject<UKCGA_Base>()
+		: nullptr;
 	if (!AbilityCDO)
 	{
-		OutError = TEXT("ActionClass의 UKCGA_Base CDO를 읽을 수 없습니다.");
+		OutError = TEXT("대응하는 Ability 클래스의 UKCGA_Base CDO를 읽을 수 없습니다.");
 		return false;
 	}
 
 	return AbilityCDO->ValidateDefinitionContract(*this, OutError);
+}
+
+bool UKCAbilityDefinition::ValidateLifecycle(FString& OutError) const
+{
+	return true;
 }

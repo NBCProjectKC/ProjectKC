@@ -31,7 +31,7 @@ void AKCPlayerController::BeginPlay()
 
 }
 
-void AKCPlayerController::UseHeldItem(const FInputActionValue& InputValue)
+void AKCPlayerController::BeginUseHeldItem(const FInputActionValue& InputValue)
 {
 	if (!InputValue.Get<bool>())
 	{
@@ -40,7 +40,15 @@ void AKCPlayerController::UseHeldItem(const FInputActionValue& InputValue)
 
 	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
 	{
-		PlayerCharacter->TryUseHeldItem();
+		PlayerCharacter->BeginUseHeldItem();
+	}
+}
+
+void AKCPlayerController::EndUseHeldItem(const FInputActionValue& InputValue)
+{
+	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->EndUseHeldItem();
 	}
 }
 
@@ -87,7 +95,17 @@ void AKCPlayerController::SetupInputComponent()
 			AttackAction,
 			ETriggerEvent::Started,
 			this,
-			&AKCPlayerController::UseHeldItem);
+			&AKCPlayerController::BeginUseHeldItem);
+		EnhancedInputComponent->BindAction(
+			AttackAction,
+			ETriggerEvent::Completed,
+			this,
+			&AKCPlayerController::EndUseHeldItem);
+		EnhancedInputComponent->BindAction(
+			AttackAction,
+			ETriggerEvent::Canceled,
+			this,
+			&AKCPlayerController::EndUseHeldItem);
 	}
 
 	if (InteractAction)

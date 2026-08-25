@@ -119,7 +119,7 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::GrantAbilityDefinition(
 
 		const bool bSameGrant =
 			ExistingSpec.Ability &&
-			ExistingSpec.Ability->GetClass() == Definition->ActionClass &&
+			ExistingSpec.Ability->GetClass() == Definition->GetAbilityClass() &&
 			ExistingSpec.Level == Definition->AbilityLevel &&
 			ExistingSpec.InputID == InputId;
 		if (bSameGrant)
@@ -136,7 +136,7 @@ FGameplayAbilitySpecHandle UKCAbilitySystemComponent::GrantAbilityDefinition(
 	}
 
 	return GiveAbility(FGameplayAbilitySpec(
-		Definition->ActionClass,
+		Definition->GetAbilityClass(),
 		Definition->AbilityLevel,
 		InputId,
 		SourceObject));
@@ -146,6 +146,78 @@ bool UKCAbilitySystemComponent::TryActivateGrantedAbility(
 	FGameplayAbilitySpecHandle AbilityHandle)
 {
 	return AbilityHandle.IsValid() && TryActivateAbility(AbilityHandle);
+}
+
+bool UKCAbilitySystemComponent::PressAbilityInputByHandle(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	if (!AbilityHandle.IsValid())
+	{
+		return false;
+	}
+
+	if (IsOwnerActorAuthoritative())
+	{
+		return ProcessAbilityInputPressed(AbilityHandle);
+	}
+
+	ServerPressAbilityInputByHandle(AbilityHandle);
+	return true;
+}
+
+bool UKCAbilitySystemComponent::ReleaseAbilityInputByHandle(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	if (!AbilityHandle.IsValid())
+	{
+		return false;
+	}
+
+	if (IsOwnerActorAuthoritative())
+	{
+		return ProcessAbilityInputReleased(AbilityHandle);
+	}
+
+	ServerReleaseAbilityInputByHandle(AbilityHandle);
+	return true;
+}
+
+void UKCAbilitySystemComponent::ServerPressAbilityInputByHandle_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	ProcessAbilityInputPressed(AbilityHandle);
+}
+
+void UKCAbilitySystemComponent::ServerReleaseAbilityInputByHandle_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	ProcessAbilityInputReleased(AbilityHandle);
+}
+
+bool UKCAbilitySystemComponent::ProcessAbilityInputPressed(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	if (!IsOwnerActorAuthoritative() || !Spec)
+	{
+		return false;
+	}
+
+	AbilitySpecInputPressed(*Spec);
+	return Spec->IsActive() || TryActivateAbility(AbilityHandle);
+}
+
+bool UKCAbilitySystemComponent::ProcessAbilityInputReleased(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	if (!IsOwnerActorAuthoritative() || !Spec)
+	{
+		return false;
+	}
+
+	AbilitySpecInputReleased(*Spec);
+	return true;
 }
 
 bool UKCAbilitySystemComponent::TryActivateGrantedAbilityWithEvent(
