@@ -30,10 +30,8 @@ void UKCLobbyWidget::NativeConstruct()
 	if (Button_StartGame)
 	{
 		Button_StartGame->OnClicked.AddDynamic(this, &UKCLobbyWidget::OnStartGameClicked);
-		// 방장(서버)만 StartGame 버튼 노출 (블루프린트의 IsServer와 동일)
 		const bool bIsServer = UKismetSystemLibrary::IsServer(this);
 		Button_StartGame->SetVisibility(bIsServer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-		// 시작 시 기본 비활성화 (전원 레디 시 활성화)
 		Button_StartGame->SetIsEnabled(false);
 	}
 
@@ -42,7 +40,9 @@ void UKCLobbyWidget::NativeConstruct()
 		if (AKCLobbyPlayerState* PS = PC->GetPlayerState<AKCLobbyPlayerState>())
 		{
 			PS->OnReadyStatusChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnReadyStatusUpdated);
+			PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);
 			OnReadyStatusUpdated(PS->IsReady());
+			OnTeamIdUpdated(PS->GetTeamId());
 		}
 	}
 }
@@ -51,12 +51,13 @@ void UKCLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	// 클라이언트에서 PlayerState가 뒤늦게 동기화되었을 때 바인딩 보장
+	// 클라이언트에서 PlayerState 복제 지연 대응 바인딩
 	if (APlayerController* PC = GetOwningPlayer())
 	{
 		if (AKCLobbyPlayerState* PS = PC->GetPlayerState<AKCLobbyPlayerState>())
 		{
 			PS->OnReadyStatusChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnReadyStatusUpdated);
+			PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);
 		}
 	}
 }
@@ -110,6 +111,16 @@ void UKCLobbyWidget::OnReadyStatusUpdated(bool bIsReady)
 {
 	if (Text_Ready)
 	{
+		// 준비 완료 시: CANCEL READY (준비 취소), 미준비 시: READY (준비하기)
 		Text_Ready->SetText(bIsReady ? FText::FromString(TEXT("CANCEL READY")) : FText::FromString(TEXT("READY")));
+	}
+}
+
+void UKCLobbyWidget::OnTeamIdUpdated(int32 NewTeamId)
+{
+	if (Text_TeamName)
+	{
+		const FString TeamStr = (NewTeamId == 0) ? TEXT("TEAM RED") : TEXT("TEAM BLUE");
+		Text_TeamName->SetText(FText::FromString(TeamStr));
 	}
 }
