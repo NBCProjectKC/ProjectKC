@@ -27,7 +27,7 @@ public:
 
 	/** 세션 생성 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Session")
-	void CreateSession(int32 NumPublicConnections = 4, bool bIsLANMatch = false);
+	void CreateSession(int32 NumPublicConnections = 6, bool bIsLANMatch = false);
 
 	/** 세션 참가 (FBlueprintSessionResult 이용) */
 	UFUNCTION(BlueprintCallable, Category = "KC|Session")
