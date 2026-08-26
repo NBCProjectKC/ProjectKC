@@ -5,6 +5,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
+#include "ProjectKC/Player/Animation/KCPlayerAnimInstance.h"
 
 UKCEmoteComponent::UKCEmoteComponent()
 {
@@ -51,7 +52,7 @@ bool UKCEmoteComponent::RequestPlayNextEmote()
 
 void UKCEmoteComponent::RequestStopEmote(const float BlendOutTime)
 {
-	if (!IsRequestOwnerAllowed())
+	if (!IsRequestOwnerAllowed() || ActiveEmoteIndex == INDEX_NONE)
 	{
 		return;
 	}
@@ -63,8 +64,16 @@ void UKCEmoteComponent::RequestStopEmote(const float BlendOutTime)
 	}
 	else
 	{
+		// 이동과 공격은 입력 즉시 보여야 하므로 소유 클라이언트에서 먼저 끊고
+		// Reliable RPC로 서버와 다른 클라이언트에 같은 결과를 전파한다.
+		StopEmoteLocal(SafeBlendOutTime);
 		ServerStopEmote(SafeBlendOutTime);
 	}
+}
+
+void UKCEmoteComponent::RequestInterruptEmote()
+{
+	RequestStopEmote(InterruptionBlendOutTime);
 }
 
 int32 UKCEmoteComponent::GetEmoteCount() const
@@ -198,11 +207,29 @@ void UKCEmoteComponent::PlayEmoteLocal(const int32 EmoteIndex)
 	}
 
 	ActiveEmoteIndex = EmoteIndex;
+	SetGroundIKAllowed(false);
+	if (UAnimInstance* AnimInstance = Character->GetMesh()
+		? Character->GetMesh()->GetAnimInstance()
+		: nullptr)
+	{
+		FOnMontageEnded MontageEndedDelegate;
+		MontageEndedDelegate.BindUObject(
+			this,
+			&UKCEmoteComponent::HandleEmoteMontageEnded);
+		AnimInstance->Montage_SetEndDelegate(
+			MontageEndedDelegate,
+			EmoteMontages[EmoteIndex]);
+	}
 	OnEmotePlayed.Broadcast(EmoteIndex, EmoteMontages[EmoteIndex]);
 }
 
 void UKCEmoteComponent::StopEmoteLocal(const float BlendOutTime)
 {
+	if (ActiveEmoteIndex == INDEX_NONE)
+	{
+		return;
+	}
+
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
 	UAnimInstance* AnimInstance = Character && Character->GetMesh()
 		? Character->GetMesh()->GetAnimInstance()
@@ -210,11 +237,41 @@ void UKCEmoteComponent::StopEmoteLocal(const float BlendOutTime)
 	UAnimMontage* ActiveMontage = IsConfiguredEmote(ActiveEmoteIndex)
 		? EmoteMontages[ActiveEmoteIndex]
 		: nullptr;
+	// Montage_Stop이 종료 델리게이트를 동기적으로 호출해도 중복 이벤트가
+	// 발생하지 않도록 상태를 먼저 비운다.
+	ActiveEmoteIndex = INDEX_NONE;
+	SetGroundIKAllowed(true);
 	if (AnimInstance && ActiveMontage)
 	{
 		AnimInstance->Montage_Stop(BlendOutTime, ActiveMontage);
 	}
 
+	OnEmoteStopped.Broadcast();
+}
+
+void UKCEmoteComponent::SetGroundIKAllowed(const bool bAllowed) const
+{
+	const ACharacter* Character = Cast<ACharacter>(GetOwner());
+	UKCPlayerAnimInstance* AnimInstance = Character && Character->GetMesh()
+		? Cast<UKCPlayerAnimInstance>(Character->GetMesh()->GetAnimInstance())
+		: nullptr;
+	if (AnimInstance)
+	{
+		AnimInstance->SetEmoteActive(!bAllowed);
+	}
+}
+
+void UKCEmoteComponent::HandleEmoteMontageEnded(
+	UAnimMontage* Montage,
+	const bool bInterrupted)
+{
+	if (!IsConfiguredEmote(ActiveEmoteIndex) ||
+		EmoteMontages[ActiveEmoteIndex] != Montage)
+	{
+		return;
+	}
+
 	ActiveEmoteIndex = INDEX_NONE;
+	SetGroundIKAllowed(true);
 	OnEmoteStopped.Broadcast();
 }

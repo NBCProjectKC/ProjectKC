@@ -2,8 +2,10 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Components/SkeletalMeshComponent.h"
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_StaminaRegen.h"
+#include "ProjectKC/Player/Animation/KCPlayerAnimInstance.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
 #include "ProjectKC/Player/KCPlayerCharacter.h"
 
@@ -28,6 +30,9 @@ bool FKCPlayerSustainAndEmoteContractTest::RunTest(const FString& Parameters)
 		TestNotNull(
 			TEXT("감정표현 컴포넌트는 순차 재생 요청 API를 제공한다."),
 			EmoteComponent->FindFunction(TEXT("RequestPlayNextEmote")));
+		TestNotNull(
+			TEXT("감정표현 컴포넌트는 우선 행동 인터럽트 API를 제공한다."),
+			EmoteComponent->FindFunction(TEXT("RequestInterruptEmote")));
 
 		const UFunction* ServerPlayNextEmoteFunction =
 			EmoteComponent->FindFunction(TEXT("ServerPlayNextEmote"));
@@ -44,6 +49,22 @@ bool FKCPlayerSustainAndEmoteContractTest::RunTest(const FString& Parameters)
 					RequiredFlags);
 		}
 	}
+
+	USkeletalMeshComponent* AnimInstanceOuter =
+		NewObject<USkeletalMeshComponent>();
+	UKCPlayerAnimInstance* AnimInstance =
+		NewObject<UKCPlayerAnimInstance>(AnimInstanceOuter);
+	TestTrue(
+		TEXT("평상시에는 플레이어 지면 IK를 허용한다."),
+		AnimInstance->bAllowGroundIK);
+	AnimInstance->SetEmoteActive(true);
+	TestFalse(
+		TEXT("감정표현 중에는 전신 포즈 보존을 위해 지면 IK를 막는다."),
+		AnimInstance->bAllowGroundIK);
+	AnimInstance->SetEmoteActive(false);
+	TestTrue(
+		TEXT("감정표현 종료 후 지면 IK를 다시 허용한다."),
+		AnimInstance->bAllowGroundIK);
 
 	const UKCGE_StaminaRegen* RegenEffect =
 		GetDefault<UKCGE_StaminaRegen>();

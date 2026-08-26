@@ -36,6 +36,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Emote")
 	void RequestStopEmote(float BlendOutTime = 0.2f);
 
+	/** 이동, 공격, 피격처럼 감정표현보다 우선하는 행동이 발생했을 때 중단한다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Emote")
+	void RequestInterruptEmote();
+
 	UFUNCTION(BlueprintPure, Category = "KC|Emote")
 	int32 GetEmoteCount() const;
 
@@ -72,6 +76,8 @@ private:
 	int32 FindNextConfiguredEmoteIndex() const;
 	void PlayEmoteLocal(int32 EmoteIndex);
 	void StopEmoteLocal(float BlendOutTime);
+	void SetGroundIKAllowed(bool bAllowed) const;
+	void HandleEmoteMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Emote")
 	TArray<TObjectPtr<UAnimMontage>> EmoteMontages;
@@ -81,6 +87,10 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Emote")
 	bool bBlockWhenAnyMontagePlaying = true;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Emote",
+		meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float InterruptionBlendOutTime = 0.15f;
 
 	/** 서버가 다음에 승인할 몽타주 풀 인덱스다. */
 	int32 NextEmoteIndex = 0;

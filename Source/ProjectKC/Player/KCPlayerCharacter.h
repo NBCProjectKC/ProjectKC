@@ -38,6 +38,10 @@ public:
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void LaunchCharacter(
+		FVector LaunchVelocity,
+		bool bXYOverride,
+		bool bZOverride) override;
 
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
@@ -90,7 +94,9 @@ private:
 	void EnsureStaminaRegenEffect();
 	void BindAttributeDelegates();
 	void HandleMoveSpeedChanged(const FOnAttributeChangeData& ChangeData);
+	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData);
 	void ApplyMoveSpeed(float MoveSpeed);
+	void InterruptEmote();
 	void ApplyFacingYaw(float FacingYaw);
 	void ApplyAcceptedServerFacingYaw(
 		float FacingYaw,
@@ -178,5 +184,6 @@ private:
 	bool bHasPendingServerFacingYaw = false;
 	FTimerHandle ServerFacingUpdateTimer;
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
+	FDelegateHandle HealthChangedDelegateHandle;
 	FActiveGameplayEffectHandle StaminaRegenEffectHandle;
 };

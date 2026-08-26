@@ -90,8 +90,9 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	ConfigureAvatarPart(AvatarHandLeft, SphereMesh);
 
 	AvatarHandRight = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarHandRight"));
-	AvatarHandRight->SetupAttachment(GetMesh(), TEXT("hand_r"));
-	AvatarHandRight->SetRelativeLocation(FVector(0.0f, -25.0f, 0.0f));
+	// 스켈레톤의 표준 그립 소켓은 유지하고, 보이는 손이 그 기준을 따른다.
+	// 아이템도 같은 소켓에 붙으므로 Grip이 손 중심과 자연스럽게 일치한다.
+	AvatarHandRight->SetupAttachment(GetMesh(), TEXT("HandGrip_R"));
 	AvatarHandRight->SetRelativeScale3D(FVector(0.26f));
 	ConfigureAvatarPart(AvatarHandRight, SphereMesh);
 
@@ -198,8 +199,17 @@ void AKCPlayerCharacter::ConfigureDriverMesh()
 
 bool AKCPlayerCharacter::BeginUseHeldItem()
 {
-	return IsLocallyControlled() && HeldItemComponent &&
-		HeldItemComponent->PressHeldItemUse();
+	if (!IsLocallyControlled() || !HeldItemComponent)
+	{
+		return false;
+	}
+
+	const bool bUseStarted = HeldItemComponent->PressHeldItemUse();
+	if (bUseStarted)
+	{
+		InterruptEmote();
+	}
+	return bUseStarted;
 }
 
 void AKCPlayerCharacter::EndUseHeldItem()
@@ -421,12 +431,33 @@ void AKCPlayerCharacter::BindAttributeDelegates()
 		this,
 		&AKCPlayerCharacter::HandleMoveSpeedChanged);
 	ApplyMoveSpeed(CharacterAttributes->GetMoveSpeed());
+
+	FOnGameplayAttributeValueChange& HealthDelegate =
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+			UKCCharacterAttributeSet::GetHealthAttribute());
+	if (HealthChangedDelegateHandle.IsValid())
+	{
+		HealthDelegate.Remove(HealthChangedDelegateHandle);
+		HealthChangedDelegateHandle.Reset();
+	}
+	HealthChangedDelegateHandle = HealthDelegate.AddUObject(
+		this,
+		&AKCPlayerCharacter::HandleHealthChanged);
 }
 
 void AKCPlayerCharacter::HandleMoveSpeedChanged(
 	const FOnAttributeChangeData& ChangeData)
 {
 	ApplyMoveSpeed(ChangeData.NewValue);
+}
+
+void AKCPlayerCharacter::HandleHealthChanged(
+	const FOnAttributeChangeData& ChangeData)
+{
+	if (HasAuthority() && ChangeData.NewValue < ChangeData.OldValue)
+	{
+		InterruptEmote();
+	}
 }
 
 void AKCPlayerCharacter::ApplyMoveSpeed(const float MoveSpeed)
@@ -443,6 +474,7 @@ void AKCPlayerCharacter::MoveInWorldDirection(const FVector& WorldDirection, con
 {
 	if (!FMath::IsNearlyZero(ScaleValue))
 	{
+		InterruptEmote();
 		AddMovementInput(WorldDirection, ScaleValue);
 	}
 }
@@ -476,10 +508,16 @@ bool AKCPlayerCharacter::RequestDash()
 	EventData.Target = this;
 	EventData.EventMagnitude = FMath::UnwindDegrees(
 		DashDirection.Rotation().Yaw);
-	return AbilitySystemComponent->TryActivateGrantedAbilityWithEvent(
+	const bool bDashActivated =
+		AbilitySystemComponent->TryActivateGrantedAbilityWithEvent(
 		DashSpec->Handle,
 		TAG_KC_GameplayEvent_Player_Dash,
 		EventData);
+	if (bDashActivated)
+	{
+		InterruptEmote();
+	}
+	return bDashActivated;
 }
 
 bool AKCPlayerCharacter::RequestPlayEmote(const int32 EmoteIndex)
@@ -497,6 +535,23 @@ void AKCPlayerCharacter::RequestStopEmote(const float BlendOutTime)
 	if (EmoteComponent)
 	{
 		EmoteComponent->RequestStopEmote(BlendOutTime);
+	}
+}
+
+void AKCPlayerCharacter::LaunchCharacter(
+	const FVector LaunchVelocity,
+	const bool bXYOverride,
+	const bool bZOverride)
+{
+	InterruptEmote();
+	Super::LaunchCharacter(LaunchVelocity, bXYOverride, bZOverride);
+}
+
+void AKCPlayerCharacter::InterruptEmote()
+{
+	if (EmoteComponent)
+	{
+		EmoteComponent->RequestInterruptEmote();
 	}
 }
 
