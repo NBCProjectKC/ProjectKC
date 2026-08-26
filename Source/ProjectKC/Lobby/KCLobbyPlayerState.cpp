@@ -17,6 +17,16 @@ void AKCLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 	DOREPLIFETIME(AKCLobbyPlayerState, bReady);
 	DOREPLIFETIME(AKCLobbyPlayerState, TeamId);
+	DOREPLIFETIME(AKCLobbyPlayerState, SlotIndex);
+}
+
+void AKCLobbyPlayerState::SetSlotIndex(int32 InSlotIndex)
+{
+	if (HasAuthority())
+	{
+		SlotIndex = InSlotIndex;
+		OnRep_SlotIndex();
+	}
 }
 
 void AKCLobbyPlayerState::SetTeamId(int32 InTeamId)
@@ -53,4 +63,9 @@ void AKCLobbyPlayerState::OnRep_Ready()
 void AKCLobbyPlayerState::OnRep_TeamId()
 {
 	OnTeamIdChanged.Broadcast(TeamId);
+}
+
+void AKCLobbyPlayerState::OnRep_SlotIndex()
+{
+	OnSlotIndexChanged.Broadcast(SlotIndex);
 }

@@ -1,6 +1,6 @@
 /**
  * @file KCLobbyPlayerState.h
- * @brief 로비 내 플레이어의 준비(Ready) 상태 및 팀 정보 동기화를 담당하는 PlayerState 클래스
+ * @brief 로비 내 플레이어의 준비(Ready) 상태, 슬롯 인덱스(SlotIndex), 팀 정보(TeamId) 동기화를 담당하는 PlayerState 클래스
  */
 
 #pragma once
@@ -11,10 +11,11 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCReadyStatusChangedDelegate, bool, bNewReady);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCTeamIdChangedDelegate, int32, NewTeamId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCSlotIndexChangedDelegate, int32, NewSlotIndex);
 
 /**
  * @class AKCLobbyPlayerState
- * @brief 로비 레벨에서 각 플레이어의 레디 여부, 팀 ID를 관리하고 변경 시 UI에 브로드캐스트하는 PlayerState
+ * @brief 로비 레벨에서 각 플레이어의 레디 여부, 슬롯 번호(0~5), 팀 ID를 관리하고 변경 시 UI에 브로드캐스트하는 PlayerState
  */
 UCLASS()
 class PROJECTKC_API AKCLobbyPlayerState : public APlayerState
@@ -28,7 +29,15 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	//~End of APlayerState interface
 
-	/** @brief 현재 설정된 TeamId를 반환합니다. (0부터 시작) */
+	/** @brief 현재 배정된 슬롯 인덱스를 반환합니다. (0~5) */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	int32 GetSlotIndex() const { return SlotIndex; }
+
+	/** @brief 서버 권한으로 슬롯 인덱스를 변경합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void SetSlotIndex(int32 InSlotIndex);
+
+	/** @brief 현재 설정된 TeamId를 반환합니다. (0: Red, 1: Blue) */
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetTeamId() const { return TeamId; }
 
@@ -57,14 +66,22 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Events")
 	FOnKCTeamIdChangedDelegate OnTeamIdChanged;
 
+	/** @brief 슬롯 인덱스가 변경되었을 때 브로드캐스트되는 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Events")
+	FOnKCSlotIndexChangedDelegate OnSlotIndexChanged;
+
 protected:
 	/** @brief 플레이어 준비 완료 상태 (네트워크 복제) */
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
 	bool bReady = false;
 
-	/** @brief 플레이어 팀 ID (네트워크 복제) */
+	/** @brief 플레이어 소속 팀 ID (네트워크 복제, 0: Red, 1: Blue) */
 	UPROPERTY(ReplicatedUsing = OnRep_TeamId, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
 	int32 TeamId = 0;
+
+	/** @brief 현재 플레이어가 점유 중인 슬롯 인덱스 (네트워크 복제, 0~5) */
+	UPROPERTY(ReplicatedUsing = OnRep_SlotIndex, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
+	int32 SlotIndex = INDEX_NONE;
 
 	/** @brief bReady 프로퍼티 복제 수신 시 호출 */
 	UFUNCTION()
@@ -73,4 +90,8 @@ protected:
 	/** @brief TeamId 프로퍼티 복제 수신 시 호출 */
 	UFUNCTION()
 	virtual void OnRep_TeamId();
+
+	/** @brief SlotIndex 프로퍼티 복제 수신 시 호출 */
+	UFUNCTION()
+	virtual void OnRep_SlotIndex();
 };
