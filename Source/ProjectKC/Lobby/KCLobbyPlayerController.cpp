@@ -4,9 +4,11 @@
  */
 
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
+#include "Blueprint/UserWidget.h"
+#include "Kismet/GameplayStatics.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
@@ -19,17 +21,14 @@ void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 오직 로컬 플레이어 화면에서만 UI 위젯 생성 및 마우스 포커스 설정
 	if (IsLocalPlayerController())
 	{
-		// 마우스 커서 표시 및 Game & UI 입력 모드 설정
 		FInputModeGameAndUI InputMode;
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		InputMode.SetHideCursorDuringCapture(false);
 		SetInputMode(InputMode);
 
-		bShowMouseCursor = true;
-
-		// 로비 메인 위젯 클래스 동적 로드 (CDO 순환 참조 방지)
 		if (!LobbyWidgetClass)
 		{
 			LobbyWidgetClass = StaticLoadClass(UKCLobbyWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyUI.WBP_LobbyUI_C"));
@@ -43,24 +42,27 @@ void AKCLobbyPlayerController::BeginPlay()
 				LobbyWidgetInstance->AddToViewport();
 			}
 		}
-
-		// 서버에 초기 플레이어 정보 동기화 요청
-		ROS_UpdatePlayerInfo();
 	}
 }
 
 void AKCLobbyPlayerController::ROS_ToggleReadyStatus_Implementation()
 {
-	if (AKCLobbyPlayerState* LobbyPS = GetPlayerState<AKCLobbyPlayerState>())
-	{
-		LobbyPS->ToggleReady();
-	}
-
 	if (UWorld* World = GetWorld())
 	{
 		if (AKCLobbyGameMode* GM = World->GetAuthGameMode<AKCLobbyGameMode>())
 		{
-			GM->UpdatePlayerSlots();
+			GM->HandlePlayerReadyToggled(this);
+		}
+	}
+}
+
+void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 TargetSlotIndex)
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (AKCLobbyGameMode* GM = World->GetAuthGameMode<AKCLobbyGameMode>())
+		{
+			GM->MovePlayerToSlot(this, TargetSlotIndex);
 		}
 	}
 }
@@ -71,14 +73,15 @@ void AKCLobbyPlayerController::ROS_UpdatePlayerInfo_Implementation()
 	{
 		if (AKCLobbyGameMode* GM = World->GetAuthGameMode<AKCLobbyGameMode>())
 		{
-			GM->UpdatePlayerSlots();
+			GM->UpdateLobbyReadyState();
 		}
 	}
 }
 
 void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 {
-	DisableInput(this);
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
 
 	if (LobbyWidgetInstance)
 	{

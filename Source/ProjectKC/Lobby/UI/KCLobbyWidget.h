@@ -1,6 +1,6 @@
 /**
  * @file KCLobbyWidget.h
- * @brief 로비 레벨의 메인 UI 위젯 클래스 정의 (레디 토글, 소셜 메뉴 열기, 게임 시작, 시작 애니메이션)
+ * @brief 로비 레벨의 메인 UI 위젯 클래스 정의 (레디 토글, 소셜 메뉴 열기, 게임 시작)
  */
 
 #pragma once
@@ -54,6 +54,10 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UTextBlock> Text_Ready;
 
+	/** @brief 현재 소속 팀명 표시 텍스트 블록 바인딩 (Optional) */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UTextBlock> Text_TeamName;
+
 	/** @brief 내부 임베드된 친구 목록 서브 위젯 */
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCFriendListWidget> WBP_FriendList;
@@ -77,4 +81,8 @@ protected:
 	/** @brief 플레이어 레디 상태 변경 시 UI 텍스트를 갱신하는 콜백 핸들러 */
 	UFUNCTION()
 	virtual void OnReadyStatusUpdated(bool bIsReady);
+
+	/** @brief 플레이어 팀 ID 변경 시 호출되는 콜백 핸들러 */
+	UFUNCTION()
+	virtual void OnTeamIdUpdated(int32 NewTeamId);
 };
