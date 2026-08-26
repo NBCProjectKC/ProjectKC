@@ -7,6 +7,10 @@
 
 class UCommonActivatableWidgetStack;
 class UCommonActivatableWidget;
+class UOverlay;
+class UPanelWidget;
+class UWidget;
+class UKCUserWidget;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTKC_API UKCPrimaryGameLayout : public UCommonUserWidget
@@ -20,11 +24,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	UCommonActivatableWidgetStack* GetLayerStack(FGameplayTag LayerTag) const;
 
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetHUDWidget(UKCUserWidget* InHUDWidget);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void ClearHUDWidget();
+
 protected:
 	virtual void NativeConstruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UCommonActivatableWidgetStack> GameLayer;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UOverlay> HUDLayer;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UCommonActivatableWidgetStack> MenuLayer;
@@ -35,19 +48,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UCommonActivatableWidgetStack> ModalLayer;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UCommonActivatableWidgetStack> SystemLayer;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UCommonActivatableWidgetStack> ToastLayer;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UCommonActivatableWidgetStack> IndicatorLayer;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UCommonActivatableWidgetStack> TransitionLayer;
-
 private:
+	void EnsureRuntimeLayers();
+	void AddRuntimeLayerToRoot(UWidget* LayerWidget, int32 ZOrder);
 	void CacheLayerStacks();
 
 	UPROPERTY(Transient)

@@ -6,7 +6,9 @@
 #include "KCLocalPlayerUISubsystem.generated.h"
 
 class UCommonActivatableWidget;
+class APlayerController;
 class UKCPrimaryGameLayout;
+class UKCUISettings;
 class UKCUserWidget;
 class UKCToastWidget;
 
@@ -18,6 +20,9 @@ class PROJECTKC_API UKCLocalPlayerUISubsystem : public ULocalPlayerSubsystem
 public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetPrimaryGameLayout(UKCPrimaryGameLayout* InPrimaryGameLayout);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	UKCPrimaryGameLayout* EnsurePrimaryGameLayout();
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	UKCPrimaryGameLayout* GetPrimaryGameLayout() const { return PrimaryGameLayout; }
@@ -38,6 +43,8 @@ protected:
 	virtual void Deinitialize() override;
 
 private:
+	APlayerController* GetOwningPlayerController() const;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UKCPrimaryGameLayout> PrimaryGameLayout;
 
