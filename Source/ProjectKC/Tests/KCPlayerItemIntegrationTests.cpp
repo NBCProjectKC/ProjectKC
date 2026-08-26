@@ -68,10 +68,13 @@ bool FKCPlayerItemIntegrationTest::RunTest(const FString& Parameters)
 		FinalPlayerBlueprintClass);
 	if (FinalPlayerBlueprintClass)
 	{
-		const AKCPlayerCharacter* FinalPlayer =
+		AKCPlayerCharacter* FinalPlayer =
 			FinalPlayerBlueprintClass->GetDefaultObject<AKCPlayerCharacter>();
 		const UKCHeldItemComponent* FinalHeldItem =
 			FinalPlayer->GetHeldItemComponent();
+		const UStaticMeshComponent* AvatarHandRight =
+			Cast<UStaticMeshComponent>(
+				FinalPlayer->GetDefaultSubobjectByName(TEXT("AvatarHandRight")));
 		USceneComponent* FinalAttachment =
 			FinalHeldItem ? FinalHeldItem->GetAttachmentComponent() : nullptr;
 		TestNotNull(
@@ -83,6 +86,16 @@ bool FKCPlayerItemIntegrationTest::RunTest(const FString& Parameters)
 				TEXT("최종 Player Blueprint의 설정된 손 소켓이 실제로 존재한다."),
 				FinalAttachment->DoesSocketExist(
 					FinalHeldItem->GetHandSocketName()));
+		}
+		TestNotNull(
+			TEXT("보이는 오른손 컴포넌트를 찾을 수 있다."),
+			AvatarHandRight);
+		if (FinalHeldItem && AvatarHandRight)
+		{
+			TestEqual(
+				TEXT("보이는 오른손과 아이템은 같은 스켈레톤 소켓을 따른다."),
+				AvatarHandRight->GetAttachSocketName(),
+				FinalHeldItem->GetHandSocketName());
 		}
 	}
 

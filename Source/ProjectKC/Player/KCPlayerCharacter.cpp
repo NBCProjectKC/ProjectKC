@@ -6,12 +6,19 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "GameplayAbilitySpec.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "ProjectKC/AbilitySystem/Ability/KCGA_PlayerDash.h"
+#include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCKnockbackComponent.h"
+#include "ProjectKC/AbilitySystem/Effect/KCGE_StaminaRegen.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/Player/Component/KCEmoteComponent.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -19,6 +26,16 @@ namespace
 {
 	constexpr float FacingReplicationInterval = 1.0f / 30.0f;
 	constexpr float MinimumFacingReplicationAngle = 0.5f;
+	constexpr double MinimumServerFacingUpdateInterval = 1.0 / 60.0;
+	constexpr float MinimumFacingYaw = -180.0f;
+	constexpr float MaximumFacingYaw = 180.0f;
+
+	bool IsValidFacingYaw(const float FacingYaw)
+	{
+		return FMath::IsFinite(FacingYaw) &&
+			FacingYaw >= MinimumFacingYaw &&
+			FacingYaw <= MaximumFacingYaw;
+	}
 
 	void ConfigureAvatarPart(UStaticMeshComponent* Component, UStaticMesh* Mesh)
 	{
@@ -73,8 +90,9 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	ConfigureAvatarPart(AvatarHandLeft, SphereMesh);
 
 	AvatarHandRight = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarHandRight"));
-	AvatarHandRight->SetupAttachment(GetMesh(), TEXT("hand_r"));
-	AvatarHandRight->SetRelativeLocation(FVector(0.0f, -25.0f, 0.0f));
+	// 스켈레톤의 표준 그립 소켓은 유지하고, 보이는 손이 그 기준을 따른다.
+	// 아이템도 같은 소켓에 붙으므로 Grip이 손 중심과 자연스럽게 일치한다.
+	AvatarHandRight->SetupAttachment(GetMesh(), TEXT("HandGrip_R"));
 	AvatarHandRight->SetRelativeScale3D(FVector(0.26f));
 	ConfigureAvatarPart(AvatarHandRight, SphereMesh);
 
@@ -99,12 +117,17 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement();
 	CharacterMovementComponent->bOrientRotationToMovement = false;
 	CharacterMovementComponent->bUseControllerDesiredRotation = false;
-	CharacterMovementComponent->MaxWalkSpeed = 600.0f;
 
 	AbilitySystemComponent =
 		CreateDefaultSubobject<UKCAbilitySystemComponent>(TEXT("AbilitySystem"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+	CharacterAttributes =
+		CreateDefaultSubobject<UKCCharacterAttributeSet>(TEXT("CharacterAttributes"));
+	CharacterMovementComponent->MaxWalkSpeed = CharacterAttributes->GetMoveSpeed();
+	DashAbilityClass = UKCGA_PlayerDash::StaticClass();
+	StaminaRegenEffectClass = UKCGE_StaminaRegen::StaticClass();
+	EmoteComponent = CreateDefaultSubobject<UKCEmoteComponent>(TEXT("Emote"));
 
 	HeldItemComponent =
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
@@ -176,8 +199,17 @@ void AKCPlayerCharacter::ConfigureDriverMesh()
 
 bool AKCPlayerCharacter::BeginUseHeldItem()
 {
-	return IsLocallyControlled() && HeldItemComponent &&
-		HeldItemComponent->PressHeldItemUse();
+	if (!IsLocallyControlled() || !HeldItemComponent)
+	{
+		return false;
+	}
+
+	const bool bUseStarted = HeldItemComponent->PressHeldItemUse();
+	if (bUseStarted)
+	{
+		InterruptEmote();
+	}
+	return bUseStarted;
 }
 
 void AKCPlayerCharacter::EndUseHeldItem()
@@ -210,6 +242,16 @@ void AKCPlayerCharacter::RequestDropHeldItem()
 UKCAbilitySystemComponent* AKCPlayerCharacter::GetKCAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+UKCCharacterAttributeSet* AKCPlayerCharacter::GetCharacterAttributes() const
+{
+	return CharacterAttributes;
+}
+
+UKCEmoteComponent* AKCPlayerCharacter::GetEmoteComponent() const
+{
+	return EmoteComponent;
 }
 
 UKCHeldItemComponent* AKCPlayerCharacter::GetHeldItemComponent() const
@@ -315,9 +357,116 @@ void AKCPlayerCharacter::PawnClientRestart()
 
 void AKCPlayerCharacter::InitializeAbilityActorInfo()
 {
-	if (AbilitySystemComponent)
+	if (!AbilitySystemComponent)
 	{
-		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+		return;
+	}
+
+	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+	BindAttributeDelegates();
+	GrantDefaultAbilities();
+	EnsureStaminaRegenEffect();
+}
+
+void AKCPlayerCharacter::GrantDefaultAbilities()
+{
+	if (!HasAuthority() || !AbilitySystemComponent || !DashAbilityClass ||
+		AbilitySystemComponent->FindAbilitySpecFromClass(DashAbilityClass))
+	{
+		return;
+	}
+
+	AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(
+		DashAbilityClass,
+		1,
+		INDEX_NONE,
+		this));
+}
+
+void AKCPlayerCharacter::EnsureStaminaRegenEffect()
+{
+	if (!HasAuthority() || !AbilitySystemComponent ||
+		!StaminaRegenEffectClass)
+	{
+		return;
+	}
+
+	if (StaminaRegenEffectHandle.IsValid() &&
+		AbilitySystemComponent->GetActiveGameplayEffect(
+			StaminaRegenEffectHandle))
+	{
+		return;
+	}
+
+	const UGameplayEffect* RegenEffect =
+		StaminaRegenEffectClass->GetDefaultObject<UGameplayEffect>();
+	if (!RegenEffect)
+	{
+		return;
+	}
+
+	StaminaRegenEffectHandle =
+		AbilitySystemComponent->ApplyGameplayEffectToSelf(
+			RegenEffect,
+			1.0f,
+			AbilitySystemComponent->MakeEffectContext());
+}
+
+void AKCPlayerCharacter::BindAttributeDelegates()
+{
+	if (!AbilitySystemComponent || !CharacterAttributes)
+	{
+		return;
+	}
+
+	FOnGameplayAttributeValueChange& MoveSpeedDelegate =
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+			UKCCharacterAttributeSet::GetMoveSpeedAttribute());
+	if (MoveSpeedChangedDelegateHandle.IsValid())
+	{
+		MoveSpeedDelegate.Remove(MoveSpeedChangedDelegateHandle);
+		MoveSpeedChangedDelegateHandle.Reset();
+	}
+	MoveSpeedChangedDelegateHandle = MoveSpeedDelegate.AddUObject(
+		this,
+		&AKCPlayerCharacter::HandleMoveSpeedChanged);
+	ApplyMoveSpeed(CharacterAttributes->GetMoveSpeed());
+
+	FOnGameplayAttributeValueChange& HealthDelegate =
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+			UKCCharacterAttributeSet::GetHealthAttribute());
+	if (HealthChangedDelegateHandle.IsValid())
+	{
+		HealthDelegate.Remove(HealthChangedDelegateHandle);
+		HealthChangedDelegateHandle.Reset();
+	}
+	HealthChangedDelegateHandle = HealthDelegate.AddUObject(
+		this,
+		&AKCPlayerCharacter::HandleHealthChanged);
+}
+
+void AKCPlayerCharacter::HandleMoveSpeedChanged(
+	const FOnAttributeChangeData& ChangeData)
+{
+	ApplyMoveSpeed(ChangeData.NewValue);
+}
+
+void AKCPlayerCharacter::HandleHealthChanged(
+	const FOnAttributeChangeData& ChangeData)
+{
+	if (HasAuthority() && ChangeData.NewValue < ChangeData.OldValue)
+	{
+		InterruptEmote();
+	}
+}
+
+void AKCPlayerCharacter::ApplyMoveSpeed(const float MoveSpeed)
+{
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->MaxWalkSpeed = FMath::IsFinite(MoveSpeed)
+			? FMath::Max(MoveSpeed, 0.0f)
+			: 0.0f;
 	}
 }
 
@@ -325,7 +474,84 @@ void AKCPlayerCharacter::MoveInWorldDirection(const FVector& WorldDirection, con
 {
 	if (!FMath::IsNearlyZero(ScaleValue))
 	{
+		InterruptEmote();
 		AddMovementInput(WorldDirection, ScaleValue);
+	}
+}
+
+bool AKCPlayerCharacter::RequestDash()
+{
+	if (!IsLocallyControlled() || !AbilitySystemComponent || !DashAbilityClass)
+	{
+		return false;
+	}
+
+	FGameplayAbilitySpec* DashSpec =
+		AbilitySystemComponent->FindAbilitySpecFromClass(DashAbilityClass);
+	if (!DashSpec)
+	{
+		return false;
+	}
+
+	FVector DashDirection = GetLastMovementInputVector().GetSafeNormal2D();
+	if (DashDirection.IsNearlyZero())
+	{
+		DashDirection = GetActorForwardVector().GetSafeNormal2D();
+	}
+	if (DashDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	FGameplayEventData EventData;
+	EventData.Instigator = this;
+	EventData.Target = this;
+	EventData.EventMagnitude = FMath::UnwindDegrees(
+		DashDirection.Rotation().Yaw);
+	const bool bDashActivated =
+		AbilitySystemComponent->TryActivateGrantedAbilityWithEvent(
+		DashSpec->Handle,
+		TAG_KC_GameplayEvent_Player_Dash,
+		EventData);
+	if (bDashActivated)
+	{
+		InterruptEmote();
+	}
+	return bDashActivated;
+}
+
+bool AKCPlayerCharacter::RequestPlayEmote(const int32 EmoteIndex)
+{
+	return EmoteComponent && EmoteComponent->RequestPlayEmote(EmoteIndex);
+}
+
+bool AKCPlayerCharacter::RequestPlayNextEmote()
+{
+	return EmoteComponent && EmoteComponent->RequestPlayNextEmote();
+}
+
+void AKCPlayerCharacter::RequestStopEmote(const float BlendOutTime)
+{
+	if (EmoteComponent)
+	{
+		EmoteComponent->RequestStopEmote(BlendOutTime);
+	}
+}
+
+void AKCPlayerCharacter::LaunchCharacter(
+	const FVector LaunchVelocity,
+	const bool bXYOverride,
+	const bool bZOverride)
+{
+	InterruptEmote();
+	Super::LaunchCharacter(LaunchVelocity, bXYOverride, bZOverride);
+}
+
+void AKCPlayerCharacter::InterruptEmote()
+{
+	if (EmoteComponent)
+	{
+		EmoteComponent->RequestInterruptEmote();
 	}
 }
 
@@ -358,10 +584,78 @@ void AKCPlayerCharacter::UpdateFacingDirection(const FVector& WorldDirection, co
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)
 {
+	if (!IsValidFacingYaw(FacingYaw))
+	{
+		return;
+	}
+
 	SetActorRotation(FRotator(0.0f, FMath::UnwindDegrees(FacingYaw), 0.0f));
 }
 
 void AKCPlayerCharacter::ServerSetFacingYaw_Implementation(const float FacingYaw)
 {
+	if (!IsValidFacingYaw(FacingYaw))
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	const double ElapsedSinceLastUpdate =
+		CurrentTimeSeconds - LastServerFacingUpdateTimeSeconds;
+	if (LastServerFacingUpdateTimeSeconds < 0.0 ||
+		CurrentTimeSeconds < LastServerFacingUpdateTimeSeconds ||
+		ElapsedSinceLastUpdate >= MinimumServerFacingUpdateInterval)
+	{
+		GetWorldTimerManager().ClearTimer(ServerFacingUpdateTimer);
+		bHasPendingServerFacingYaw = false;
+		ApplyAcceptedServerFacingYaw(FacingYaw, CurrentTimeSeconds);
+		return;
+	}
+
+	// 지연으로 같은 서버 틱에 RPC가 몰리면 오래된 중간값은 버리고
+	// 제한 구간에서 받은 가장 최신 방향 하나만 다음 슬롯에 적용한다.
+	PendingServerFacingYaw = FacingYaw;
+	bHasPendingServerFacingYaw = true;
+	if (!GetWorldTimerManager().IsTimerActive(ServerFacingUpdateTimer))
+	{
+		GetWorldTimerManager().SetTimer(
+			ServerFacingUpdateTimer,
+			this,
+			&AKCPlayerCharacter::FlushPendingServerFacingYaw,
+			MinimumServerFacingUpdateInterval - ElapsedSinceLastUpdate,
+			false);
+	}
+}
+
+void AKCPlayerCharacter::ApplyAcceptedServerFacingYaw(
+	const float FacingYaw,
+	const double CurrentTimeSeconds)
+{
+	LastServerFacingUpdateTimeSeconds = CurrentTimeSeconds;
 	ApplyFacingYaw(FacingYaw);
+}
+
+void AKCPlayerCharacter::FlushPendingServerFacingYaw()
+{
+	if (!HasAuthority() || !bHasPendingServerFacingYaw)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		bHasPendingServerFacingYaw = false;
+		return;
+	}
+
+	const float FacingYaw = PendingServerFacingYaw;
+	bHasPendingServerFacingYaw = false;
+	ApplyAcceptedServerFacingYaw(FacingYaw, World->GetTimeSeconds());
 }

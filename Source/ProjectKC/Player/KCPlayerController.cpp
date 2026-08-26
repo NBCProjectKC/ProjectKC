@@ -78,6 +78,32 @@ void AKCPlayerController::DropHeldItem(const FInputActionValue& InputValue)
 	}
 }
 
+void AKCPlayerController::Dash(const FInputActionValue& InputValue)
+{
+	if (!InputValue.Get<bool>())
+	{
+		return;
+	}
+
+	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->RequestDash();
+	}
+}
+
+void AKCPlayerController::Emote(const FInputActionValue& InputValue)
+{
+	if (!InputValue.Get<bool>())
+	{
+		return;
+	}
+
+	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->RequestPlayNextEmote();
+	}
+}
+
 void AKCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -87,6 +113,24 @@ void AKCPlayerController::SetupInputComponent()
 	{
 		EnhancedInputComponent->BindAction(
 			MoveAction, ETriggerEvent::Triggered, this, &AKCPlayerController::Move);
+	}
+
+	if (DashAction)
+	{
+		EnhancedInputComponent->BindAction(
+			DashAction,
+			ETriggerEvent::Started,
+			this,
+			&AKCPlayerController::Dash);
+	}
+
+	if (EmoteAction)
+	{
+		EnhancedInputComponent->BindAction(
+			EmoteAction,
+			ETriggerEvent::Started,
+			this,
+			&AKCPlayerController::Emote);
 	}
 
 	if (AttackAction)

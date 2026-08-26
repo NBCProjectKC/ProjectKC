@@ -23,6 +23,8 @@ protected:
 
 private:
 	void Move(const FInputActionValue& InputValue);
+	void Dash(const FInputActionValue& InputValue);
+	void Emote(const FInputActionValue& InputValue);
 	void BeginUseHeldItem(const FInputActionValue& InputValue);
 	void EndUseHeldItem(const FInputActionValue& InputValue);
 	void Interact(const FInputActionValue& InputValue);
@@ -34,6 +36,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> DashAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> EmoteAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> AttackAction;

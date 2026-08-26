@@ -2,12 +2,18 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "GameplayEffectTypes.h"
 #include "GameFramework/Character.h"
+#include "TimerManager.h"
 #include "KCPlayerCharacter.generated.h"
 
 class UAbilitySystemComponent;
 class UCameraComponent;
+class UGameplayAbility;
+class UGameplayEffect;
 class UKCAbilitySystemComponent;
+class UKCCharacterAttributeSet;
+class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
@@ -18,6 +24,7 @@ class UStaticMeshComponent;
 #if WITH_EDITOR
 struct FPropertyChangedEvent;
 #endif
+struct FOnAttributeChangeData;
 
 UCLASS()
 class PROJECTKC_API AKCPlayerCharacter
@@ -31,9 +38,17 @@ public:
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void LaunchCharacter(
+		FVector LaunchVelocity,
+		bool bXYOverride,
+		bool bZOverride) override;
 
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
+	bool RequestDash();
+	bool RequestPlayEmote(int32 EmoteIndex = 0);
+	bool RequestPlayNextEmote();
+	void RequestStopEmote(float BlendOutTime = 0.2f);
 	bool BeginUseHeldItem();
 	void EndUseHeldItem();
 	void RequestInteract();
@@ -41,6 +56,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Ability")
 	UKCAbilitySystemComponent* GetKCAbilitySystemComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Attributes")
+	UKCCharacterAttributeSet* GetCharacterAttributes() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Emote")
+	UKCEmoteComponent* GetEmoteComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	UKCHeldItemComponent* GetHeldItemComponent() const;
@@ -69,7 +90,18 @@ protected:
 private:
 	void ConfigureDriverMesh();
 	void InitializeAbilityActorInfo();
+	void GrantDefaultAbilities();
+	void EnsureStaminaRegenEffect();
+	void BindAttributeDelegates();
+	void HandleMoveSpeedChanged(const FOnAttributeChangeData& ChangeData);
+	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData);
+	void ApplyMoveSpeed(float MoveSpeed);
+	void InterruptEmote();
 	void ApplyFacingYaw(float FacingYaw);
+	void ApplyAcceptedServerFacingYaw(
+		float FacingYaw,
+		double CurrentTimeSeconds);
+	void FlushPendingServerFacingYaw();
 
 	UFUNCTION(Server, Unreliable)
 	void ServerSetFacingYaw(float FacingYaw);
@@ -83,6 +115,20 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Attributes",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCCharacterAttributeSet> CharacterAttributes;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Dash")
+	TSubclassOf<UGameplayAbility> DashAbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Attributes")
+	TSubclassOf<UGameplayEffect> StaminaRegenEffectClass;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Emote",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCEmoteComponent> EmoteComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item",
 		meta = (AllowPrivateAccess = "true"))
@@ -133,4 +179,11 @@ private:
 
 	float FacingReplicationElapsed = 0.0f;
 	float LastSentFacingYaw = 0.0f;
+	double LastServerFacingUpdateTimeSeconds = -1.0;
+	float PendingServerFacingYaw = 0.0f;
+	bool bHasPendingServerFacingYaw = false;
+	FTimerHandle ServerFacingUpdateTimer;
+	FDelegateHandle MoveSpeedChangedDelegateHandle;
+	FDelegateHandle HealthChangedDelegateHandle;
+	FActiveGameplayEffectHandle StaminaRegenEffectHandle;
 };
