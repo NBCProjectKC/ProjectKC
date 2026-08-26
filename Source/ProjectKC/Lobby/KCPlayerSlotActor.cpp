@@ -8,31 +8,43 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/ArrowComponent.h"
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 
 AKCPlayerSlotActor::AKCPlayerSlotActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
+	SlotState = EKCLobbySlotStateType::Empty;
+}
+
+void AKCPlayerSlotActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AKCPlayerSlotActor, SlotState);
+	DOREPLIFETIME(AKCPlayerSlotActor, bIsOccupied);
+	DOREPLIFETIME(AKCPlayerSlotActor, CurrentPlayerInfo);
 }
 
 void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo)
 {
 	CurrentPlayerInfo = InPlayerInfo;
 	bIsOccupied = true;
+	SlotState = InPlayerInfo.bReady ? EKCLobbySlotStateType::Ready : EKCLobbySlotStateType::Occupied;
+	OnRep_SlotState();
 
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	// 기존에 스폰되어 있던 캐릭터가 있다면 파괴
-	if (SpawnedCharacter)
+	// [튕김 및 크래시 방지] 이미 스폰된 캐릭터가 있고 유효하다면 정보만 갱신
+	if (SpawnedCharacter && IsValid(SpawnedCharacter))
 	{
-		SpawnedCharacter->Destroy();
-		SpawnedCharacter = nullptr;
+		SpawnedCharacter->UpdatePlayerInfo(InPlayerInfo);
+		return;
 	}
 
-	// 로비 캐릭터 클래스 동적 로드 (CDO 순환 참조 방지)
 	if (!CharacterClass)
 	{
 		CharacterClass = StaticLoadClass(AKCLobbyCharacter::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/Lobby/BP_Lobby_PlayerCharacter.BP_Lobby_PlayerCharacter_C"));
@@ -45,7 +57,7 @@ void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo)
 		{
 			SpawnTransform = ArrowComp->GetComponentTransform();
 		}
-		// 캐릭터 원래 인게임 스케일 (1.0, 1.0, 1.0) 보장
+
 		SpawnTransform.SetScale3D(FVector::OneVector);
 
 		FActorSpawnParameters SpawnParams;
@@ -55,7 +67,6 @@ void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo)
 		SpawnedCharacter = GetWorld()->SpawnActor<AKCLobbyCharacter>(CharacterClass, SpawnTransform, SpawnParams);
 		if (SpawnedCharacter)
 		{
-			// 캡슐 절반 높이(Z) 보정으로 발바닥 높이 일치
 			if (UCapsuleComponent* Capsule = SpawnedCharacter->GetCapsuleComponent())
 			{
 				FVector AdjustedLoc = SpawnTransform.GetLocation();
@@ -73,10 +84,42 @@ void AKCPlayerSlotActor::ClearSlot()
 {
 	CurrentPlayerInfo = FKCPlayerInfoStruct();
 	bIsOccupied = false;
+	SlotState = EKCLobbySlotStateType::Empty;
+	OnRep_SlotState();
 
 	if (HasAuthority() && SpawnedCharacter)
 	{
 		SpawnedCharacter->Destroy();
 		SpawnedCharacter = nullptr;
 	}
+}
+
+void AKCPlayerSlotActor::SetSlotClosed(bool bClosed)
+{
+	if (bClosed)
+	{
+		CurrentPlayerInfo = FKCPlayerInfoStruct();
+		bIsOccupied = false;
+		SlotState = EKCLobbySlotStateType::Closed;
+		OnRep_SlotState();
+
+		if (HasAuthority() && SpawnedCharacter)
+		{
+			SpawnedCharacter->Destroy();
+			SpawnedCharacter = nullptr;
+		}
+	}
+	else
+	{
+		if (SlotState == EKCLobbySlotStateType::Closed)
+		{
+			SlotState = EKCLobbySlotStateType::Empty;
+			OnRep_SlotState();
+		}
+	}
+}
+
+void AKCPlayerSlotActor::OnRep_SlotState()
+{
+	OnSlotStateChanged(SlotState);
 }

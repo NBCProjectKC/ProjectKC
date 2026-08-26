@@ -1,6 +1,6 @@
 /**
  * @file KCLobbyPlayerController.h
- * @brief 로비 전용 PlayerController 클래스 정의 (UI 생성, 입력 모드, 서버 RPC 통신)
+ * @brief 로비 전용 PlayerController 클래스 정의 (UI 생성, 입력 모드, 슬롯 이동 및 레디 Server RPC)
  */
 
 #pragma once
@@ -26,6 +26,10 @@ public:
 	/** @brief 클라이언트가 서버에 준비(Ready) 상태 토글을 요청하는 Server RPC */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void ROS_ToggleReadyStatus();
+
+	/** @brief 클라이언트가 서버에 특정 슬롯(TargetSlotIndex: 0~5)으로 1:1 자리 이동을 요청하는 Server RPC */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
+	void ROS_RequestMoveToSlot(int32 TargetSlotIndex);
 
 	/** @brief 클라이언트가 서버에 플레이어 정보 동기화를 요청하는 Server RPC */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
