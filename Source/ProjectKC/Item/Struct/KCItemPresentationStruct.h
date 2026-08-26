@@ -26,7 +26,7 @@ struct PROJECTKC_API FKCItemPresentationStruct
 		BlueprintReadOnly,
 		Category = "World",
 		meta = (CollisionProfileName = true))
-	FName WorldCollisionProfile = TEXT("PhysicsActor");
+	FName WorldCollisionProfile = TEXT("KCWorldItem");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World")
 	bool bSimulatePhysicsInWorld = true;

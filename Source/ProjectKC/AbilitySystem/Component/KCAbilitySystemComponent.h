@@ -122,6 +122,8 @@ private:
 		FName StartSection);
 	void StopLocalActionMontagePrediction(bool bResetState);
 	void ResetLocalActionMontagePrediction();
+	/** 이 핸들의 액션이 아직 진행 중인지. 중복 Press의 예측 재생을 막는다. */
+	bool HasOutstandingLocalAction(FGameplayAbilitySpecHandle AbilityHandle);
 	bool MatchesLocalActionRequest(
 		FGameplayAbilitySpecHandle AbilityHandle,
 		uint32 ActionRequestId) const;

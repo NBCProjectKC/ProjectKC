@@ -162,6 +162,16 @@ bool UKCAbilitySystemComponent::PressAbilityInputByHandle(
 		return ProcessAbilityInputPressed(AbilityHandle);
 	}
 
+	// 이미 진행 중인 액션에 다시 들어온 Press는 여기서 버린다.
+	// 서버는 활성 Spec의 재활성화를 거부하므로 이 입력은 어차피 아무것도
+	// 시작하지 못한다. 그런데 예측 재생은 시작 전에 진행 중인 연출을 끊고
+	// 처음부터 다시 트니, 유효한 연출만 망가뜨리고 되돌릴 방법이 없다.
+	// 서버 RPC도 보내지 않아 Press와 Release 짝이 어긋나지 않게 한다.
+	if (HasOutstandingLocalAction(AbilityHandle))
+	{
+		return false;
+	}
+
 	const uint32 ActionRequestId =
 		BeginLocalActionMontagePrediction(AbilityHandle);
 	ServerPressAbilityInputByHandle(AbilityHandle, ActionRequestId);
@@ -530,6 +540,32 @@ void UKCAbilitySystemComponent::ResetLocalActionMontagePrediction()
 	bLocalActionStopOnRelease = false;
 	bLocalActionInputReleased = false;
 	bLocalActionMontagePlayed = false;
+}
+
+bool UKCAbilitySystemComponent::HasOutstandingLocalAction(
+	FGameplayAbilitySpecHandle AbilityHandle)
+{
+	// 서버가 확정한 활성 상태다. 한 왕복 늦게 도착하지만,
+	// 로컬 연출이 먼저 끝나고 Ability는 아직 살아 있는 구간을 메운다.
+	const FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	if (Spec && Spec->IsActive())
+	{
+		return true;
+	}
+
+	if (LocalActionRequestId == 0 || LocalActionAbilityHandle != AbilityHandle)
+	{
+		return false;
+	}
+
+	// 아직 서버 응답 전이면 예측 연출이 살아 있는지로 판단한다.
+	// 연출이 이미 끝났다면 응답이 유실돼도 다음 입력을 영구히 막지 않는다.
+	const UAnimMontage* PredictedMontage = LocalActionMontage.Get();
+	const UAnimInstance* AnimInstance = AbilityActorInfo.IsValid()
+		? AbilityActorInfo->GetAnimInstance()
+		: nullptr;
+	return bLocalActionMontagePlayed && IsValid(PredictedMontage) &&
+		AnimInstance && AnimInstance->Montage_IsPlaying(PredictedMontage);
 }
 
 bool UKCAbilitySystemComponent::MatchesLocalActionRequest(
