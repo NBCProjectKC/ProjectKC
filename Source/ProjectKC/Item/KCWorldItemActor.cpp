@@ -19,7 +19,7 @@ AKCWorldItemActor::AKCWorldItemActor()
 
 	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
 	SetRootComponent(ItemMesh);
-	ItemMesh->SetCollisionProfileName(TEXT("PhysicsActor"));
+	ItemMesh->SetCollisionProfileName(TEXT("KCWorldItem"));
 	ItemMesh->SetGenerateOverlapEvents(true);
 	ItemMesh->SetSimulatePhysics(false);
 	ItemMesh->ComponentTags.AddUnique(TEXT("Interactable"));
