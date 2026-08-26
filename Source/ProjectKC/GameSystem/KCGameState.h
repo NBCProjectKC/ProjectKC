@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameState.h"
 #include "GameplayTagContainer.h"
-#include "KCGamePhaseType.h"
+#include "GameSystem/KCGamePhaseType.h"
 #include "KCGameState.generated.h"
 
 /**
