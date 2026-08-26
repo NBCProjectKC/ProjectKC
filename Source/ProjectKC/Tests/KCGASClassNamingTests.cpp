@@ -44,7 +44,7 @@ bool FKCGASClassNamingConventionTest::RunTest(const FString& Parameters)
 		}
 	}
 
-	TestEqual(TEXT("ProjectKC 네이티브 GA 클래스 수"), AbilityClassCount, 2);
+	TestEqual(TEXT("ProjectKC 네이티브 GA 클래스 수"), AbilityClassCount, 4);
 	TestEqual(TEXT("ProjectKC 네이티브 GE 클래스 수"), EffectClassCount, 3);
 	return true;
 }

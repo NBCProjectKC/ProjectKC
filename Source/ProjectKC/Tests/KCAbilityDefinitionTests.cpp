@@ -2,6 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "UObject/UnrealType.h"
+
 #include "Animation/AnimMontage.h"
 #include "GameplayEffect.h"
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
@@ -338,6 +340,55 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("런타임 주입값은 인스턴스 Definition Override보다 우선한다."),
 		Resolved == RuntimeDefinition);
+
+	return true;
+}
+
+
+/**
+ * 클라이언트의 중복 Press 가드는 '서버가 활성 Spec의 재활성화를 거부한다'는
+ * 전제 위에 서 있다. bRetriggerInstancedAbility가 켜지면 서버도 몽타주를
+ * 다시 시작하므로 그 전제가 무너진다.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FKCActionActivationPolicyTest,
+	"ProjectKC.GAS.Action.ActivationPolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FKCActionActivationPolicyTest::RunTest(const FString& Parameters)
+{
+	const UGameplayAbility* ActionDefaults = GetDefault<UKCGA_Action>();
+	const UGameplayAbility* ChannelDefaults = GetDefault<UKCGA_ChannelAction>();
+
+	// protected 멤버라 리플렉션으로 읽는다.
+	const FBoolProperty* RetriggerProperty = FindFProperty<FBoolProperty>(
+		UGameplayAbility::StaticClass(),
+		TEXT("bRetriggerInstancedAbility"));
+
+	for (const UGameplayAbility* Ability : { ActionDefaults, ChannelDefaults })
+	{
+		const FString AbilityName = GetNameSafe(Ability->GetClass());
+		TestTrue(
+			*FString::Printf(
+				TEXT("'%s'는 서버에서만 실행된다."), *AbilityName),
+			Ability->GetNetExecutionPolicy() ==
+				EGameplayAbilityNetExecutionPolicy::ServerOnly);
+		TestTrue(
+			*FString::Printf(
+				TEXT("'%s'는 Actor당 하나의 인스턴스만 갖는다."), *AbilityName),
+			Ability->GetInstancingPolicy() ==
+				EGameplayAbilityInstancingPolicy::InstancedPerActor);
+		if (TestNotNull(
+			TEXT("bRetriggerInstancedAbility 프로퍼티를 찾는다."),
+			RetriggerProperty))
+		{
+			TestFalse(
+				*FString::Printf(
+					TEXT("'%s'는 실행 중 재활성화로 재시작하지 않는다."),
+					*AbilityName),
+				RetriggerProperty->GetPropertyValue_InContainer(Ability));
+		}
+	}
 
 	return true;
 }
