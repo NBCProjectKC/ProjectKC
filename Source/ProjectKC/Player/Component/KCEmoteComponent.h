@@ -29,6 +29,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Emote")
 	bool RequestPlayEmote(int32 EmoteIndex);
 
+	/** 몽타주 풀의 다음 유효한 감정표현을 서버 승인 순서대로 요청한다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Emote")
+	bool RequestPlayNextEmote();
+
 	UFUNCTION(BlueprintCallable, Category = "KC|Emote")
 	void RequestStopEmote(float BlendOutTime = 0.2f);
 
@@ -49,6 +53,9 @@ protected:
 	void ServerPlayEmote(int32 EmoteIndex);
 
 	UFUNCTION(Server, Reliable)
+	void ServerPlayNextEmote();
+
+	UFUNCTION(Server, Reliable)
 	void ServerStopEmote(float BlendOutTime);
 
 	UFUNCTION(NetMulticast, Reliable)
@@ -59,8 +66,10 @@ protected:
 
 private:
 	bool IsRequestOwnerAllowed() const;
+	bool TryPlayEmoteOnServer(int32 EmoteIndex);
 	bool CanServerAcceptEmote(int32 EmoteIndex) const;
 	bool IsConfiguredEmote(int32 EmoteIndex) const;
+	int32 FindNextConfiguredEmoteIndex() const;
 	void PlayEmoteLocal(int32 EmoteIndex);
 	void StopEmoteLocal(float BlendOutTime);
 
@@ -73,6 +82,8 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Emote")
 	bool bBlockWhenAnyMontagePlaying = true;
 
+	/** 서버가 다음에 승인할 몽타주 풀 인덱스다. */
+	int32 NextEmoteIndex = 0;
 	int32 ActiveEmoteIndex = INDEX_NONE;
 	double LastAcceptedRequestTimeSeconds = -1.0;
 };

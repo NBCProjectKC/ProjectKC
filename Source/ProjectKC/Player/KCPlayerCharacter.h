@@ -43,6 +43,7 @@ public:
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
 	bool RequestDash();
 	bool RequestPlayEmote(int32 EmoteIndex = 0);
+	bool RequestPlayNextEmote();
 	void RequestStopEmote(float BlendOutTime = 0.2f);
 	bool BeginUseHeldItem();
 	void EndUseHeldItem();

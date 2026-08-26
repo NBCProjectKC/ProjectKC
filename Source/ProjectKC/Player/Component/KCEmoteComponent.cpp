@@ -30,6 +30,25 @@ bool UKCEmoteComponent::RequestPlayEmote(const int32 EmoteIndex)
 	return true;
 }
 
+bool UKCEmoteComponent::RequestPlayNextEmote()
+{
+	if (!IsRequestOwnerAllowed() ||
+		FindNextConfiguredEmoteIndex() == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (GetOwner()->HasAuthority())
+	{
+		ServerPlayNextEmote_Implementation();
+	}
+	else
+	{
+		ServerPlayNextEmote();
+	}
+	return true;
+}
+
 void UKCEmoteComponent::RequestStopEmote(const float BlendOutTime)
 {
 	if (!IsRequestOwnerAllowed())
@@ -68,13 +87,16 @@ bool UKCEmoteComponent::IsPlayingEmote() const
 
 void UKCEmoteComponent::ServerPlayEmote_Implementation(const int32 EmoteIndex)
 {
-	if (!CanServerAcceptEmote(EmoteIndex))
-	{
-		return;
-	}
+	TryPlayEmoteOnServer(EmoteIndex);
+}
 
-	LastAcceptedRequestTimeSeconds = GetWorld()->GetTimeSeconds();
-	MulticastPlayEmote(EmoteIndex);
+void UKCEmoteComponent::ServerPlayNextEmote_Implementation()
+{
+	const int32 EmoteIndex = FindNextConfiguredEmoteIndex();
+	if (EmoteIndex != INDEX_NONE)
+	{
+		TryPlayEmoteOnServer(EmoteIndex);
+	}
 }
 
 void UKCEmoteComponent::ServerStopEmote_Implementation(const float BlendOutTime)
@@ -96,6 +118,19 @@ bool UKCEmoteComponent::IsRequestOwnerAllowed() const
 {
 	const APawn* PawnOwner = Cast<APawn>(GetOwner());
 	return PawnOwner && (PawnOwner->HasAuthority() || PawnOwner->IsLocallyControlled());
+}
+
+bool UKCEmoteComponent::TryPlayEmoteOnServer(const int32 EmoteIndex)
+{
+	if (!CanServerAcceptEmote(EmoteIndex))
+	{
+		return false;
+	}
+
+	LastAcceptedRequestTimeSeconds = GetWorld()->GetTimeSeconds();
+	NextEmoteIndex = (EmoteIndex + 1) % EmoteMontages.Num();
+	MulticastPlayEmote(EmoteIndex);
+	return true;
 }
 
 bool UKCEmoteComponent::CanServerAcceptEmote(const int32 EmoteIndex) const
@@ -124,6 +159,29 @@ bool UKCEmoteComponent::IsConfiguredEmote(const int32 EmoteIndex) const
 {
 	return EmoteMontages.IsValidIndex(EmoteIndex) &&
 		IsValid(EmoteMontages[EmoteIndex]);
+}
+
+int32 UKCEmoteComponent::FindNextConfiguredEmoteIndex() const
+{
+	if (EmoteMontages.IsEmpty())
+	{
+		return INDEX_NONE;
+	}
+
+	const int32 StartIndex = EmoteMontages.IsValidIndex(NextEmoteIndex)
+		? NextEmoteIndex
+		: 0;
+	for (int32 Offset = 0; Offset < EmoteMontages.Num(); ++Offset)
+	{
+		const int32 CandidateIndex =
+			(StartIndex + Offset) % EmoteMontages.Num();
+		if (IsConfiguredEmote(CandidateIndex))
+		{
+			return CandidateIndex;
+		}
+	}
+
+	return INDEX_NONE;
 }
 
 void UKCEmoteComponent::PlayEmoteLocal(const int32 EmoteIndex)

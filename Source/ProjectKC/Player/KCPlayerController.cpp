@@ -100,7 +100,7 @@ void AKCPlayerController::Emote(const FInputActionValue& InputValue)
 
 	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
 	{
-		PlayerCharacter->RequestPlayEmote(0);
+		PlayerCharacter->RequestPlayNextEmote();
 	}
 }
 

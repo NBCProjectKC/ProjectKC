@@ -25,6 +25,24 @@ bool FKCPlayerSustainAndEmoteContractTest::RunTest(const FString& Parameters)
 		TestTrue(
 			TEXT("감정표현 컴포넌트는 네트워크 복제를 사용한다."),
 			EmoteComponent->GetIsReplicated());
+		TestNotNull(
+			TEXT("감정표현 컴포넌트는 순차 재생 요청 API를 제공한다."),
+			EmoteComponent->FindFunction(TEXT("RequestPlayNextEmote")));
+
+		const UFunction* ServerPlayNextEmoteFunction =
+			EmoteComponent->FindFunction(TEXT("ServerPlayNextEmote"));
+		TestNotNull(
+			TEXT("순차 감정표현 요청은 서버 RPC로 전달된다."),
+			ServerPlayNextEmoteFunction);
+		if (ServerPlayNextEmoteFunction)
+		{
+			const EFunctionFlags RequiredFlags =
+				FUNC_Net | FUNC_NetServer | FUNC_NetReliable;
+			TestTrue(
+				TEXT("순차 감정표현 RPC는 Reliable Server 함수다."),
+				(ServerPlayNextEmoteFunction->FunctionFlags & RequiredFlags) ==
+					RequiredFlags);
+		}
 	}
 
 	const UKCGE_StaminaRegen* RegenEffect =

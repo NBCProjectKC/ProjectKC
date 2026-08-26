@@ -487,6 +487,11 @@ bool AKCPlayerCharacter::RequestPlayEmote(const int32 EmoteIndex)
 	return EmoteComponent && EmoteComponent->RequestPlayEmote(EmoteIndex);
 }
 
+bool AKCPlayerCharacter::RequestPlayNextEmote()
+{
+	return EmoteComponent && EmoteComponent->RequestPlayNextEmote();
+}
+
 void AKCPlayerCharacter::RequestStopEmote(const float BlendOutTime)
 {
 	if (EmoteComponent)
