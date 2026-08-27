@@ -20,6 +20,17 @@ void AKCLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(AKCLobbyPlayerState, SlotIndex);
 }
 
+void AKCLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
+{
+	Super::CopyProperties(PlayerState);
+
+	if (AKCLobbyPlayerState* TargetPS = Cast<AKCLobbyPlayerState>(PlayerState))
+	{
+		TargetPS->TeamId = this->TeamId;
+		TargetPS->SlotIndex = this->SlotIndex;
+	}
+}
+
 void AKCLobbyPlayerState::SetSlotIndex(int32 InSlotIndex)
 {
 	if (HasAuthority())
