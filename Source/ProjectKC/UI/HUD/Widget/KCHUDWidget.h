@@ -37,13 +37,14 @@ protected:
 private:
 	void HandleTeamScoresChanged(const TArray<int32>& TeamScores);
 	void HandleRecipesChanged();
-	void RefreshRoughHUD();
+	void RefreshHUD();
 	void RefreshScore();
 	void RefreshRecipes();
 
-	UPROPERTY(meta = (BindWidgetOptional))
+protected:
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team1ScoreText;
 	
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team2ScoreText;
 };
