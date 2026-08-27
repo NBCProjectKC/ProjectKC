@@ -33,6 +33,9 @@ public:
 	// Debuging Method : "Debug_FinishDish 0 Recipe_Simple"
 	UFUNCTION(Exec)
 	void Debug_FinishDish(int32 TeamId, FName RecipeRowName);
+	// 즉시 승리 디버깅 함수
+	UFUNCTION(Exec)
+	void Debug_WinMatch(int32 WinningTeamId);
 	
 protected:
 	// GameMode Methods

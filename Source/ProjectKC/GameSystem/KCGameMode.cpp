@@ -349,3 +349,9 @@ void AKCGameMode::Debug_FinishDish(int32 TeamId, FName RecipeRowName)
 
 	OnDishFinished(KCGameplayTags::Message_Dish_Finished, FakeMessage);
 }
+
+void AKCGameMode::Debug_WinMatch(int32 WinningTeamId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[Debug] Team %d 즉시 승리 처리"), WinningTeamId);
+	EndGame(WinningTeamId);
+}
