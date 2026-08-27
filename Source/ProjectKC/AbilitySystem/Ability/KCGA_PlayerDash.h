@@ -49,6 +49,11 @@ protected:
 private:
 	UFUNCTION()
 	void HandleDashFinished();
+
+	UFUNCTION()
+	void HandleDashInterrupted();
+
+	void FinishDash(bool bWasCancelled);
 	void StartDashMontage();
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Dash", meta = (ClampMin = "1.0"))
@@ -73,4 +78,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> ActiveDashMontageTask;
+
+	bool bIsEndingDash = false;
 };

@@ -7,6 +7,7 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "GameplayAbilitySpec.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCAbilitySystem, Log, All);
@@ -160,6 +161,16 @@ bool UKCAbilitySystemComponent::PressAbilityInputByHandle(
 	if (IsOwnerActorAuthoritative())
 	{
 		return ProcessAbilityInputPressed(AbilityHandle);
+	}
+
+	const FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	const FGameplayTagContainer* AbilityTags = Spec && Spec->Ability
+		? &Spec->Ability->GetAssetTags()
+		: nullptr;
+	if (AbilityTags && AbilityTags->HasTag(TAG_KC_Ability_Attack) &&
+		AreAbilityTagsBlocked(*AbilityTags))
+	{
+		return false;
 	}
 
 	// 이미 진행 중인 액션에 다시 들어온 Press는 여기서 버린다.
