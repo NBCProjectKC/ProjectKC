@@ -19,22 +19,12 @@ struct FKCResultTeamViewData
 	int32 Rank = 0;
 };
 
-UCLASS(BlueprintType, Blueprintable, meta = (MVVMAllowedContextCreationType = "Manual|CreateInstance"))
+UCLASS(BlueprintType)
 class PROJECTKC_API UKCResultViewModel : public UKCViewModelBase
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintPure, Category = "KC|UI")
-	const TArray<FKCResultTeamViewData>& GetTeams() const { return Teams; }
-
-	UFUNCTION(BlueprintCallable, Category = "KC|UI")
-	void SetTeams(const TArray<FKCResultTeamViewData>& NewTeams);
-
-	UFUNCTION(BlueprintCallable, Category = "KC|UI|Preview")
-	void SetPreviewData(const TArray<FKCResultTeamViewData>& NewTeams);
-
-private:
-	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
 	TArray<FKCResultTeamViewData> Teams;
 };

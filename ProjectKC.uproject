@@ -50,6 +50,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
 			"Name": "ModelViewViewModel",
 			"Enabled": true
 		},
@@ -63,10 +67,6 @@
 		},
 		{
 			"Name": "SteamSockets",
-			"Enabled": true
-		},
-		{
-			"Name": "ModelViewViewModelPreview",
 			"Enabled": true
 		}
 	]

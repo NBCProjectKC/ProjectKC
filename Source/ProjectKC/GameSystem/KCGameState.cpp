@@ -2,9 +2,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/KCGameplayTags.h"
-#include "Messages/Struct/KCActiveRecipesChangedStruct.h"
 #include "Messages/Struct/KCGamePhaseChangedStruct.h"
-#include "Messages/Struct/KCPotIngredientsChangedStruct.h"
 #include "Messages/Struct/KCScoreChangedStruct.h"
 
 AKCGameState::AKCGameState()
@@ -19,6 +17,7 @@ void AKCGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AKCGameState, TeamScores);
 	DOREPLIFETIME(AKCGameState, PotIngredients);
 	DOREPLIFETIME(AKCGameState, ActiveRecipeRowNames);
+	DOREPLIFETIME(AKCGameState, bIsFarmingOpen);
 }
 
 void AKCGameState::InitializeTeamCount(int32 InTeamCount)
@@ -123,20 +122,21 @@ void AKCGameState::OnRep_TeamScores()
 
 void AKCGameState::OnRep_PotIngredients()
 {
-	for (int32 TeamId = 0; TeamId < PotIngredients.Num(); ++TeamId)
-	{
-		FKCPotIngredientsChangedStruct Message;
-		Message.TeamId = TeamId;
-		Message.Ingredients = PotIngredients[TeamId];
-
-		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Game_PotIngredientsChanged, Message);
-	}
+	// TODO : 재료 투입 시 UI 연출 필요해지면 여기서 이벤트 Broadcast
 }
 
 void AKCGameState::OnRep_ActiveRecipes()
 {
-	FKCActiveRecipesChangedStruct Message;
-	Message.RecipeRowNames = ActiveRecipeRowNames;
+	// TODO : 게임 시작 후 레시피가 정해지면 여기서 연출 이벤트 Broadcast
+	// ex)슬롯머신처럼 돌아가는 효과 줘도 재밌을 듯
+}
 
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Game_ActiveRecipesChanged, Message);
+void AKCGameState::SetFarmingOpen(bool bOpen)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	bIsFarmingOpen = bOpen;
 }
