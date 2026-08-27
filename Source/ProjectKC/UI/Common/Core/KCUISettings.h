@@ -4,13 +4,14 @@
 #include "Engine/DeveloperSettings.h"
 #include "KCUISettings.generated.h"
 
-class UKCActivatableWidget;
+class UKCColorStyle;
 class UKCHUDWidget;
-class UKCPrimaryGameLayout;
 class UKCToastWidget;
 class UKCModalWidget;
 class UKCWorldIndicatorWidget;
 class UKCInteractionPromptWidget;
+class UKCUserWidget;
+class UDataTable;
 
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "ProjectKC UI"))
 class PROJECTKC_API UKCUISettings : public UDeveloperSettings
@@ -18,26 +19,26 @@ class PROJECTKC_API UKCUISettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Layout")
-	TSoftClassPtr<UKCPrimaryGameLayout> PrimaryGameLayoutClass;
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Style")
+	TSoftObjectPtr<UKCColorStyle> DefaultColorStyle;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
-	TSoftClassPtr<UKCActivatableWidget> LoadingScreenClass;
+	TSoftClassPtr<UKCUserWidget> LoadingScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
-	TSoftClassPtr<UKCActivatableWidget> MainMenuScreenClass;
+	TSoftClassPtr<UKCUserWidget> MainMenuScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
-	TSoftClassPtr<UKCActivatableWidget> LobbyScreenClass;
+	TSoftClassPtr<UKCUserWidget> LobbyScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
-	TSoftClassPtr<UKCActivatableWidget> PauseMenuScreenClass;
+	TSoftClassPtr<UKCUserWidget> PauseMenuScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
-	TSoftClassPtr<UKCActivatableWidget> SettingsScreenClass;
+	TSoftClassPtr<UKCUserWidget> SettingsScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
-	TSoftClassPtr<UKCActivatableWidget> ResultScreenClass;
+	TSoftClassPtr<UKCUserWidget> ResultScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|HUD")
 	TSoftClassPtr<UKCHUDWidget> HUDWidgetClass;
@@ -53,4 +54,7 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Indicator")
 	TSoftClassPtr<UKCInteractionPromptWidget> InteractionPromptWidgetClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|HUD")
+	TSoftObjectPtr<UDataTable> RecipeDataTable;
 };
