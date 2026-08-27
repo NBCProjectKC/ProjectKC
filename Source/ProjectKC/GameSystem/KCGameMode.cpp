@@ -9,19 +9,14 @@
 #include "Recipe/KCDishRuinedStruct.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
-#include "KCLevelTypeLibrary.h"
 
 
 AKCGameMode::AKCGameMode()
 {
-	bUseSeamlessTravel = true;
-	
 	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
 	PlayerControllerClass = AKCPlayerController::StaticClass();
-	PlayerStateClass = AKCLobbyPlayerState::StaticClass();
 }
 
 // 매치 흐름
@@ -112,13 +107,6 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 	{
 		return;
 	}
-	
-	// 덮개 열리기 전 파밍 못하게
-	if (!KCGameState->IsFarmingOpen())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("덮개가 열리기 전 재료 습득 시도 감지"));
-		return;
-	}
 
 	// 지금까지 투입된 재료에 이번 재료를 투입
 	FGameplayTagContainer CurrentIngredients = KCGameState->GetPotIngredients(TeamId);
@@ -131,7 +119,9 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 
 		// TODO: 페널티(점수 차감 등) 확장 시 여기서
 
-		Multicast_NotifyDishRuined(TeamId);
+		FKCDishRuinedStruct RuinedMessage;
+		RuinedMessage.TeamId = TeamId;
+		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, RuinedMessage);
 
 		UE_LOG(LogTemp, Log, TEXT("Team %d: 요리 실패 (유효한 레시피 없음)"), TeamId);
 		return;
@@ -143,7 +133,10 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 	{
 		KCGameState->SetPotIngredients(TeamId, FGameplayTagContainer());
 
-		Multicast_NotifyRecipeCompleted(TeamId, CompletedRecipeRowName);
+		FKCRecipeCompletedStruct CompletedMessage;
+		CompletedMessage.TeamId = TeamId;
+		CompletedMessage.RecipeRowName = CompletedRecipeRowName;
+		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, CompletedMessage);
 
 		UE_LOG(LogTemp, Log, TEXT("Team %d: 레시피 '%s' 완성, 조리 시작"), TeamId, *CompletedRecipeRowName.ToString());
 		return;
@@ -281,21 +274,13 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 {
 	if (KCGameState)
 	{
-		KCGameState->SetGamePhase(EKCGamePhaseType::Ending);
+		KCGameState->SetGamePhase(EKCGamePhaseType::Ended);
 	}
 
 	// TODO: 게임 종료 후 처리(결과 화면, 로비 복귀)
 	UE_LOG(LogTemp, Log, TEXT("Game Ended. Winning Team: %d"), WinningTeamId);
 
 	EndMatch();
-	
-	GetWorldTimerManager().SetTimer(
-		ResultScreenTimerHandle,
-		this,
-		&AKCGameMode::TravelBackToLobby,
-		ResultScreenDuration,
-		false
-	);
 }
 
 
@@ -307,26 +292,6 @@ const FKCRecipeStruct* AKCGameMode::FindRecipeByRowName(FName RowName) const
 	}
 
 	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
-}
-
-void AKCGameMode::TravelBackToLobby()
-{
-	GetWorld()->ServerTravel(UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString());
-}
-
-void AKCGameMode::Multicast_NotifyDishRuined_Implementation(int32 TeamId)
-{
-	FKCDishRuinedStruct Message;
-	Message.TeamId = TeamId;
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, Message);
-}
-
-void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, FName RecipeRowName)
-{
-	FKCRecipeCompletedStruct Message;
-	Message.TeamId = TeamId;
-	Message.RecipeRowName = RecipeRowName;
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, Message);
 }
 
 void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName)
