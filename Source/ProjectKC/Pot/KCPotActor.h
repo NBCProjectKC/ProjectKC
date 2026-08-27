@@ -14,6 +14,7 @@ class UDataTable;
 class UPrimitiveComponent;
 class UKCAbilitySystemComponent;
 class UKCCookingProgressAttributeSet;
+struct FOnAttributeChangeData;
 struct FKCDishRuinedStruct;
 struct FKCRecipeCompletedStruct;
 
@@ -99,6 +100,7 @@ private:
 	void AdvanceCookingProgress();
 	void CompleteCooking();
 	void ApplyCookingProgressIncrease(float Amount);
+	void HandleCookingProgressChanged(const FOnAttributeChangeData& ChangeData);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastCookingStarted();
@@ -112,6 +114,8 @@ private:
 	FGameplayMessageListenerHandle RecipeCompletedListenerHandle;
 	FGameplayMessageListenerHandle DishRuinedListenerHandle;
 	FTimerHandle CookingTimerHandle;
+	FDelegateHandle CookingProgressChangedDelegateHandle;
 	FName ActiveRecipeRowName;
 	float ActiveProgressSpeedPerSecond = 0.0f;
+	bool bRestoringCookingProgress = false;
 };
