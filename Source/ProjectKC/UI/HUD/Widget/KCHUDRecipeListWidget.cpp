@@ -7,18 +7,12 @@
 void UKCHUDRecipeListWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
-
-	if (RecipeListView)
-	{
-		if (const TSubclassOf<UKCHUDRecipeEntryWidget> ResolvedEntryClass = ResolveEntryWidgetClass())
-		{
-			RecipeListView->SetEntryWidgetClass(ResolvedEntryClass);
-		}
-	}
 }
 
 void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes)
 {
+	BP_OnRecipesSet(Recipes);
+
 	RecipeItems.Reset();
 	RecipeItems.Reserve(Recipes.Num());
 
@@ -35,20 +29,17 @@ void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes
 
 	if (RecipeListView)
 	{
-		if (const TSubclassOf<UKCHUDRecipeEntryWidget> ResolvedEntryClass = ResolveEntryWidgetClass())
-		{
-			RecipeListView->SetEntryWidgetClass(ResolvedEntryClass);
-		}
 		RecipeListView->SetListItems(ListItems);
 		return;
 	}
 
-	if (!RecipeEntryContainer)
+	UVerticalBox* EntryContainer = GetRecipeEntryContainer();
+	if (!EntryContainer)
 	{
 		return;
 	}
 
-	RecipeEntryContainer->ClearChildren();
+	EntryContainer->ClearChildren();
 
 	const TSubclassOf<UKCHUDRecipeEntryWidget> ResolvedEntryClass = ResolveEntryWidgetClass();
 	if (!ResolvedEntryClass)
@@ -65,18 +56,16 @@ void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes
 		}
 
 		EntryWidget->SetRecipe(Recipe);
-		RecipeEntryContainer->AddChildToVerticalBox(EntryWidget);
+		EntryContainer->AddChildToVerticalBox(EntryWidget);
 	}
 }
 
 TSubclassOf<UKCHUDRecipeEntryWidget> UKCHUDRecipeListWidget::ResolveEntryWidgetClass() const
 {
-	if (EntryWidgetClass)
-	{
-		return EntryWidgetClass;
-	}
+	return EntryWidgetClass;
+}
 
-	return LoadClass<UKCHUDRecipeEntryWidget>(
-		nullptr,
-		TEXT("/Game/KC/UI/HUD/Recipe/WBP_HUDRecipeEntry.WBP_HUDRecipeEntry_C"));
+UVerticalBox* UKCHUDRecipeListWidget::GetRecipeEntryContainer() const
+{
+	return RecipeEntryContainer ? RecipeEntryContainer.Get() : VerticalBox.Get();
 }

@@ -31,6 +31,9 @@ public:
 	void SetRecipes(const TArray<FKCRecipeViewData>& Recipes);
 
 protected:
+	UFUNCTION(BlueprintImplementableEvent, Category = "KC|UI", meta = (DisplayName = "On Recipes Set"))
+	void BP_OnRecipesSet(const TArray<FKCRecipeViewData>& Recipes);
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI")
 	TSubclassOf<UKCHUDRecipeEntryWidget> EntryWidgetClass;
 
@@ -40,8 +43,12 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UVerticalBox> RecipeEntryContainer;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UVerticalBox> VerticalBox;
+
 private:
 	TSubclassOf<UKCHUDRecipeEntryWidget> ResolveEntryWidgetClass() const;
+	UVerticalBox* GetRecipeEntryContainer() const;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCHUDRecipeListItem>> RecipeItems;

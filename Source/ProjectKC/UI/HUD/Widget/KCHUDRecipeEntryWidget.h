@@ -9,6 +9,7 @@
 class UListView;
 class UTextBlock;
 class UVerticalBox;
+class UKCColorStyle;
 class UKCHUDRecipeIngredientWidget;
 
 UCLASS(BlueprintType)
@@ -34,6 +35,10 @@ public:
 
 protected:
 	virtual void NativeOnListItemObjectSet(UObject* ListItemObject) override;
+	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "KC|UI", meta = (DisplayName = "On Recipe Set"))
+	void BP_OnRecipeSet(const FKCRecipeViewData& Recipe);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI")
 	TSubclassOf<UKCHUDRecipeIngredientWidget> IngredientWidgetClass;

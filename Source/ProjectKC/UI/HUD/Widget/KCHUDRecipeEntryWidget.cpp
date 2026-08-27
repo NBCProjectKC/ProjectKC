@@ -3,6 +3,7 @@
 #include "Components/ListView.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeIngredientWidget.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeListWidget.h"
 
@@ -10,13 +11,6 @@ void UKCHUDRecipeEntryWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 
-	if (IngredientListView)
-	{
-		if (const TSubclassOf<UKCHUDRecipeIngredientWidget> ResolvedEntryClass = ResolveIngredientWidgetClass())
-		{
-			IngredientListView->SetEntryWidgetClass(ResolvedEntryClass);
-		}
-	}
 }
 
 void UKCHUDRecipeEntryWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
@@ -29,6 +23,8 @@ void UKCHUDRecipeEntryWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
 
 void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 {
+	BP_OnRecipeSet(Recipe);
+
 	if (DifficultyText)
 	{
 		DifficultyText->SetText(BuildStarsText(Recipe.DifficultyStars));
@@ -55,10 +51,6 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 
 	if (IngredientListView)
 	{
-		if (const TSubclassOf<UKCHUDRecipeIngredientWidget> ResolvedEntryClass = ResolveIngredientWidgetClass())
-		{
-			IngredientListView->SetEntryWidgetClass(ResolvedEntryClass);
-		}
 		IngredientListView->SetListItems(ListItems);
 		return;
 	}
@@ -107,12 +99,23 @@ FText UKCHUDRecipeEntryWidget::BuildStarsText(int32 DifficultyStars)
 
 TSubclassOf<UKCHUDRecipeIngredientWidget> UKCHUDRecipeEntryWidget::ResolveIngredientWidgetClass() const
 {
-	if (IngredientWidgetClass)
+	return IngredientWidgetClass;
+}
+
+void UKCHUDRecipeEntryWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
+{
+	if (!InColorStyle)
 	{
-		return IngredientWidgetClass;
+		return;
 	}
 
-	return LoadClass<UKCHUDRecipeIngredientWidget>(
-		nullptr,
-		TEXT("/Game/KC/UI/HUD/Recipe/WBP_HUDRecipeIngredient.WBP_HUDRecipeIngredient_C"));
+	if (DifficultyText)
+	{
+		DifficultyText->SetColorAndOpacity(FSlateColor(InColorStyle->RecipeText));
+	}
+
+	if (FoodNameText)
+	{
+		FoodNameText->SetColorAndOpacity(FSlateColor(InColorStyle->RecipeText));
+	}
 }
