@@ -95,4 +95,10 @@ protected:
 	/** @brief SlotIndex 프로퍼티 복제 수신 시 호출 */
 	UFUNCTION()
 	virtual void OnRep_SlotIndex();
+
+	virtual void BeginPlay() override;
+	virtual void OnRep_PlayerName() override;
+
+	/** @brief KCSessionSubsystem에 저장된 이전 팀/슬롯 정보가 있다면 자동 복원 */
+	void TryRestoreSavedLobbyData();
 };
