@@ -27,7 +27,6 @@ public:
 
 	//~APlayerState interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual void CopyProperties(APlayerState* PlayerState) override;
 	//~End of APlayerState interface
 
 	/** @brief 현재 배정된 슬롯 인덱스를 반환합니다. (0~5) */

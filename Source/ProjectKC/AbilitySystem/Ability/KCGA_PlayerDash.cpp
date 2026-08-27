@@ -25,7 +25,7 @@ UKCGA_PlayerDash::UKCGA_PlayerDash()
 	AssetTags.AddTag(TAG_KC_Ability_Player_Dash);
 	SetAssetTags(AssetTags);
 	ActivationOwnedTags.AddTag(TAG_KC_State_Dashing);
-	BlockAbilitiesWithTag.AddTag(TAG_KC_Ability_Attack);
+	BlockAbilitiesWithTag.AddTag(TAG_KC_Ability_Action);
 }
 
 UAnimMontage* UKCGA_PlayerDash::GetDashMontage() const

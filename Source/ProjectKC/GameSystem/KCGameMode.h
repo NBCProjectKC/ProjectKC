@@ -58,10 +58,6 @@ protected:
 	// 승리점수
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
 	int32 TargetScore = 10;
-	// 한 판 종료 후 결과화면 보는 시간(= Ending Phase 시작부터 SeverTravel 하기까지의 시간)
-	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
-	float ResultScreenDuration = 10.f;
-
 
 	// 시드 고정
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug")
@@ -74,13 +70,6 @@ private:
 	{
 		return TeamCount * PlayersPerTeam;
 	}
-	
-	// Multicast RPC로 클라이언트 알림 : 요리가 망할 때, 요리가 시작할 때
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_NotifyDishRuined(int32 TeamId);
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_NotifyRecipeCompleted(int32 TeamId, FName RecipeRowName);
 	
 	// Callback
 	void OnIngredientSubmitted(FGameplayTag Channel, const FKCIngredientSubmittedStruct& Message);
@@ -101,11 +90,7 @@ private:
 	bool IsTargetScoreReached(int32& OutWinningTeamId) const;
 	void CheckWinCondition();
 	void EndGame(int32 WinningTeamId);
-	
-	// 로비 세션으로 이동(EndGame() 내부에서 타이머 끝나면 실행됨)
-	void TravelBackToLobby();
-	FTimerHandle ResultScreenTimerHandle;
-	
+
 	FGameplayMessageListenerHandle IngredientSubmittedListenerHandle;
 	FGameplayMessageListenerHandle DishFinishedListenerHandle;
 

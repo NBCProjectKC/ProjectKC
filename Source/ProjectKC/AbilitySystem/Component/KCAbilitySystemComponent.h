@@ -122,6 +122,12 @@ private:
 		FName StartSection);
 	void StopLocalActionMontagePrediction(bool bResetState);
 	void ResetLocalActionMontagePrediction();
+	/**
+	 * 서버가 거절할 게 확실한 Press인지 클라에서 미리 판정한다.
+	 * Spec을 아직 못 받았으면 판단을 미루고 서버 판정에 맡긴다.
+	 */
+	bool CanActivateGrantedAbilityLocally(
+		FGameplayAbilitySpecHandle AbilityHandle) const;
 	/** 이 핸들의 액션이 아직 진행 중인지. 중복 Press의 예측 재생을 막는다. */
 	bool HasOutstandingLocalAction(FGameplayAbilitySpecHandle AbilityHandle);
 	bool MatchesLocalActionRequest(

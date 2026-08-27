@@ -160,14 +160,6 @@ bool UKCSessionSubsystem::SendSessionInviteToFriend(const FString& FriendUniqueN
 
 void UKCSessionSubsystem::HandleCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	if (bWasSuccessful)
-	{
-		if (UWorld* World = GetWorld())
-		{
-			World->ServerTravel(TEXT("/Game/KC/SteamLobbySystem/Levels/L_LobbyLevel?listen"));
-		}
-	}
-
 	OnCreateSessionComplete.Broadcast(bWasSuccessful);
 }
 

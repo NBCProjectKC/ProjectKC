@@ -4,7 +4,6 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayEffectTypes.h"
 #include "GameFramework/Character.h"
-#include "Player/Struct/KCAvatarTeamAppearanceStruct.h"
 #include "TimerManager.h"
 #include "KCPlayerCharacter.generated.h"
 
@@ -12,7 +11,6 @@ class UAbilitySystemComponent;
 class UCameraComponent;
 class UGameplayAbility;
 class UGameplayEffect;
-class AKCLobbyPlayerState;
 class UKCAbilitySystemComponent;
 class UKCCharacterAttributeSet;
 class UKCEmoteComponent;
@@ -80,15 +78,9 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_Controller() override;
-	virtual void OnRep_Owner() override;
-	virtual void OnRep_PlayerState() override;
 	virtual void PawnClientRestart() override;
-
-	void BindTeamAppearanceToPlayerState(AKCLobbyPlayerState* InPlayerState);
-	void ApplyTeamAppearance(int32 TeamId);
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(
@@ -97,12 +89,6 @@ protected:
 
 private:
 	void ConfigureDriverMesh();
-	void RefreshTeamAppearanceBinding();
-	void UnbindTeamAppearanceFromPlayerState();
-
-	UFUNCTION()
-	void HandleTeamIdChanged(int32 NewTeamId);
-
 	void InitializeAbilityActorInfo();
 	void GrantDefaultAbilities();
 	void EnsureStaminaRegenEffect();
@@ -180,15 +166,7 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> FaceAnchor;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Avatar|Team",
-		meta = (AllowPrivateAccess = "true", TitleProperty = "TeamId"))
-	TArray<FKCAvatarTeamAppearanceStruct> TeamAppearances;
-
 #if WITH_EDITORONLY_DATA
-	UPROPERTY(EditAnywhere, Category = "KC|Avatar|Team|Preview",
-		meta = (ClampMin = "0"))
-	int32 PreviewTeamId = 0;
-
 	UPROPERTY(
 		EditAnywhere,
 		Category = "KC|Item|Preview",
@@ -208,5 +186,4 @@ private:
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
 	FDelegateHandle HealthChangedDelegateHandle;
 	FActiveGameplayEffectHandle StaminaRegenEffectHandle;
-	TWeakObjectPtr<AKCLobbyPlayerState> BoundTeamPlayerState;
 };

@@ -46,11 +46,7 @@ public:
 protected:
 	//~APlayerController interface
 	virtual void BeginPlay() override;
-	virtual void PostSeamlessTravel() override;
 	//~End of APlayerController interface
-
-	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
-	void SetupLobbyUI();
 
 	/** @brief 뷰포트에 생성할 로비 메인 UI 위젯 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|UI")
