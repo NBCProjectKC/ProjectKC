@@ -4,6 +4,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "FindSessionsCallbackProxy.h"
+#include "ProjectKC/Lobby/Struct/KCLobbySavedPlayerDataStruct.h"
 #include "KCSessionSubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCCreateSessionCompleteDelegate, bool, bWasSuccessful);
@@ -12,7 +13,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCDestroySessionCompleteDelegate,
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnKCSessionInviteAcceptedDelegate, bool, bWasSuccessful, const FBlueprintSessionResult&, SessionToJoin);
 
 /**
- * @brief 기존 BP_GameInstance의 세션 관리(생성/참가/파괴/초대) 로직을 전담하는 서브시스템
+ * @brief 기존 BP_GameInstance의 세션 관리(생성/참가/파괴/초대) 및 로비<->인게임 영구 데이터 보존을 전담하는 서브시스템
  */
 UCLASS()
 class PROJECTKC_API UKCSessionSubsystem : public UGameInstanceSubsystem
@@ -41,6 +42,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Session")
 	bool SendSessionInviteToFriend(const FString& FriendUniqueNetIdStr);
 
+	/** 로비에서 매치 시작 시 플레이어 팀/슬롯 정보 저장 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void SaveLobbyPlayerData(const FString& PlayerName, int32 InTeamId, int32 InSlotIndex);
+
+	/** 인게임에서 플레이어 팀/슬롯 정보 조회 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	bool GetSavedLobbyPlayerData(const FString& PlayerName, int32& OutTeamId, int32& OutSlotIndex) const;
+
+	/** 저장된 로비 플레이어 데이터 초기화 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void ClearSavedLobbyData();
+
+	/** 예상 플레이어 총 인원수 설정 및 조회 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void SetExpectedPlayerCount(int32 Count) { ExpectedPlayerCount = Count; }
+
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	int32 GetExpectedPlayerCount() const { return ExpectedPlayerCount; }
+
 public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Session|Events")
 	FOnKCCreateSessionCompleteDelegate OnCreateSessionComplete;
@@ -55,6 +75,12 @@ public:
 	FOnKCSessionInviteAcceptedDelegate OnSessionInviteAccepted;
 
 private:
+	UPROPERTY()
+	TMap<FString, FKCLobbySavedPlayerDataStruct> SavedLobbyPlayers;
+
+	UPROPERTY()
+	int32 ExpectedPlayerCount = 0;
+
 	IOnlineSessionPtr SessionInterface;
 	TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
 

@@ -195,3 +195,34 @@ void UKCSessionSubsystem::HandleSessionUserInviteAccepted(const bool bWasSuccess
 	Result.OnlineResult = InviteResult;
 	OnSessionInviteAccepted.Broadcast(bWasSuccessful, Result);
 }
+
+void UKCSessionSubsystem::SaveLobbyPlayerData(const FString& PlayerName, int32 InTeamId, int32 InSlotIndex)
+{
+	FKCLobbySavedPlayerDataStruct Data;
+	Data.PlayerName = PlayerName;
+	Data.TeamId = InTeamId;
+	Data.SlotIndex = InSlotIndex;
+
+	SavedLobbyPlayers.Add(PlayerName, Data);
+
+	UE_LOG(LogTemp, Log, TEXT("[KCSessionSubsystem] Saved Lobby Player Data: Name='%s', TeamId=%d, SlotIndex=%d"),
+		*PlayerName, InTeamId, InSlotIndex);
+}
+
+bool UKCSessionSubsystem::GetSavedLobbyPlayerData(const FString& PlayerName, int32& OutTeamId, int32& OutSlotIndex) const
+{
+	if (const FKCLobbySavedPlayerDataStruct* FoundData = SavedLobbyPlayers.Find(PlayerName))
+	{
+		OutTeamId = FoundData->TeamId;
+		OutSlotIndex = FoundData->SlotIndex;
+		return true;
+	}
+	return false;
+}
+
+void UKCSessionSubsystem::ClearSavedLobbyData()
+{
+	SavedLobbyPlayers.Empty();
+	ExpectedPlayerCount = 0;
+	UE_LOG(LogTemp, Log, TEXT("[KCSessionSubsystem] Cleared Saved Lobby Player Data"));
+}

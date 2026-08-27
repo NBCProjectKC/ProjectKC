@@ -7,6 +7,7 @@
 #include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -451,6 +452,31 @@ void AKCLobbyGameMode::UpdateLobbyReadyState()
 
 void AKCLobbyGameMode::StartGame()
 {
+	// 1. KCSessionSubsystem에 로비 플레이어 데이터(TeamId, SlotIndex, 인원수) 영구 보존
+	if (UKCSessionSubsystem* Subsystem = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
+	{
+		Subsystem->ClearSavedLobbyData();
+
+		int32 ActiveCount = 0;
+		if (GameState)
+		{
+			for (APlayerState* PS : GameState->PlayerArray)
+			{
+				if (AKCLobbyPlayerState* LobbyPS = Cast<AKCLobbyPlayerState>(PS))
+				{
+					if (LobbyPS->GetSlotIndex() != INDEX_NONE)
+					{
+						Subsystem->SaveLobbyPlayerData(LobbyPS->GetPlayerName(), LobbyPS->GetTeamId(), LobbyPS->GetSlotIndex());
+						ActiveCount++;
+					}
+				}
+			}
+		}
+		Subsystem->SetExpectedPlayerCount(ActiveCount);
+		UE_LOG(LogTemp, Log, TEXT("[KCLobbyGameMode] StartGame: Saved %d active players data into KCSessionSubsystem"), ActiveCount);
+	}
+
+	// 2. 클라이언트들에게 매치 시작 알림
 	if (GameState)
 	{
 		for (APlayerState* PS : GameState->PlayerArray)
@@ -462,6 +488,7 @@ void AKCLobbyGameMode::StartGame()
 		}
 	}
 
+	// 3. 인게임 레벨로 ServerTravel 이동
 	FTimerHandle TravelTimerHandle;
 	GetWorldTimerManager().SetTimer(
 		TravelTimerHandle,
