@@ -10,6 +10,7 @@
 #include "GameplayAbilitySpec.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "ProjectKC/AbilitySystem/Ability/KCGA_PlayerDash.h"
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
@@ -18,6 +19,8 @@
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/Lobby/KCPlayerSlotActor.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -75,6 +78,28 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	if (PillBodyMeshFinder.Succeeded())
 	{
 		PillBodyMesh = PillBodyMeshFinder.Object;
+	}
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RedMaterialFinder(
+		TEXT("/Game/KC/Player/Avatar/MI_Red.MI_Red"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlueMaterialFinder(
+		TEXT("/Game/KC/Player/Avatar/MI_Blue.MI_Blue"));
+	if (RedMaterialFinder.Succeeded())
+	{
+		FKCAvatarTeamAppearanceStruct& Team0Appearance =
+			TeamAppearances.AddDefaulted_GetRef();
+		Team0Appearance.TeamId = 0;
+		Team0Appearance.BodyMaterial = RedMaterialFinder.Object;
+		Team0Appearance.HandMaterial = RedMaterialFinder.Object;
+		Team0Appearance.FootMaterial = RedMaterialFinder.Object;
+	}
+	if (BlueMaterialFinder.Succeeded())
+	{
+		FKCAvatarTeamAppearanceStruct& Team1Appearance =
+			TeamAppearances.AddDefaulted_GetRef();
+		Team1Appearance.TeamId = 1;
+		Team1Appearance.BodyMaterial = BlueMaterialFinder.Object;
+		Team1Appearance.HandMaterial = BlueMaterialFinder.Object;
+		Team1Appearance.FootMaterial = BlueMaterialFinder.Object;
 	}
 
 	AvatarBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarBody"));
@@ -179,6 +204,11 @@ void AKCPlayerCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	ConfigureDriverMesh();
+
+#if WITH_EDITOR
+	ApplyTeamAppearance(PreviewTeamId);
+#endif
+
 	RefreshHeldItemPreview();
 }
 
@@ -327,6 +357,7 @@ void AKCPlayerCharacter::PostEditChangeProperty(
 	FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+	ApplyTeamAppearance(PreviewTeamId);
 	RefreshHeldItemPreview();
 }
 #endif
@@ -335,24 +366,130 @@ void AKCPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializeAbilityActorInfo();
+	RefreshTeamAppearanceBinding();
+}
+
+void AKCPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindTeamAppearanceFromPlayerState();
+	Super::EndPlay(EndPlayReason);
 }
 
 void AKCPlayerCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	InitializeAbilityActorInfo();
+	RefreshTeamAppearanceBinding();
 }
 
 void AKCPlayerCharacter::OnRep_Controller()
 {
 	Super::OnRep_Controller();
 	InitializeAbilityActorInfo();
+	RefreshTeamAppearanceBinding();
+}
+
+void AKCPlayerCharacter::OnRep_Owner()
+{
+	Super::OnRep_Owner();
+	RefreshTeamAppearanceBinding();
+}
+
+void AKCPlayerCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	RefreshTeamAppearanceBinding();
 }
 
 void AKCPlayerCharacter::PawnClientRestart()
 {
 	Super::PawnClientRestart();
 	InitializeAbilityActorInfo();
+	RefreshTeamAppearanceBinding();
+}
+
+void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
+{
+	AKCLobbyPlayerState* TeamPlayerState =
+		GetPlayerState<AKCLobbyPlayerState>();
+	BindTeamAppearanceToPlayerState(TeamPlayerState);
+
+	if (!TeamPlayerState)
+	{
+		if (const AKCPlayerSlotActor* PlayerSlot =
+			Cast<AKCPlayerSlotActor>(GetOwner()))
+		{
+			ApplyTeamAppearance(PlayerSlot->GetSlotTeamId());
+		}
+	}
+}
+
+void AKCPlayerCharacter::BindTeamAppearanceToPlayerState(
+	AKCLobbyPlayerState* InPlayerState)
+{
+	if (BoundTeamPlayerState.Get() != InPlayerState)
+	{
+		UnbindTeamAppearanceFromPlayerState();
+		BoundTeamPlayerState = InPlayerState;
+
+		if (InPlayerState)
+		{
+			InPlayerState->OnTeamIdChanged.AddUniqueDynamic(
+				this,
+				&AKCPlayerCharacter::HandleTeamIdChanged);
+		}
+	}
+
+	if (InPlayerState)
+	{
+		ApplyTeamAppearance(InPlayerState->GetTeamId());
+	}
+}
+
+void AKCPlayerCharacter::UnbindTeamAppearanceFromPlayerState()
+{
+	if (AKCLobbyPlayerState* TeamPlayerState = BoundTeamPlayerState.Get())
+	{
+		TeamPlayerState->OnTeamIdChanged.RemoveDynamic(
+			this,
+			&AKCPlayerCharacter::HandleTeamIdChanged);
+	}
+
+	BoundTeamPlayerState.Reset();
+}
+
+void AKCPlayerCharacter::HandleTeamIdChanged(const int32 NewTeamId)
+{
+	ApplyTeamAppearance(NewTeamId);
+}
+
+void AKCPlayerCharacter::ApplyTeamAppearance(const int32 TeamId)
+{
+	const FKCAvatarTeamAppearanceStruct* Appearance =
+		TeamAppearances.FindByPredicate(
+			[TeamId](const FKCAvatarTeamAppearanceStruct& Candidate)
+			{
+				return Candidate.TeamId == TeamId;
+			});
+	if (!Appearance)
+	{
+		return;
+	}
+
+	const auto ApplyMaterial = [](UStaticMeshComponent* Component,
+		UMaterialInterface* Material)
+	{
+		if (Component && Material)
+		{
+			Component->SetMaterial(0, Material);
+		}
+	};
+
+	ApplyMaterial(AvatarBody, Appearance->BodyMaterial);
+	ApplyMaterial(AvatarHandLeft, Appearance->HandMaterial);
+	ApplyMaterial(AvatarHandRight, Appearance->HandMaterial);
+	ApplyMaterial(AvatarFootLeft, Appearance->FootMaterial);
+	ApplyMaterial(AvatarFootRight, Appearance->FootMaterial);
 }
 
 void AKCPlayerCharacter::InitializeAbilityActorInfo()

@@ -9,6 +9,7 @@
 #include "Recipe/KCDishRuinedStruct.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
 
@@ -17,6 +18,7 @@ AKCGameMode::AKCGameMode()
 {
 	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
 	PlayerControllerClass = AKCPlayerController::StaticClass();
+	PlayerStateClass = AKCLobbyPlayerState::StaticClass();
 }
 
 // 매치 흐름
