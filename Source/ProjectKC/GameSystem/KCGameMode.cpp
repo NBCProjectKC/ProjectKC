@@ -119,9 +119,7 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 
 		// TODO: 페널티(점수 차감 등) 확장 시 여기서
 
-		FKCDishRuinedStruct RuinedMessage;
-		RuinedMessage.TeamId = TeamId;
-		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, RuinedMessage);
+		Multicast_NotifyDishRuined(TeamId);
 
 		UE_LOG(LogTemp, Log, TEXT("Team %d: 요리 실패 (유효한 레시피 없음)"), TeamId);
 		return;
@@ -133,10 +131,7 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 	{
 		KCGameState->SetPotIngredients(TeamId, FGameplayTagContainer());
 
-		FKCRecipeCompletedStruct CompletedMessage;
-		CompletedMessage.TeamId = TeamId;
-		CompletedMessage.RecipeRowName = CompletedRecipeRowName;
-		UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, CompletedMessage);
+		Multicast_NotifyRecipeCompleted(TeamId, CompletedRecipeRowName);
 
 		UE_LOG(LogTemp, Log, TEXT("Team %d: 레시피 '%s' 완성, 조리 시작"), TeamId, *CompletedRecipeRowName.ToString());
 		return;
@@ -274,7 +269,7 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 {
 	if (KCGameState)
 	{
-		KCGameState->SetGamePhase(EKCGamePhaseType::Ended);
+		KCGameState->SetGamePhase(EKCGamePhaseType::Ending);
 	}
 
 	// TODO: 게임 종료 후 처리(결과 화면, 로비 복귀)
@@ -292,6 +287,21 @@ const FKCRecipeStruct* AKCGameMode::FindRecipeByRowName(FName RowName) const
 	}
 
 	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
+}
+
+void AKCGameMode::Multicast_NotifyDishRuined_Implementation(int32 TeamId)
+{
+	FKCDishRuinedStruct Message;
+	Message.TeamId = TeamId;
+	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, Message);
+}
+
+void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, FName RecipeRowName)
+{
+	FKCRecipeCompletedStruct Message;
+	Message.TeamId = TeamId;
+	Message.RecipeRowName = RecipeRowName;
+	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, Message);
 }
 
 void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName)

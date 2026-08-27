@@ -71,6 +71,13 @@ private:
 		return TeamCount * PlayersPerTeam;
 	}
 	
+	// Multicast RPC로 클라이언트 알림 : 요리가 망할 때, 요리가 시작할 때
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_NotifyDishRuined(int32 TeamId);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_NotifyRecipeCompleted(int32 TeamId, FName RecipeRowName);
+	
 	// Callback
 	void OnIngredientSubmitted(FGameplayTag Channel, const FKCIngredientSubmittedStruct& Message);
 	void OnDishFinished(FGameplayTag Channel, const FKCDishFinishedStruct& Message);
