@@ -25,6 +25,7 @@ UKCGA_PlayerDash::UKCGA_PlayerDash()
 	AssetTags.AddTag(TAG_KC_Ability_Player_Dash);
 	SetAssetTags(AssetTags);
 	ActivationOwnedTags.AddTag(TAG_KC_State_Dashing);
+	BlockAbilitiesWithTag.AddTag(TAG_KC_Ability_Attack);
 }
 
 UAnimMontage* UKCGA_PlayerDash::GetDashMontage() const
@@ -104,6 +105,7 @@ void UKCGA_PlayerDash::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	bIsEndingDash = false;
 	Super::ActivateAbility(
 		Handle,
 		ActorInfo,
@@ -162,6 +164,12 @@ void UKCGA_PlayerDash::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (bIsEndingDash)
+	{
+		return;
+	}
+
+	TGuardValue<bool> EndingDashGuard(bIsEndingDash, true);
 	ActiveDashTask = nullptr;
 	ActiveDashMontageTask = nullptr;
 	Super::EndAbility(
@@ -190,16 +198,43 @@ void UKCGA_PlayerDash::StartDashMontage()
 			0.0f);
 	if (ActiveDashMontageTask)
 	{
+		ActiveDashMontageTask->OnBlendOut.AddDynamic(
+			this,
+			&UKCGA_PlayerDash::HandleDashFinished);
+		ActiveDashMontageTask->OnCompleted.AddDynamic(
+			this,
+			&UKCGA_PlayerDash::HandleDashFinished);
+		ActiveDashMontageTask->OnInterrupted.AddDynamic(
+			this,
+			&UKCGA_PlayerDash::HandleDashInterrupted);
+		ActiveDashMontageTask->OnCancelled.AddDynamic(
+			this,
+			&UKCGA_PlayerDash::HandleDashInterrupted);
 		ActiveDashMontageTask->ReadyForActivation();
 	}
 }
 
 void UKCGA_PlayerDash::HandleDashFinished()
 {
+	FinishDash(false);
+}
+
+void UKCGA_PlayerDash::HandleDashInterrupted()
+{
+	FinishDash(true);
+}
+
+void UKCGA_PlayerDash::FinishDash(const bool bWasCancelled)
+{
+	if (!IsActive() || bIsEndingDash)
+	{
+		return;
+	}
+
 	EndAbility(
 		GetCurrentAbilitySpecHandle(),
 		GetCurrentActorInfo(),
 		GetCurrentActivationInfo(),
 		true,
-		false);
+		bWasCancelled);
 }

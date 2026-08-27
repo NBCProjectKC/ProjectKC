@@ -15,7 +15,7 @@ public:
 
 	void SetEmoteActive(bool bNewEmoteActive);
 
-	/** 점프 및 전신 몽타주 중에는 발/손 후처리 IK가 원본 포즈를 다시 꺾지 않도록 막는다. */
+	/** 점프 및 전신 몽타주 중에는 발 후처리 IK가 원본 포즈를 다시 꺾지 않도록 막는다. */
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Animation")
 	bool bAllowGroundIK = true;
 
