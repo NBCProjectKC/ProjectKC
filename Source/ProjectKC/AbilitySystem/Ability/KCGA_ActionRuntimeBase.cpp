@@ -12,6 +12,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogKCActionRuntime, Log, All);
 
 UKCGA_ActionRuntimeBase::UKCGA_ActionRuntimeBase()
 {
+	FGameplayTagContainer AssetTags;
+	AssetTags.AddTag(TAG_KC_Ability_Attack);
+	SetAssetTags(AssetTags);
+
 	AddSupportedActionHook(TAG_KC_ActionHook_OnStart);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnExecute);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnComplete);
