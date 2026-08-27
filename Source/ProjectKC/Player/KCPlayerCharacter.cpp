@@ -137,7 +137,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoomComponent"));
 	CameraBoomComponent->SetupAttachment(RootComponent);
 	CameraBoomComponent->SetUsingAbsoluteRotation(true);
-	CameraBoomComponent->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
+	// 탑다운 구도는 유지한 채, 화면의 전방을 월드 Y+ 방향으로 90도 회전한다.
+	CameraBoomComponent->SetRelativeRotation(FRotator(-60.0f, 90.0f, 0.0f));
 	CameraBoomComponent->TargetArmLength = 1200.0f;
 	CameraBoomComponent->bDoCollisionTest = false;
 	CameraBoomComponent->bUsePawnControlRotation = false;
