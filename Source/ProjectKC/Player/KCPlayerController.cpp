@@ -1,5 +1,7 @@
 #include "Player/KCPlayerController.h"
 
+#include "Math/RotationMatrix.h"
+
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
@@ -183,8 +185,17 @@ void AKCPlayerController::Move(const FInputActionValue& InputValue)
 	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(GetPawn()))
 	{
 		const FVector2D MovementInput = InputValue.Get<FVector2D>();
-		PlayerCharacter->MoveInWorldDirection(FVector::ForwardVector, MovementInput.Y);
-		PlayerCharacter->MoveInWorldDirection(FVector::RightVector, MovementInput.X);
+
+		// 카메라가 회전해도 WASD는 항상 화면의 위/오른쪽을 기준으로 움직인다.
+		FVector CameraLocation;
+		FRotator CameraRotation;
+		GetPlayerViewPoint(CameraLocation, CameraRotation);
+		const FRotationMatrix CameraYawRotation(
+			FRotator(0.0f, CameraRotation.Yaw, 0.0f));
+		PlayerCharacter->MoveInWorldDirection(
+			CameraYawRotation.GetUnitAxis(EAxis::X), MovementInput.Y);
+		PlayerCharacter->MoveInWorldDirection(
+			CameraYawRotation.GetUnitAxis(EAxis::Y), MovementInput.X);
 	}
 }
 

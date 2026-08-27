@@ -9,7 +9,7 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_KC_GameplayEvent_Action_Execute, "GameplayEvent.Actio
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_GameplayEvent_Player_Dash, "GameplayEvent.Player.Dash");
 
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Ability_Player_Dash, "Ability.Player.Dash");
-UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Ability_Action, "Ability.Action");
+UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Ability_Attack, "Ability.Attack");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Cooldown_Ability_Dash, "Cooldown.Ability.Dash");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_State_Dashing, "State.Dashing");
 

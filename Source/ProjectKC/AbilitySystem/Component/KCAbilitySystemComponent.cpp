@@ -7,6 +7,7 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "GameplayAbilitySpec.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCAbilitySystem, Log, All);
@@ -162,10 +163,12 @@ bool UKCAbilitySystemComponent::PressAbilityInputByHandle(
 		return ProcessAbilityInputPressed(AbilityHandle);
 	}
 
-	// 서버가 어차피 거절할 Press는 여기서 버린다. 예측 재생은 시작 전에
-	// 진행 중인 연출을 끊고 처음부터 다시 트니, 활성화되지도 못할 입력이
-	// 대시 같은 다른 연출을 로컬에서 망가뜨리게 두면 되돌릴 방법이 없다.
-	if (!CanActivateGrantedAbilityLocally(AbilityHandle))
+	const FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	const FGameplayTagContainer* AbilityTags = Spec && Spec->Ability
+		? &Spec->Ability->GetAssetTags()
+		: nullptr;
+	if (AbilityTags && AbilityTags->HasTag(TAG_KC_Ability_Attack) &&
+		AreAbilityTagsBlocked(*AbilityTags))
 	{
 		return false;
 	}
@@ -548,33 +551,6 @@ void UKCAbilitySystemComponent::ResetLocalActionMontagePrediction()
 	bLocalActionStopOnRelease = false;
 	bLocalActionInputReleased = false;
 	bLocalActionMontagePlayed = false;
-}
-
-bool UKCAbilitySystemComponent::CanActivateGrantedAbilityLocally(
-	FGameplayAbilitySpecHandle AbilityHandle) const
-{
-	// 확실히 거절될 입력만 여기서 버린다. 복제가 아직 안 닿아서 못 보는 것과
-	// 서버가 거절할 것을 구분할 수 없는 상태라면 판단을 서버에 맡긴다.
-	const FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
-	if (!Spec || !Spec->Ability || !Spec->SourceObject.IsValid())
-	{
-		return true;
-	}
-
-	const UKCAbilityDefinition* Definition = nullptr;
-	if (!GetDefinitionFromSource(Spec->SourceObject.Get(), Definition))
-	{
-		return true;
-	}
-
-	// CanActivateAbility는 CDO에서 호출하는 계약이라 Spec의 Ability를 그대로 쓴다.
-	// 태그 차단, Cost, Cooldown, InputID 차단까지 서버와 같은 기준으로 본다.
-	return Spec->Ability->CanActivateAbility(
-		AbilityHandle,
-		AbilityActorInfo.Get(),
-		nullptr,
-		nullptr,
-		nullptr);
 }
 
 bool UKCAbilitySystemComponent::HasOutstandingLocalAction(

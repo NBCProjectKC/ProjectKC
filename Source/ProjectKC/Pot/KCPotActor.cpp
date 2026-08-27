@@ -3,6 +3,7 @@
 #include "Components/BoxComponent.h"
 #include "Engine/DataTable.h"
 #include "Engine/World.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectKC/AbilitySystem/Attribute/KCCookingProgressAttributeSet.h"
@@ -17,6 +18,7 @@
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCIngredientSubmittedStruct.h"
 #include "TimerManager.h"
@@ -68,6 +70,10 @@ void AKCPotActor::BeginPlay()
 	CookingProgressAttributes->InitMaxCookingProgress(
 		KCPot::MaxCookingProgress);
 	CookingProgressAttributes->InitCookingProgress(0.0f);
+	CookingProgressChangedDelegateHandle =
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+			UKCCookingProgressAttributeSet::GetCookingProgressAttribute())
+			.AddUObject(this, &AKCPotActor::HandleCookingProgressChanged);
 
 	RecipeCompletedListenerHandle =
 		UGameplayMessageSubsystem::Get(this).RegisterListener<FKCRecipeCompletedStruct>(
@@ -84,6 +90,9 @@ void AKCPotActor::BeginPlay()
 void AKCPotActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(CookingTimerHandle);
+	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+		UKCCookingProgressAttributeSet::GetCookingProgressAttribute())
+		.Remove(CookingProgressChangedDelegateHandle);
 	if (HasAuthority())
 	{
 		UGameplayMessageSubsystem::Get(this).UnregisterListener(
@@ -139,7 +148,9 @@ bool AKCPotActor::ResetPot()
 	ActiveRecipeRowName = NAME_None;
 	ActiveProgressSpeedPerSecond = 0.0f;
 	PotState = EKCPotStateType::Idle;
+	bRestoringCookingProgress = true;
 	CookingProgressAttributes->InitCookingProgress(0.0f);
+	bRestoringCookingProgress = false;
 	ForceNetUpdate();
 	return true;
 }
@@ -208,15 +219,14 @@ bool AKCPotActor::TrySubmitHeldIngredient(AActor& Interactor)
 		return false;
 	}
 
-	// 독립형 테스트에서는 기본 APlayerState를 사용하므로 팀 검사를 비활성화한다.
-	// const APawn* InteractorPawn = Cast<APawn>(&Interactor);
-	// const AKCLobbyPlayerState* PlayerState = InteractorPawn
-	// 	? InteractorPawn->GetPlayerState<AKCLobbyPlayerState>()
-	// 	: nullptr;
-	// if (!PlayerState || PlayerState->GetTeamId() != AssignedTeamId)
-	// {
-	// 	return false;
-	// }
+	const APawn* InteractorPawn = Cast<APawn>(&Interactor);
+	const AKCLobbyPlayerState* PlayerState = InteractorPawn
+		? InteractorPawn->GetPlayerState<AKCLobbyPlayerState>()
+		: nullptr;
+	if (!PlayerState || PlayerState->GetTeamId() != AssignedTeamId)
+	{
+		return false;
+	}
 
 	UKCHeldItemComponent* HeldItemComponent =
 		Interactor.FindComponentByClass<UKCHeldItemComponent>();
@@ -346,6 +356,20 @@ void AKCPotActor::ApplyCookingProgressIncrease(float Amount)
 			Amount);
 		AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 	}
+}
+
+void AKCPotActor::HandleCookingProgressChanged(
+	const FOnAttributeChangeData& ChangeData)
+{
+	if (!HasAuthority() || PotState == EKCPotStateType::Cooking ||
+		bRestoringCookingProgress || ChangeData.NewValue >= ChangeData.OldValue)
+	{
+		return;
+	}
+
+	bRestoringCookingProgress = true;
+	CookingProgressAttributes->SetCookingProgress(ChangeData.OldValue);
+	bRestoringCookingProgress = false;
 }
 
 void AKCPotActor::MulticastCookingStarted_Implementation()
