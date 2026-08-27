@@ -33,6 +33,8 @@ namespace KCGameplayTags
 	 * ========================================================================= */
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_PhaseChanged);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_ScoreChanged);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_ActiveRecipesChanged);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_PotIngredientsChanged);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Ingredient_Submitted);
 	
 	/* =========================================================================
