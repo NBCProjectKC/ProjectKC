@@ -23,7 +23,7 @@ public class ProjectKC : ModuleRules
 			"GameplayTags","GameplayMessageRuntime", "NetCore",
 
 			// UI
-			"CommonUI", "CommonInput", "UMG", "Slate", "SlateCore", "ModelViewViewModel", "DeveloperSettings",
+			"UMG", "Slate", "SlateCore", "ModelViewViewModel", "DeveloperSettings",
 			
 			// Online & Steam Sessions
 			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam",
