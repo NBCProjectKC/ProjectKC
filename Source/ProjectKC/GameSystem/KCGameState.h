@@ -44,6 +44,12 @@ public:
 	// UI : 이번 판의 레시피 3종 조회 -> 레시피 표시
 	UFUNCTION(BlueprintPure, Category = "KC|GameState")
 	const TArray<FName>& GetActiveRecipes() const { return ActiveRecipeRowNames; }
+	
+	
+	// 접시 덮개 오픈 전 재료 습득 방어
+	void SetFarmingOpen(bool bOpen);
+    UFUNCTION(BlueprintPure, Category = "KC|GameState")
+    bool IsFarmingOpen() const { return bIsFarmingOpen; }
 
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentPhase)
@@ -60,6 +66,10 @@ protected:
 	// 이번 매치의 레시피 3종 (DataTable RowName)
 	UPROPERTY(ReplicatedUsing = OnRep_ActiveRecipes)
 	TArray<FName> ActiveRecipeRowNames;
+	
+	// 덮개 오픈 여부
+	UPROPERTY(Replicated)
+	bool bIsFarmingOpen = false;
 
 	UFUNCTION()
 	void OnRep_CurrentPhase();

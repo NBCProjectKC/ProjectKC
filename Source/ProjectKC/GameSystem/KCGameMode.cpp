@@ -12,10 +12,13 @@
 #include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
+#include "KCLevelTypeLibrary.h"
 
 
 AKCGameMode::AKCGameMode()
 {
+	bUseSeamlessTravel = true;
+	
 	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
 	PlayerControllerClass = AKCPlayerController::StaticClass();
 	PlayerStateClass = AKCLobbyPlayerState::StaticClass();
@@ -107,6 +110,13 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 {
 	if (!KCGameState)
 	{
+		return;
+	}
+	
+	// 덮개 열리기 전 파밍 못하게
+	if (!KCGameState->IsFarmingOpen())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("덮개가 열리기 전 재료 습득 시도 감지"));
 		return;
 	}
 
@@ -278,6 +288,14 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 	UE_LOG(LogTemp, Log, TEXT("Game Ended. Winning Team: %d"), WinningTeamId);
 
 	EndMatch();
+	
+	GetWorldTimerManager().SetTimer(
+		ResultScreenTimerHandle,
+		this,
+		&AKCGameMode::TravelBackToLobby,
+		ResultScreenDuration,
+		false
+	);
 }
 
 
@@ -289,6 +307,11 @@ const FKCRecipeStruct* AKCGameMode::FindRecipeByRowName(FName RowName) const
 	}
 
 	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
+}
+
+void AKCGameMode::TravelBackToLobby()
+{
+	GetWorld()->ServerTravel(UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString());
 }
 
 void AKCGameMode::Multicast_NotifyDishRuined_Implementation(int32 TeamId)
