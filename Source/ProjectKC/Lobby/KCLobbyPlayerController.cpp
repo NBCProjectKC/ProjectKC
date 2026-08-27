@@ -20,27 +20,52 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	SetupLobbyUI();
+}
 
-	// 오직 로컬 플레이어 화면에서만 UI 위젯 생성 및 마우스 포커스 설정
-	if (IsLocalPlayerController())
+void AKCLobbyPlayerController::PostSeamlessTravel()
+{
+	Super::PostSeamlessTravel();
+	SetupLobbyUI();
+}
+
+void AKCLobbyPlayerController::SetupLobbyUI()
+{
+	if (!IsLocalPlayerController())
 	{
-		FInputModeGameAndUI InputMode;
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		InputMode.SetHideCursorDuringCapture(false);
-		SetInputMode(InputMode);
+		return;
+	}
 
-		if (!LobbyWidgetClass)
-		{
-			LobbyWidgetClass = StaticLoadClass(UKCLobbyWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyUI.WBP_LobbyUI_C"));
-		}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
 
-		if (LobbyWidgetClass)
+	// L_LobbyLevel 레벨에 있을 때만 로비 UI 생성
+	const FString MapName = World->GetMapName();
+	if (!MapName.Contains(TEXT("L_LobbyLevel")))
+	{
+		return;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+
+	if (!LobbyWidgetClass)
+	{
+		LobbyWidgetClass = StaticLoadClass(UKCLobbyWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyUI.WBP_LobbyUI_C"));
+	}
+
+	if (LobbyWidgetClass && (!LobbyWidgetInstance || !LobbyWidgetInstance->IsInViewport()))
+	{
+		LobbyWidgetInstance = CreateWidget<UKCLobbyWidget>(this, LobbyWidgetClass);
+		if (LobbyWidgetInstance)
 		{
-			LobbyWidgetInstance = CreateWidget<UKCLobbyWidget>(this, LobbyWidgetClass);
-			if (LobbyWidgetInstance)
-			{
-				LobbyWidgetInstance->AddToViewport();
-			}
+			LobbyWidgetInstance->AddToViewport();
 		}
 	}
 }
