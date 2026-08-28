@@ -54,6 +54,18 @@ struct FKCRecipeViewData
 
 	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
 	TArray<FKCRecipeIngredientViewData> Ingredients;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	float Team0Progress = 0.0f;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	float Team1Progress = 0.0f;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bTeam0ProgressVisible = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bTeam1ProgressVisible = false;
 };
 
 DECLARE_MULTICAST_DELEGATE(FKCRecipesChangedNativeDelegate);

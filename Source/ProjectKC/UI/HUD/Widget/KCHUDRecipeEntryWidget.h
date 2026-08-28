@@ -72,7 +72,7 @@ protected:
 private:
 	void RefreshDifficultyStars(int32 DifficultyStars);
 	void RefreshIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
-	void RefreshTeamProgressBars(const TArray<FKCRecipeIngredientViewData>& Ingredients);
+	void RefreshTeamProgressBars(const FKCRecipeViewData& Recipe);
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCHUDRecipeIngredientListItem>> IngredientItems;

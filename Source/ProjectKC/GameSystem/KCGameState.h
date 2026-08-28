@@ -69,7 +69,7 @@ protected:
 	
 	// 덮개 오픈 여부
 	UPROPERTY(Replicated)
-	bool bIsFarmingOpen = false;
+	bool bIsFarmingOpen = true;
 
 	UFUNCTION()
 	void OnRep_CurrentPhase();
