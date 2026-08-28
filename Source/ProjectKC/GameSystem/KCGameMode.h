@@ -36,7 +36,14 @@ public:
 	// 즉시 승리 디버깅 함수
 	UFUNCTION(Exec)
 	void Debug_WinMatch(int32 WinningTeamId);
-		
+	// 테스트용 레시피 고정 구현 -> 로직에 영향x 삭제예정
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug")
+	TObjectPtr<UDataTable> DebugRecipeDataTable;
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug", meta = (EditCondition = "bUseFixedRecipeList", GetOptions = "GetRecipeRowNameOptions"))
+	TArray<FName> FixedRecipeList;
+	UFUNCTION()
+	TArray<FName> GetRecipeRowNameOptions() const;	
+	
 	// 이탈/재접속
 	virtual void Logout(AController* Exiting) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
@@ -48,9 +55,6 @@ protected:
 	virtual void HandleMatchHasEnded() override;
 
 	// Game Rule
-	// 전체 레시피 목록
-	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe")
-	TObjectPtr<UDataTable> RecipeDataTable;
 	// 매칭 시 레시피 랜덤 선정
 	virtual TArray<FName> SelectActiveRecipes() const;
 	// 한 매치에 배정할 레시피 개수
@@ -68,13 +72,9 @@ protected:
 	// 한 판 종료 후 결과화면 보는 시간(= Ending Phase 시작부터 SeverTravel 하기까지의 시간)
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
 	float ResultScreenDuration = 10.f;
-
-
-	// 시드 고정
+	
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug")
-	bool bUseFixedRecipeSeed = false;
-	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug", meta = (EditCondition = "bUseFixedRecipeSeed"))
-	int32 FixedRecipeSeed = 404;
+	bool bUseFixedRecipeList = true;
 	
 private:
 	int32 GetRequiredPlayerCount() const
@@ -101,9 +101,6 @@ private:
 
 	// 재료 잘못 투입했나 판단
 	bool HasAnyViableRecipe(const FGameplayTagContainer& CurrentIngredients) const;
-
-	// 레시피 데이터 조회
-	const FKCRecipeStruct* FindRecipeByRowName(FName RowName) const;
 
 	bool IsTargetScoreReached(int32& OutWinningTeamId) const;
 	void CheckWinCondition();

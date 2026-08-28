@@ -6,6 +6,8 @@
 #include "Messages/Struct/KCGamePhaseChangedStruct.h"
 #include "Messages/Struct/KCPotIngredientsChangedStruct.h"
 #include "Messages/Struct/KCScoreChangedStruct.h"
+#include "Recipe/KCRecipeStruct.h"
+#include "Engine/DataTable.h"
 
 AKCGameState::AKCGameState()
 {
@@ -100,6 +102,24 @@ int32 AKCGameState::GetTeamScore(int32 TeamId) const
 FGameplayTagContainer AKCGameState::GetPotIngredients(int32 TeamId) const
 {
 	return PotIngredients.IsValidIndex(TeamId) ? PotIngredients[TeamId] : FGameplayTagContainer();
+}
+
+const FKCRecipeStruct* AKCGameState::FindRecipeByRowName(FName RowName) const
+{
+	if (!RecipeDataTable)
+	{
+		return nullptr;
+	}
+	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
+}
+
+TArray<FName> AKCGameState::GetAllRecipeRowNames() const
+{
+	if (!RecipeDataTable)
+	{
+		return TArray<FName>();
+	}
+	return RecipeDataTable->GetRowNames();
 }
 
 void AKCGameState::OnRep_CurrentPhase()
