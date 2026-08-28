@@ -31,7 +31,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Apply")
 	EKCActionScope ApplicationScope = EKCActionScope::Target;
 
-	/** false면 실행 조건이 맞지 않을 때 이 Fragment만 건너뛴다. */
+	/**
+	 * true면 이 Fragment가 실패할 때 Hook 전체를 취소한다.
+	 * 대가나 전제처럼 다른 Fragment와 묶인 경우에만 켠다.
+	 * 그 외에는 실패한 Fragment만 건너뛴다.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Apply")
-	bool bRequired = true;
+	bool bRequired = false;
 };

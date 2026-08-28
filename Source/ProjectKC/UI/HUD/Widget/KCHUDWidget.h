@@ -7,8 +7,10 @@
 class UTextBlock;
 class UDataTable;
 class UKCColorStyle;
+class UKCHUDPotProgressWidget;
 class UKCHUDRecipeListWidget;
 class UKCHUDViewModel;
+struct FKCPotProgressViewData;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTKC_API UKCHUDWidget : public UKCUserWidget
@@ -41,9 +43,12 @@ protected:
 private:
 	void HandleTeamScoresChanged(const TArray<int32>& TeamScores);
 	void HandleRecipesChanged();
+	void HandlePotProgressChanged(int32 TeamId, const FKCPotProgressViewData& PotProgress);
 	void RefreshHUD();
 	void RefreshScore();
 	void RefreshRecipes();
+	void RefreshPotProgresses();
+	void RefreshPotProgress(int32 TeamId);
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -51,4 +56,10 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team2ScoreText;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UKCHUDPotProgressWidget> WBP_Team1PotProgress;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UKCHUDPotProgressWidget> WBP_Team2PotProgress;
 };

@@ -90,6 +90,10 @@ private:
 	FDelegateHandle DestroySessionCompleteDelegateHandle;
 	FDelegateHandle SessionUserInviteAcceptedDelegateHandle;
 
+	// Pending Join State (이전 세션 정리 후 자동 참가를 위한 상태값)
+	FBlueprintSessionResult PendingSessionToJoin;
+	bool bJoiningPendingSessionAfterDestroy = false;
+
 	// Internal Callbacks
 	void HandleCreateSessionComplete(FName SessionName, bool bWasSuccessful);
 	void HandleJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);

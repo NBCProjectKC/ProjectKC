@@ -108,6 +108,40 @@ void UKCHUDViewModel::SetPreviewData(const TArray<int32>& NewTeamScores, const T
 	SetRecipes(NewRecipes);
 }
 
+FKCPotProgressViewData UKCHUDViewModel::GetPotProgress(int32 TeamId) const
+{
+	return PotProgresses.IsValidIndex(TeamId) ? PotProgresses[TeamId] : FKCPotProgressViewData();
+}
+
+void UKCHUDViewModel::SetPotProgress(
+	int32 TeamId,
+	float ProgressPercent,
+	int32 RemainingSeconds,
+	bool bVisible,
+	bool bCompleted)
+{
+	if (TeamId < 0)
+	{
+		return;
+	}
+
+	TArray<FKCPotProgressViewData> NewPotProgresses = PotProgresses;
+	if (TeamId >= NewPotProgresses.Num())
+	{
+		NewPotProgresses.SetNum(TeamId + 1);
+	}
+
+	FKCPotProgressViewData& PotProgress = NewPotProgresses[TeamId];
+	PotProgress.ProgressPercent = FMath::Clamp(ProgressPercent, 0.0f, 1.0f);
+	PotProgress.RemainingSeconds = FMath::Max(0, RemainingSeconds);
+	PotProgress.bVisible = bVisible;
+	PotProgress.bCompleted = bCompleted;
+
+	PotProgresses = NewPotProgresses;
+	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(PotProgresses);
+	OnPotProgressChangedNative.Broadcast(TeamId, PotProgresses[TeamId]);
+}
+
 void UKCHUDViewModel::HandleScoreChanged(FGameplayTag Channel, const FKCScoreChangedStruct& Message)
 {
 	TArray<int32> NewTeamScores = TeamScores;
