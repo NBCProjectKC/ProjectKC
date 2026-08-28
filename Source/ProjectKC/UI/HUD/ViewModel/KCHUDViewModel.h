@@ -71,6 +71,26 @@ struct FKCRecipeViewData
 DECLARE_MULTICAST_DELEGATE(FKCRecipesChangedNativeDelegate);
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCTeamScoresChangedNativeDelegate, const TArray<int32>&);
 
+USTRUCT(BlueprintType)
+struct FKCPotProgressViewData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	float ProgressPercent = 0.0f;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	int32 RemainingSeconds = 0;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bVisible = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bCompleted = false;
+};
+
+DECLARE_MULTICAST_DELEGATE_TwoParams(FKCPotProgressChangedNativeDelegate, int32, const FKCPotProgressViewData&);
+
 UCLASS(BlueprintType, Blueprintable, meta = (MVVMAllowedContextCreationType = "Manual|CreateInstance"))
 class PROJECTKC_API UKCHUDViewModel : public UKCViewModelBase
 {
@@ -113,8 +133,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI|Preview")
 	void SetPreviewData(const TArray<int32>& NewTeamScores, const TArray<FKCRecipeViewData>& NewRecipes);
 
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	FKCPotProgressViewData GetPotProgress(int32 TeamId) const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	const TArray<FKCPotProgressViewData>& GetPotProgresses() const { return PotProgresses; }
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetPotProgress(
+		int32 TeamId,
+		float ProgressPercent,
+		int32 RemainingSeconds,
+		bool bVisible,
+		bool bCompleted);
+
 	FKCTeamScoresChangedNativeDelegate OnTeamScoresChangedNative;
 	FKCRecipesChangedNativeDelegate OnRecipesChangedNative;
+	FKCPotProgressChangedNativeDelegate OnPotProgressChangedNative;
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "KC|UI")
@@ -146,6 +181,9 @@ private:
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCRecipeViewData> Recipes;
+
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	TArray<FKCPotProgressViewData> PotProgresses;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UDataTable> RecipeDataTable;
