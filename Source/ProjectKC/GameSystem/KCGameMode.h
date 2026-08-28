@@ -36,6 +36,10 @@ public:
 	// 즉시 승리 디버깅 함수
 	UFUNCTION(Exec)
 	void Debug_WinMatch(int32 WinningTeamId);
+		
+	// 이탈/재접속
+	virtual void Logout(AController* Exiting) override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 	
 protected:
 	// GameMode Methods

@@ -13,6 +13,8 @@
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
 #include "KCLevelTypeLibrary.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 
 
 AKCGameMode::AKCGameMode()
@@ -328,6 +330,59 @@ void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, F
 	Message.TeamId = TeamId;
 	Message.RecipeRowName = RecipeRowName;
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, Message);
+}
+
+// 플레이어 이탈 시 정보 백업
+void AKCGameMode::Logout(AController* Exiting)
+{
+	if (Exiting)
+	{
+		if (AKCLobbyPlayerState* KCPS = Exiting->GetPlayerState<AKCLobbyPlayerState>())
+		{
+			if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
+			{
+				SessionSub->SaveLobbyPlayerData(KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
+				UE_LOG(LogTemp, Warning, TEXT("[GasRange] 플레이어 이탈: %s, TeamId=%d, SlotIndex=%d 자리 보존"),
+					*KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
+			}
+		}
+	}
+
+	Super::Logout(Exiting);
+}
+// 재접속 시 정보 복원
+void AKCGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+
+	if (!NewPlayer)
+	{
+		return;
+	}
+
+	AKCLobbyPlayerState* KCPS = NewPlayer->GetPlayerState<AKCLobbyPlayerState>();
+	if (!KCPS)
+	{
+		return;
+	}
+
+	if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
+	{
+		int32 SavedTeamId = 0;
+		int32 SavedSlotIndex = INDEX_NONE;
+		if (SessionSub->GetSavedLobbyPlayerData(KCPS->GetPlayerName(), SavedTeamId, SavedSlotIndex))
+		{
+			KCPS->SetTeamId(SavedTeamId);
+			KCPS->SetSlotIndex(SavedSlotIndex);
+			UE_LOG(LogTemp, Log, TEXT("[GasRange] 플레이어 재접속: %s, TeamId=%d, SlotIndex=%d 복원 (명시적 백업)"),
+				*KCPS->GetPlayerName(), SavedTeamId, SavedSlotIndex);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("[GasRange] 플레이어 접속: %s, 저장된 데이터 없음 (CopyProperties 자동복원에 의존)"),
+				*KCPS->GetPlayerName());
+		}
+	}
 }
 
 void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName)
