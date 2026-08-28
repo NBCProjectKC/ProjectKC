@@ -1,6 +1,7 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 
 #include "AbilitySystemComponent.h"
+#include "GameFramework/Actor.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
@@ -8,6 +9,8 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
 #include "ProjectKC/AbilitySystem/Struct/KCGameplayEffectRecipeStruct.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogKCActionHook, Log, All);
 
 UKCGA_Base::UKCGA_Base()
 {
@@ -168,6 +171,11 @@ bool UKCGA_Base::ExecuteActionHook(
 	{
 		if (!IsValid(Fragment))
 		{
+			UE_LOG(
+				LogKCActionHook,
+				Warning,
+				TEXT("Hook '%s'에 비어 있는 Fragment가 있어 실행을 중단했습니다."),
+				*HookTag.ToString());
 			return false;
 		}
 
@@ -178,6 +186,15 @@ bool UKCGA_Base::ExecuteActionHook(
 		}
 		else if (Fragment->bRequired)
 		{
+			UE_LOG(
+				LogKCActionHook,
+				Warning,
+				TEXT("Hook '%s'의 필수 Fragment '%s'가 대상 '%s'에서 실행 조건을 ")
+				TEXT("만족하지 못해 Hook 전체를 취소했습니다: %s"),
+				*HookTag.ToString(),
+				*GetNameSafe(Fragment),
+				*GetNameSafe(TargetActor),
+				*ExecutionError);
 			return false;
 		}
 	}
@@ -186,6 +203,14 @@ bool UKCGA_Base::ExecuteActionHook(
 	{
 		if (!Fragment->Execute(Context) && Fragment->bRequired)
 		{
+			UE_LOG(
+				LogKCActionHook,
+				Warning,
+				TEXT("Hook '%s'의 필수 Fragment '%s'가 대상 '%s'에서 실행에 실패해 ")
+				TEXT("남은 Fragment를 중단했습니다."),
+				*HookTag.ToString(),
+				*GetNameSafe(Fragment),
+				*GetNameSafe(TargetActor));
 			return false;
 		}
 	}

@@ -70,6 +70,11 @@ void AKCPotActor::BeginPlay()
 	CookingProgressAttributes->InitMaxCookingProgress(
 		KCPot::MaxCookingProgress);
 	CookingProgressAttributes->InitCookingProgress(0.0f);
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[Pot] State initialized: Pot=%s, State=Idle"),
+		*GetName());
 	CookingProgressChangedDelegateHandle =
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
 			UKCCookingProgressAttributeSet::GetCookingProgressAttribute())
@@ -301,6 +306,12 @@ void AKCPotActor::StartCooking(
 	ActiveProgressSpeedPerSecond = ProgressSpeedPerSecond;
 	PotState = EKCPotStateType::Cooking;
 	CookingProgressAttributes->InitCookingProgress(0.0f);
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[Pot] State changed: Pot=%s, State=Cooking, Recipe=%s"),
+		*GetName(),
+		*RecipeRowName.ToString());
 	GetWorldTimerManager().SetTimer(
 		CookingTimerHandle,
 		this,
@@ -340,7 +351,7 @@ void AKCPotActor::CompleteCooking()
 		Message);
 
 	MulticastCookingCompleted();
-	ForceNetUpdate();
+	ResetPot();
 }
 
 void AKCPotActor::ApplyCookingProgressIncrease(float Amount)
@@ -361,9 +372,21 @@ void AKCPotActor::ApplyCookingProgressIncrease(float Amount)
 void AKCPotActor::HandleCookingProgressChanged(
 	const FOnAttributeChangeData& ChangeData)
 {
-	if (!HasAuthority() || PotState == EKCPotStateType::Cooking ||
-		bRestoringCookingProgress || ChangeData.NewValue >= ChangeData.OldValue)
+	if (!HasAuthority() || bRestoringCookingProgress ||
+		ChangeData.NewValue >= ChangeData.OldValue)
 	{
+		return;
+	}
+
+	if (PotState == EKCPotStateType::Cooking)
+	{
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("[Pot] Hit during cooking: Pot=%s, Progress=%.2f -> %.2f"),
+			*GetName(),
+			ChangeData.OldValue,
+			ChangeData.NewValue);
 		return;
 	}
 
