@@ -52,6 +52,9 @@ void AKCPlayerController::InitializeInGameHUD()
 	}
 
 	FInputModeGameOnly InputMode;
+	// 마우스 커서를 표시한 상태에서는 기본값(true)이 첫 클릭을 뷰포트 캡처에
+	// 소비한다. 공격 입력이 첫 클릭부터 전달되도록 캡처 클릭도 게임에 넘긴다.
+	InputMode.SetConsumeCaptureMouseDown(false);
 	SetInputMode(InputMode);
 
 	ULocalPlayer* LocalPlayer = GetLocalPlayer();

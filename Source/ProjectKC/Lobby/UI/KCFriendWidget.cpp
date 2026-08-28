@@ -69,6 +69,12 @@ void UKCFriendWidget::SetupFriend(const FString& InFriendName, const FString& In
 
 void UKCFriendWidget::OnInviteClicked()
 {
+	if (CachedFriendData.OnlineState == EBPOnlinePresenceState::Offline)
+	{
+		UKismetSystemLibrary::PrintString(this, TEXT("오프라인 친구는 초대할 수 없습니다."), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
+		return;
+	}
+	
 	APlayerController* PC = GetOwningPlayer();
 	if (!PC)
 	{
@@ -81,11 +87,11 @@ void UKCFriendWidget::OnInviteClicked()
 		UAdvancedFriendsLibrary::SendSessionInviteToFriend(PC, CachedFriendData.UniqueNetId, Result);
 		if (Result == EBlueprintResultSwitch::OnSuccess)
 		{
-			UKismetSystemLibrary::PrintString(this, TEXT("Invited!"), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
+			UKismetSystemLibrary::PrintString(this, TEXT("초대 메시지 전송 선공!"), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
 		}
 		else
 		{
-			UKismetSystemLibrary::PrintString(this, TEXT("Failed to invite.."), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
+			UKismetSystemLibrary::PrintString(this, TEXT("초대 메시지 전송 실패.."), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
 		}
 	}
 	else if (UGameInstance* GI = GetGameInstance())
