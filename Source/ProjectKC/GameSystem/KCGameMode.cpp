@@ -65,36 +65,35 @@ void AKCGameMode::HandleMatchHasEnded()
 // 레시피 선정 로직
 TArray<FName> AKCGameMode::SelectActiveRecipes() const
 {
-	TArray<FName> Result;
-
-	if (!RecipeDataTable)
+	// 디버깅용 특정 레시피 고정
+	if (bUseFixedRecipeList && FixedRecipeList.Num() > 0)
 	{
-		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: RecipeDataTable이 설정되지 않았습니다."));
-		return Result;
+		UE_LOG(LogTemp, Log, TEXT("SelectActiveRecipes: 고정 레시피 목록 사용 (%d개)"), FixedRecipeList.Num());
+		return FixedRecipeList;
 	}
 
-	TArray<FName> Candidates = RecipeDataTable->GetRowNames();
+	if (!KCGameState)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: KCGameState가 없습니다."));
+		return TArray<FName>();
+	}
+
+	TArray<FName> Candidates = KCGameState->GetAllRecipeRowNames();
 	if (Candidates.Num() == 0)
 	{
-		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: RecipeDataTable이 비어있습니다."));
-		return Result;
+		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: 레시피 DataTable이 비어있습니다."));
+		return TArray<FName>();
 	}
-	
-	// Debug
-	const int32 Seed = bUseFixedRecipeSeed
-		? FixedRecipeSeed
-		: static_cast<int32>(FDateTime::Now().GetTicks());
-	FRandomStream RandomStream(Seed);
-	
-	// random
+
+	// Random
 	const int32 PickCount = FMath::Min(ActiveRecipeCount, Candidates.Num());
+	TArray<FName> Result;
 	for (int32 i = 0; i < PickCount; ++i)
 	{
 		const int32 RandomIndex = FMath::RandRange(0, Candidates.Num() - 1);
 		Result.Add(Candidates[RandomIndex]);
 		Candidates.RemoveAtSwap(RandomIndex);
 	}
-
 	return Result;
 }
 
@@ -166,7 +165,7 @@ bool AKCGameMode::HasAnyViableRecipe(const FGameplayTagContainer& CurrentIngredi
 
 	for (const FName& RowName : KCGameState->GetActiveRecipes())
 	{
-		const FKCRecipeStruct* Recipe = FindRecipeByRowName(RowName);
+		const FKCRecipeStruct* Recipe = KCGameState->FindRecipeByRowName(RowName);
 		if (!Recipe)
 		{
 			continue;
@@ -197,7 +196,7 @@ bool AKCGameMode::FindCompletedRecipe(const FGameplayTagContainer& CurrentIngred
 
 	for (const FName& RowName : KCGameState->GetActiveRecipes())
 	{
-		const FKCRecipeStruct* Recipe = FindRecipeByRowName(RowName);
+		const FKCRecipeStruct* Recipe = KCGameState->FindRecipeByRowName(RowName);
 		if (!Recipe)
 		{
 			continue;
@@ -233,7 +232,7 @@ void AKCGameMode::OnDishFinished(FGameplayTag Channel, const FKCDishFinishedStru
 		return;
 	}
 
-	const FKCRecipeStruct* Recipe = FindRecipeByRowName(Message.RecipeRowName);
+	const FKCRecipeStruct* Recipe = KCGameState->FindRecipeByRowName(Message.RecipeRowName);
 	if (!Recipe)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("OnDishFinished: 레시피 '%s'를 찾을 수 없습니다."), *Message.RecipeRowName.ToString());
@@ -299,17 +298,6 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 		ResultScreenDuration,
 		false
 	);
-}
-
-
-const FKCRecipeStruct* AKCGameMode::FindRecipeByRowName(FName RowName) const
-{
-	if (!RecipeDataTable)
-	{
-		return nullptr;
-	}
-
-	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
 }
 
 void AKCGameMode::TravelBackToLobby()
@@ -410,4 +398,9 @@ void AKCGameMode::Debug_WinMatch(int32 WinningTeamId)
 {
 	UE_LOG(LogTemp, Log, TEXT("[Debug] Team %d 즉시 승리 처리"), WinningTeamId);
 	EndGame(WinningTeamId);
+}
+// 테스트용 레시피 고정 옵션 구현함수
+TArray<FName> AKCGameMode::GetRecipeRowNameOptions() const
+{
+	return DebugRecipeDataTable ? DebugRecipeDataTable->GetRowNames() : TArray<FName>();
 }
