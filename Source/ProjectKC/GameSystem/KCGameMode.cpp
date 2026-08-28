@@ -22,6 +22,7 @@ AKCGameMode::AKCGameMode()
 	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
 	PlayerControllerClass = AKCPlayerController::StaticClass();
 	PlayerStateClass = AKCLobbyPlayerState::StaticClass();
+	HUDClass = nullptr;
 }
 
 // 매치 흐름

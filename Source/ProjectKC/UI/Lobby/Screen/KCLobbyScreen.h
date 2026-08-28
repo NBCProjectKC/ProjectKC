@@ -1,11 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ProjectKC/UI/Common/Widget/KCActivatableWidget.h"
+#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCLobbyScreen.generated.h"
 
 UCLASS(Abstract, Blueprintable)
-class PROJECTKC_API UKCLobbyScreen : public UKCActivatableWidget
+class PROJECTKC_API UKCLobbyScreen : public UKCUserWidget
 {
 	GENERATED_BODY()
 

@@ -8,6 +8,9 @@
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
 #include "Player/KCPlayerCharacter.h"
+#include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
+#include "ProjectKC/UI/Common/Core/KCUISettings.h"
+#include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
 
 AKCPlayerController::AKCPlayerController()
 {
@@ -31,6 +34,68 @@ void AKCPlayerController::BeginPlay()
 		}
 	}
 
+	InitializeInGameHUD();
+}
+
+void AKCPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ClearInGameHUD();
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void AKCPlayerController::InitializeInGameHUD()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC HUD failed: LocalPlayer is null on %s."), *GetName());
+		return;
+	}
+
+	UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>();
+	if (!UISubsystem)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC HUD failed: KCLocalPlayerUISubsystem is null on %s."), *GetName());
+		return;
+	}
+
+	const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
+	const TSubclassOf<UKCHUDWidget> HUDWidgetClass = UISettings ? UISettings->HUDWidgetClass.LoadSynchronous() : nullptr;
+	if (!HUDWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC HUD failed: HUDWidgetClass is not configured in ProjectKC UI settings."));
+		return;
+	}
+
+	if (!UISubsystem->SetHUDWidget(HUDWidgetClass))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC HUD failed: SetHUDWidget returned null for %s."), *GetNameSafe(HUDWidgetClass));
+	}
+}
+
+void AKCPlayerController::ClearInGameHUD()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>())
+		{
+			UISubsystem->ClearHUDWidget();
+		}
+	}
 }
 
 void AKCPlayerController::BeginUseHeldItem(const FInputActionValue& InputValue)
