@@ -351,7 +351,7 @@ void AKCPotActor::CompleteCooking()
 		Message);
 
 	MulticastCookingCompleted();
-	ForceNetUpdate();
+	ResetPot();
 }
 
 void AKCPotActor::ApplyCookingProgressIncrease(float Amount)
