@@ -11,7 +11,6 @@ class UKCModalWidget;
 class UKCWorldIndicatorWidget;
 class UKCInteractionPromptWidget;
 class UKCUserWidget;
-class UDataTable;
 
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "ProjectKC UI"))
 class PROJECTKC_API UKCUISettings : public UDeveloperSettings
@@ -54,7 +53,4 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Indicator")
 	TSoftClassPtr<UKCInteractionPromptWidget> InteractionPromptWidgetClass;
-
-	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|HUD")
-	TSoftObjectPtr<UDataTable> RecipeDataTable;
 };

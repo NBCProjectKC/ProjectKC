@@ -5,6 +5,7 @@
 #include "KCHUDWidget.generated.h"
 
 class UTextBlock;
+class UDataTable;
 class UKCColorStyle;
 class UKCHUDRecipeListWidget;
 class UKCHUDViewModel;
@@ -32,18 +33,22 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Transient, Category = "KC|UI")
 	TObjectPtr<UKCHUDViewModel> HUDViewModel;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Recipe")
+	TObjectPtr<UDataTable> RecipeDataTable;
+
 	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
 
 private:
 	void HandleTeamScoresChanged(const TArray<int32>& TeamScores);
 	void HandleRecipesChanged();
-	void RefreshRoughHUD();
+	void RefreshHUD();
 	void RefreshScore();
 	void RefreshRecipes();
 
-	UPROPERTY(meta = (BindWidgetOptional))
+protected:
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team1ScoreText;
 	
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team2ScoreText;
 };

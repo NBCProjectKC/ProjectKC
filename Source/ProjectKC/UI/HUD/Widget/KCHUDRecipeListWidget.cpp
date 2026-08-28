@@ -33,23 +33,22 @@ void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes
 		return;
 	}
 
-	UVerticalBox* EntryContainer = GetRecipeEntryContainer();
+	UVerticalBox* EntryContainer = RecipeEntryContainer ? RecipeEntryContainer.Get() : VerticalBox.Get();
 	if (!EntryContainer)
 	{
 		return;
 	}
 
 	EntryContainer->ClearChildren();
-
-	const TSubclassOf<UKCHUDRecipeEntryWidget> ResolvedEntryClass = ResolveEntryWidgetClass();
-	if (!ResolvedEntryClass)
+	
+	if (!EntryWidgetClass)
 	{
 		return;
 	}
 
 	for (const FKCRecipeViewData& Recipe : Recipes)
 	{
-		UKCHUDRecipeEntryWidget* EntryWidget = CreateWidget<UKCHUDRecipeEntryWidget>(this, ResolvedEntryClass);
+		UKCHUDRecipeEntryWidget* EntryWidget = CreateWidget<UKCHUDRecipeEntryWidget>(this, EntryWidgetClass);
 		if (!EntryWidget)
 		{
 			continue;
@@ -58,14 +57,4 @@ void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes
 		EntryWidget->SetRecipe(Recipe);
 		EntryContainer->AddChildToVerticalBox(EntryWidget);
 	}
-}
-
-TSubclassOf<UKCHUDRecipeEntryWidget> UKCHUDRecipeListWidget::ResolveEntryWidgetClass() const
-{
-	return EntryWidgetClass;
-}
-
-UVerticalBox* UKCHUDRecipeListWidget::GetRecipeEntryContainer() const
-{
-	return RecipeEntryContainer ? RecipeEntryContainer.Get() : VerticalBox.Get();
 }

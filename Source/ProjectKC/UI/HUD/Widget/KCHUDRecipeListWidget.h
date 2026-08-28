@@ -47,9 +47,6 @@ protected:
 	TObjectPtr<UVerticalBox> VerticalBox;
 
 private:
-	TSubclassOf<UKCHUDRecipeEntryWidget> ResolveEntryWidgetClass() const;
-	UVerticalBox* GetRecipeEntryContainer() const;
-
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCHUDRecipeListItem>> RecipeItems;
 };

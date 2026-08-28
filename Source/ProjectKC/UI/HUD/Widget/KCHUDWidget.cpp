@@ -21,10 +21,11 @@ void UKCHUDWidget::NativeConstruct()
 		HUDViewModel = NewObject<UKCHUDViewModel>(this);
 	}
 
+	HUDViewModel->SetRecipeDataTable(RecipeDataTable);
 	HUDViewModel->StartListening(this);
 	HUDViewModel->OnTeamScoresChangedNative.AddUObject(this, &ThisClass::HandleTeamScoresChanged);
 	HUDViewModel->OnRecipesChangedNative.AddUObject(this, &ThisClass::HandleRecipesChanged);
-	RefreshRoughHUD();
+	RefreshHUD();
 }
 
 void UKCHUDWidget::NativeDestruct()
@@ -49,7 +50,7 @@ void UKCHUDWidget::HandleRecipesChanged()
 	RefreshRecipes();
 }
 
-void UKCHUDWidget::RefreshRoughHUD()
+void UKCHUDWidget::RefreshHUD()
 {
 	RefreshScore();
 	RefreshRecipes();
@@ -64,6 +65,9 @@ void UKCHUDWidget::RefreshScore()
 
 	const int32 LeftScore = HUDViewModel->GetTeamScore(0);
 	const int32 RightScore = HUDViewModel->GetTeamScore(1);
+	
+	if (!Team1ScoreText || !Team2ScoreText)
+		return;
 	
 	Team1ScoreText->SetText(FText::AsNumber(LeftScore));
 	Team2ScoreText->SetText(FText::AsNumber(RightScore));
