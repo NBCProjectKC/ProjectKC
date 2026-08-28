@@ -26,13 +26,13 @@ void UKCHUDPotProgressWidget::NativeDestruct()
 
 void UKCHUDPotProgressWidget::SetPotProgress(const FKCPotProgressViewData& PotProgress)
 {
-	if (!PotProgress.bVisible)
-	{
-		HidePotProgress();
-		return;
-	}
+	// if (!PotProgress.bVisible)
+	// {
+	// 	HidePotProgress();
+	// 	return;
+	// }
 
-	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	// SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	ApplyProgressMaterial(PotProgress.ProgressPercent);
 	ApplyRemainingSeconds(PotProgress.RemainingSeconds);
 
