@@ -304,6 +304,12 @@ bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlo
 	{
 		return false;
 	}
+	
+	// 플레이어 상태가 준비 상태면 이동 불가
+	if (PS->IsReady())
+	{
+		return false;
+	}
 
 	EnsureSlotsCollected();
 
