@@ -7,6 +7,7 @@
 #include "KCItemDefinition.generated.h"
 
 class UKCAbilityDefinition;
+class UTexture2D;
 
 /** 인벤토리와 무관한 단일 월드 아이템의 불변 구성 데이터다. */
 UCLASS(BlueprintType)
@@ -31,6 +32,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	FText DisplayName;
+
+	/** 레시피, HUD 등 UI에서 이 아이템을 나타내는 아이콘이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	TObjectPtr<UTexture2D> Icon;
 
 	UPROPERTY(
 		EditDefaultsOnly,
