@@ -165,10 +165,28 @@ void UKCHUDViewModel::RebuildSubmittedStates()
 
 	for (FKCRecipeViewData& Recipe : NewRecipes)
 	{
+		int32 Team0SubmittedCount = 0;
+		int32 Team1SubmittedCount = 0;
+
 		for (FKCRecipeIngredientViewData& Ingredient : Recipe.Ingredients)
 		{
 			Ingredient.bSubmitted = false;
 			Ingredient.SubmittedTeamId = INDEX_NONE;
+
+			const bool bSubmittedByTeam0 = TeamPotIngredients.IsValidIndex(0) &&
+				TeamPotIngredients[0].HasTagExact(Ingredient.IngredientId);
+			const bool bSubmittedByTeam1 = TeamPotIngredients.IsValidIndex(1) &&
+				TeamPotIngredients[1].HasTagExact(Ingredient.IngredientId);
+
+			if (bSubmittedByTeam0)
+			{
+				++Team0SubmittedCount;
+			}
+
+			if (bSubmittedByTeam1)
+			{
+				++Team1SubmittedCount;
+			}
 
 			for (int32 TeamId = 0; TeamId < TeamPotIngredients.Num(); ++TeamId)
 			{
@@ -180,6 +198,21 @@ void UKCHUDViewModel::RebuildSubmittedStates()
 				}
 			}
 		}
+
+		const float RequiredIngredientCount = static_cast<float>(Recipe.Ingredients.Num());
+		if (RequiredIngredientCount <= 0.0f)
+		{
+			Recipe.Team0Progress = 0.0f;
+			Recipe.Team1Progress = 0.0f;
+			Recipe.bTeam0ProgressVisible = false;
+			Recipe.bTeam1ProgressVisible = false;
+			continue;
+		}
+
+		Recipe.Team0Progress = Team0SubmittedCount / RequiredIngredientCount;
+		Recipe.Team1Progress = Team1SubmittedCount / RequiredIngredientCount;
+		Recipe.bTeam0ProgressVisible = Team0SubmittedCount > 0;
+		Recipe.bTeam1ProgressVisible = Team1SubmittedCount > 0;
 	}
 
 	SetRecipes(NewRecipes);
