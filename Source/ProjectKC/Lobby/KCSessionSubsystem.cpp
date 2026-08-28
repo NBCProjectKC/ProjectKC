@@ -102,9 +102,21 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 		return;
 	}
 
+	// 기존에 남아있는 세션이 있다면 먼저 파괴 후 대기열을 통해 안전하게 참가
+	FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession);
+	if (ExistingSession)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[KCSessionSubsystem] Existing session found before Join. Destroying old session first..."));
+		PendingSessionToJoin = SessionResult;
+		bJoiningPendingSessionAfterDestroy = true;
+		SessionInterface->DestroySession(NAME_GameSession);
+		return;
+	}
+
 	const bool bSuccess = SessionInterface->JoinSession(LocalPlayer->GetControllerId(), NAME_GameSession, SessionResult.OnlineResult);
 	if (!bSuccess)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[KCSessionSubsystem] JoinSession returned false immediately!"));
 		OnJoinSessionComplete.Broadcast(false, FString());
 	}
 }
@@ -178,7 +190,14 @@ void UKCSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 
 	if (bSuccess && SessionInterface.IsValid())
 	{
-		SessionInterface->GetResolvedConnectString(SessionName, ConnectString);
+		if (SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
+		{
+			if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
+			{
+				UE_LOG(LogTemp, Log, TEXT("[KCSessionSubsystem] Join Session Success! ClientTravel to: %s"), *ConnectString);
+				PC->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
+			}
+		}
 	}
 
 	OnJoinSessionComplete.Broadcast(bSuccess, ConnectString);
@@ -186,6 +205,14 @@ void UKCSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 
 void UKCSessionSubsystem::HandleDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
+	if (bJoiningPendingSessionAfterDestroy)
+	{
+		bJoiningPendingSessionAfterDestroy = false;
+		UE_LOG(LogTemp, Log, TEXT("[KCSessionSubsystem] Old session destroyed. Now joining new pending session..."));
+		JoinSession(PendingSessionToJoin);
+		return;
+	}
+
 	OnDestroySessionComplete.Broadcast(bWasSuccessful);
 }
 
@@ -194,6 +221,12 @@ void UKCSessionSubsystem::HandleSessionUserInviteAccepted(const bool bWasSuccess
 	FBlueprintSessionResult Result;
 	Result.OnlineResult = InviteResult;
 	OnSessionInviteAccepted.Broadcast(bWasSuccessful, Result);
+
+	if (bWasSuccessful)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[KCSessionSubsystem] Session invite accepted! Automatically joining session..."));
+		JoinSession(Result);
+	}
 }
 
 void UKCSessionSubsystem::SaveLobbyPlayerData(const FString& PlayerName, int32 InTeamId, int32 InSlotIndex)
