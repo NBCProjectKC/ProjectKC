@@ -6,10 +6,12 @@
 #include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
 #include "KCHUDRecipeEntryWidget.generated.h"
 
-class UListView;
 class UTextBlock;
+class UHorizontalBox;
 class UVerticalBox;
 class UKCColorStyle;
+class UTexture2D;
+class UProgressBar;
 class UKCHUDRecipeIngredientWidget;
 
 UCLASS(BlueprintType)
@@ -43,21 +45,34 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI")
 	TSubclassOf<UKCHUDRecipeIngredientWidget> IngredientWidgetClass;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UTextBlock> DifficultyText;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Recipe")
+	TObjectPtr<UTexture2D> FilledStarTexture;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Recipe")
+	TObjectPtr<UTexture2D> EmptyStarTexture;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UTextBlock> FoodNameText;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UListView> IngredientListView;
+	TObjectPtr<UHorizontalBox> HB_Stars;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UHorizontalBox> HB_Ingredients;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UVerticalBox> IngredientEntryContainer;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UProgressBar> Team1ProgressBar;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UProgressBar> Team2ProgressBar;
 
 private:
-	static FText BuildStarsText(int32 DifficultyStars);
-	TSubclassOf<UKCHUDRecipeIngredientWidget> ResolveIngredientWidgetClass() const;
+	void RefreshDifficultyStars(int32 DifficultyStars);
+	void RefreshIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
+	void RefreshTeamProgressBars(const TArray<FKCRecipeIngredientViewData>& Ingredients);
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCHUDRecipeIngredientListItem>> IngredientItems;

@@ -14,20 +14,19 @@ void UKCHUDRecipeIngredientWidget::NativeOnListItemObjectSet(UObject* ListItemOb
 
 void UKCHUDRecipeIngredientWidget::SetIngredient(const FKCRecipeIngredientViewData& Ingredient)
 {
-	BP_OnIngredientSet(Ingredient);
-
 	if (IngredientText)
 	{
-		const FText IngredientDisplayName = Ingredient.DisplayName.IsEmpty()
-			? FText::FromString(Ingredient.IngredientId.ToString())
-			: Ingredient.DisplayName;
-		IngredientText->SetText(IngredientDisplayName);
+		IngredientText->SetText(Ingredient.DisplayName);
 	}
 
 	if (CheckText)
 	{
-		CheckText->SetText(Ingredient.bSubmitted ? FText::FromString(TEXT("v")) : FText::GetEmpty());
+		CheckText->SetVisibility(Ingredient.bSubmitted
+			? ESlateVisibility::SelfHitTestInvisible
+			: ESlateVisibility::Collapsed);
 	}
+
+	BP_OnIngredientSet(Ingredient);
 }
 
 void UKCHUDRecipeIngredientWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)

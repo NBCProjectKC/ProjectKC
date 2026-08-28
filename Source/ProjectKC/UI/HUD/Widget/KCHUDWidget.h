@@ -5,6 +5,7 @@
 #include "KCHUDWidget.generated.h"
 
 class UTextBlock;
+class UDataTable;
 class UKCColorStyle;
 class UKCHUDRecipeListWidget;
 class UKCHUDViewModel;
@@ -31,6 +32,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Transient, Category = "KC|UI")
 	TObjectPtr<UKCHUDViewModel> HUDViewModel;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Recipe")
+	TObjectPtr<UDataTable> RecipeDataTable;
 
 	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
 

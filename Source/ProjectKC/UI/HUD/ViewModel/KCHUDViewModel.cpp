@@ -8,7 +8,6 @@
 #include "ProjectKC/Messages/Struct/KCGamePhaseChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCPotIngredientsChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCScoreChangedStruct.h"
-#include "ProjectKC/UI/Common/Core/KCUISettings.h"
 
 void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 {
@@ -50,6 +49,11 @@ void UKCHUDViewModel::StopListening()
 	ActiveRecipesChangedHandle.Unregister();
 	PotIngredientsChangedHandle.Unregister();
 	ListeningWorldContext.Reset();
+}
+
+void UKCHUDViewModel::SetRecipeDataTable(UDataTable* InRecipeDataTable)
+{
+	RecipeDataTable = InRecipeDataTable;
 }
 
 void UKCHUDViewModel::SetCurrentPhase(EKCGamePhaseType NewPhase)
@@ -187,14 +191,13 @@ FKCRecipeViewData UKCHUDViewModel::BuildRecipeViewData(FName RecipeRowName) cons
 	RecipeViewData.RecipeRowName = RecipeRowName;
 	RecipeViewData.DisplayName = FText::FromName(RecipeRowName);
 
-	const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
-	const UDataTable* RecipeDataTable = UISettings ? UISettings->RecipeDataTable.LoadSynchronous() : nullptr;
 	const FKCRecipeStruct* Recipe = RecipeDataTable
 		? RecipeDataTable->FindRow<FKCRecipeStruct>(RecipeRowName, TEXT("KCHUDViewModel"))
 		: nullptr;
 
 	if (!Recipe)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("KCHUDViewModel: RecipeDataTable is missing or row '%s' was not found. This UI lookup is temporary until recipe ownership is unified."), *RecipeRowName.ToString());
 		return RecipeViewData;
 	}
 

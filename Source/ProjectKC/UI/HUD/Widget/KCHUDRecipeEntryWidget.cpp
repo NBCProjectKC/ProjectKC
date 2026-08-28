@@ -1,7 +1,10 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeEntryWidget.h"
 
-#include "Components/ListView.h"
+#include "Components/HorizontalBox.h"
+#include "Components/Image.h"
+#include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Components/Widget.h"
 #include "Components/VerticalBox.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeIngredientWidget.h"
@@ -25,33 +28,79 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 {
 	BP_OnRecipeSet(Recipe);
 
-	if (DifficultyText)
-	{
-		DifficultyText->SetText(BuildStarsText(Recipe.DifficultyStars));
-	}
-
 	if (FoodNameText)
 	{
 		FoodNameText->SetText(Recipe.DisplayName.IsEmpty() ? FText::FromName(Recipe.RecipeRowName) : Recipe.DisplayName);
 	}
 
+	RefreshDifficultyStars(Recipe.DifficultyStars);
+	RefreshTeamProgressBars(Recipe.Ingredients);
+
 	IngredientItems.Reset();
 	IngredientItems.Reserve(Recipe.Ingredients.Num());
-
-	TArray<UObject*> ListItems;
-	ListItems.Reserve(Recipe.Ingredients.Num());
 
 	for (const FKCRecipeIngredientViewData& Ingredient : Recipe.Ingredients)
 	{
 		UKCHUDRecipeIngredientListItem* Item = NewObject<UKCHUDRecipeIngredientListItem>(this);
 		Item->Ingredient = Ingredient;
 		IngredientItems.Add(Item);
-		ListItems.Add(Item);
 	}
 
-	if (IngredientListView)
+	RefreshIngredientWidgets(Recipe.Ingredients);
+}
+
+void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars)
+{
+	if (!HB_Stars)
 	{
-		IngredientListView->SetListItems(ListItems);
+		return;
+	}
+
+	const int32 FilledStarCount = FMath::Clamp(DifficultyStars, 0, HB_Stars->GetChildrenCount());
+	for (int32 ChildIndex = 0; ChildIndex < HB_Stars->GetChildrenCount(); ++ChildIndex)
+	{
+		if (UWidget* StarWidget = HB_Stars->GetChildAt(ChildIndex))
+		{
+			StarWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+			UImage* StarImage = Cast<UImage>(StarWidget);
+			if (!StarImage)
+			{
+				continue;
+			}
+
+			UTexture2D* StarTexture = ChildIndex < FilledStarCount ? FilledStarTexture.Get() : EmptyStarTexture.Get();
+			if (StarTexture)
+			{
+				StarImage->SetBrushFromTexture(StarTexture, false);
+			}
+		}
+	}
+}
+
+void UKCHUDRecipeEntryWidget::RefreshIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients)
+{
+	if (!IngredientWidgetClass)
+	{
+		return;
+	}
+
+	if (HB_Ingredients)
+	{
+		HB_Ingredients->ClearChildren();
+
+		for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
+		{
+			UKCHUDRecipeIngredientWidget* IngredientWidget = CreateWidget<UKCHUDRecipeIngredientWidget>(this, IngredientWidgetClass);
+			if (!IngredientWidget)
+			{
+				continue;
+			}
+
+			IngredientWidget->SetIngredient(Ingredient);
+			HB_Ingredients->AddChildToHorizontalBox(IngredientWidget);
+		}
+
 		return;
 	}
 
@@ -62,15 +111,9 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 
 	IngredientEntryContainer->ClearChildren();
 
-	const TSubclassOf<UKCHUDRecipeIngredientWidget> ResolvedEntryClass = ResolveIngredientWidgetClass();
-	if (!ResolvedEntryClass)
+	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
 	{
-		return;
-	}
-
-	for (const FKCRecipeIngredientViewData& Ingredient : Recipe.Ingredients)
-	{
-		UKCHUDRecipeIngredientWidget* IngredientWidget = CreateWidget<UKCHUDRecipeIngredientWidget>(this, ResolvedEntryClass);
+		UKCHUDRecipeIngredientWidget* IngredientWidget = CreateWidget<UKCHUDRecipeIngredientWidget>(this, IngredientWidgetClass);
 		if (!IngredientWidget)
 		{
 			continue;
@@ -81,25 +124,40 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 	}
 }
 
-FText UKCHUDRecipeEntryWidget::BuildStarsText(int32 DifficultyStars)
+void UKCHUDRecipeEntryWidget::RefreshTeamProgressBars(const TArray<FKCRecipeIngredientViewData>& Ingredients)
 {
-	const int32 StarCount = FMath::Clamp(DifficultyStars, 1, 5);
-	FString Result;
-	for (int32 Index = 0; Index < StarCount; ++Index)
+	UProgressBar* TeamProgressBars[] = { Team1ProgressBar.Get(), Team2ProgressBar.Get() };
+	int32 SubmittedCounts[] = { 0, 0 };
+
+	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
 	{
-		if (!Result.IsEmpty())
+		if (Ingredient.bSubmitted &&
+			Ingredient.SubmittedTeamId >= 0 &&
+			Ingredient.SubmittedTeamId < UE_ARRAY_COUNT(SubmittedCounts))
 		{
-			Result += TEXT(" ");
+			++SubmittedCounts[Ingredient.SubmittedTeamId];
 		}
-		Result += TEXT("*");
 	}
 
-	return FText::FromString(Result);
-}
+	const float RequiredIngredientCount = static_cast<float>(Ingredients.Num());
+	for (int32 TeamIndex = 0; TeamIndex < UE_ARRAY_COUNT(TeamProgressBars); ++TeamIndex)
+	{
+		UProgressBar* ProgressBar = TeamProgressBars[TeamIndex];
+		if (!ProgressBar)
+		{
+			continue;
+		}
 
-TSubclassOf<UKCHUDRecipeIngredientWidget> UKCHUDRecipeEntryWidget::ResolveIngredientWidgetClass() const
-{
-	return IngredientWidgetClass;
+		if (SubmittedCounts[TeamIndex] <= 0 || RequiredIngredientCount <= 0.0f)
+		{
+			ProgressBar->SetPercent(0.0f);
+			ProgressBar->SetVisibility(ESlateVisibility::Hidden);
+			continue;
+		}
+
+		ProgressBar->SetPercent(SubmittedCounts[TeamIndex] / RequiredIngredientCount);
+		ProgressBar->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
 }
 
 void UKCHUDRecipeEntryWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
@@ -109,13 +167,18 @@ void UKCHUDRecipeEntryWidget::NativeApplyColorStyle(const UKCColorStyle* InColor
 		return;
 	}
 
-	if (DifficultyText)
-	{
-		DifficultyText->SetColorAndOpacity(FSlateColor(InColorStyle->RecipeText));
-	}
-
 	if (FoodNameText)
 	{
 		FoodNameText->SetColorAndOpacity(FSlateColor(InColorStyle->RecipeText));
+	}
+
+	if (Team1ProgressBar && InColorStyle->TeamColors.IsValidIndex(0))
+	{
+		Team1ProgressBar->SetFillColorAndOpacity(InColorStyle->TeamColors[0]);
+	}
+
+	if (Team2ProgressBar && InColorStyle->TeamColors.IsValidIndex(1))
+	{
+		Team2ProgressBar->SetFillColorAndOpacity(InColorStyle->TeamColors[1]);
 	}
 }

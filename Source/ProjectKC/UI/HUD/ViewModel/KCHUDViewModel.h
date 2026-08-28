@@ -8,6 +8,7 @@
 #include "KCHUDViewModel.generated.h"
 
 class UTexture2D;
+class UDataTable;
 struct FKCActiveRecipesChangedStruct;
 struct FKCGamePhaseChangedStruct;
 struct FKCPotIngredientsChangedStruct;
@@ -70,6 +71,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void StopListening();
 
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetRecipeDataTable(UDataTable* InRecipeDataTable);
+
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	EKCGamePhaseType GetCurrentPhase() const { return CurrentPhase; }
 
@@ -130,6 +134,9 @@ private:
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCRecipeViewData> Recipes;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UDataTable> RecipeDataTable;
 
 	UPROPERTY(Transient)
 	TArray<FGameplayTagContainer> TeamPotIngredients;

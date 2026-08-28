@@ -21,6 +21,7 @@ void UKCHUDWidget::NativeConstruct()
 		HUDViewModel = NewObject<UKCHUDViewModel>(this);
 	}
 
+	HUDViewModel->SetRecipeDataTable(RecipeDataTable);
 	HUDViewModel->StartListening(this);
 	HUDViewModel->OnTeamScoresChangedNative.AddUObject(this, &ThisClass::HandleTeamScoresChanged);
 	HUDViewModel->OnRecipesChangedNative.AddUObject(this, &ThisClass::HandleRecipesChanged);
