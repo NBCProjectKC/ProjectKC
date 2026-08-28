@@ -16,6 +16,10 @@ class PROJECTKC_API AKCPlayerController : public APlayerController
 public:
 	AKCPlayerController();
 
+	virtual void ReceivedPlayer() override;
+	UFUNCTION(BlueprintPure, Category = "KC|Network")
+	float GetServerTime() const; 
+	
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -33,6 +37,14 @@ private:
 	void Interact(const FInputActionValue& InputValue);
 	void DropHeldItem(const FInputActionValue& InputValue);
 	void UpdateCharacterFacing(float DeltaSeconds);
+	
+	// 서버 시간 동기화
+	UFUNCTION(Server, Reliable)
+	void ServerRequestServerTime(float TimeOfClientRequest);
+	UFUNCTION(Client, Reliable)
+	void ClientReportServerTime(float TimeOfClientRequest, float TimeServerReceivedClientRequest);
+	float ClientServerDelta = 0.0f;
+	float TimeSinceLastServerTimeSync = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> PlayerMappingContext;

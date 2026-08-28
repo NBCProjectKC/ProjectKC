@@ -22,6 +22,7 @@ void AKCGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AKCGameState, PotIngredients);
 	DOREPLIFETIME(AKCGameState, ActiveRecipeRowNames);
 	DOREPLIFETIME(AKCGameState, bIsFarmingOpen);
+	DOREPLIFETIME(AKCGameState, MatchStartServerTime);
 }
 
 void AKCGameState::InitializeTeamCount(int32 InTeamCount)
