@@ -34,7 +34,7 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 	}
 
 	RefreshDifficultyStars(Recipe.DifficultyStars);
-	RefreshTeamProgressBars(Recipe.Ingredients);
+	RefreshTeamProgressBars(Recipe);
 
 	IngredientItems.Reset();
 	IngredientItems.Reserve(Recipe.Ingredients.Num());
@@ -124,40 +124,29 @@ void UKCHUDRecipeEntryWidget::RefreshIngredientWidgets(const TArray<FKCRecipeIng
 	}
 }
 
-void UKCHUDRecipeEntryWidget::RefreshTeamProgressBars(const TArray<FKCRecipeIngredientViewData>& Ingredients)
+void UKCHUDRecipeEntryWidget::RefreshTeamProgressBars(const FKCRecipeViewData& Recipe)
 {
-	UProgressBar* TeamProgressBars[] = { Team1ProgressBar.Get(), Team2ProgressBar.Get() };
-	int32 SubmittedCounts[] = { 0, 0 };
-
-	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
+	auto ApplyTeamProgress = [](UProgressBar* ProgressBar, float Progress, bool bVisible)
 	{
-		if (Ingredient.bSubmitted &&
-			Ingredient.SubmittedTeamId >= 0 &&
-			Ingredient.SubmittedTeamId < UE_ARRAY_COUNT(SubmittedCounts))
-		{
-			++SubmittedCounts[Ingredient.SubmittedTeamId];
-		}
-	}
-
-	const float RequiredIngredientCount = static_cast<float>(Ingredients.Num());
-	for (int32 TeamIndex = 0; TeamIndex < UE_ARRAY_COUNT(TeamProgressBars); ++TeamIndex)
-	{
-		UProgressBar* ProgressBar = TeamProgressBars[TeamIndex];
 		if (!ProgressBar)
 		{
-			continue;
+			return;
 		}
 
-		if (SubmittedCounts[TeamIndex] <= 0 || RequiredIngredientCount <= 0.0f)
+		if (!bVisible)
 		{
 			ProgressBar->SetPercent(0.0f);
 			ProgressBar->SetVisibility(ESlateVisibility::Hidden);
-			continue;
+			return;
 		}
 
-		ProgressBar->SetPercent(SubmittedCounts[TeamIndex] / RequiredIngredientCount);
+		ProgressBar->SetPercent(FMath::Clamp(Progress, 0.0f, 1.0f));
 		ProgressBar->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	}
+	};
+
+	// Team1ProgressBar is the visual slot for TeamId 0. Team2ProgressBar is for TeamId 1.
+	ApplyTeamProgress(Team1ProgressBar.Get(), Recipe.Team0Progress, Recipe.bTeam0ProgressVisible);
+	ApplyTeamProgress(Team2ProgressBar.Get(), Recipe.Team1Progress, Recipe.bTeam1ProgressVisible);
 }
 
 void UKCHUDRecipeEntryWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
