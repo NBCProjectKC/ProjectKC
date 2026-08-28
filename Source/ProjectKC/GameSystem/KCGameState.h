@@ -25,6 +25,12 @@ public:
 	
 	void InitializeTeamCount(int32 InTeamCount);
 	
+	// 매치 시작 시각 저장
+	UPROPERTY(Replicated)
+	float MatchStartServerTime = 0.0f;
+	void SetMatchStartServerTime(float InTime) { MatchStartServerTime = InTime; }
+	float GetMatchStartServerTime() const { return MatchStartServerTime; }
+	
 	// setter
 	void SetGamePhase(EKCGamePhaseType NewPhase);
 	void SetTeamScore(int32 TeamId, int32 NewScore);

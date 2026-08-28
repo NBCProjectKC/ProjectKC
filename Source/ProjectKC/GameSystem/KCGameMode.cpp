@@ -49,8 +49,9 @@ void AKCGameMode::HandleMatchHasStarted()
 	if (KCGameState)
 	{
 		KCGameState->InitializeTeamCount(TeamCount);
-		KCGameState->SetActiveRecipes(SelectActiveRecipes());
-		KCGameState->SetGamePhase(EKCGamePhaseType::Playing);
+		KCGameState->SetActiveRecipes(SelectActiveRecipes()); // 그 판의 레시피 룰렛
+		KCGameState->SetMatchStartServerTime(GetWorld()->GetTimeSeconds()); // 매치 시작 후 타이머 세팅
+		KCGameState->SetGamePhase(EKCGamePhaseType::Playing); // phase 변경
 	}
 }
 
