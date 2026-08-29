@@ -15,6 +15,7 @@
 #include "KCLevelTypeLibrary.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "TimerManager.h"
 
 
 AKCGameMode::AKCGameMode()
@@ -50,13 +51,29 @@ void AKCGameMode::HandleMatchHasStarted()
 	{
 		KCGameState->InitializeTeamCount(TeamCount);
 		KCGameState->SetActiveRecipes(SelectActiveRecipes()); // 그 판의 레시피 룰렛
-		KCGameState->SetMatchStartServerTime(GetWorld()->GetTimeSeconds()); // 매치 시작 후 타이머 세팅
 		KCGameState->SetGamePhase(EKCGamePhaseType::Playing); // phase 변경
+	
+		// TODO 임시 코드
+		// GameState의 서버시간 설정
+		const float ServerNow = GetWorld()->GetTimeSeconds();
+		const float SafeMatchDuration = FMath::Max(1.0f, MatchDurationSeconds);
+		KCGameState->SetMatchStartServerTime(ServerNow); // 매치 시작 후 타이머 세팅
+		KCGameState->SetMatchEndServerTime(ServerNow + SafeMatchDuration);
 	}
+
+	// TODO 임시 코드
+	// Timer 끝날 때 게임 종료 처리 
+	GetWorldTimerManager().SetTimer(
+		MatchTimerHandle,
+		this,
+		&AKCGameMode::HandleMatchTimeExpired,
+		FMath::Max(1.0f, MatchDurationSeconds),
+		false);
 }
 
 void AKCGameMode::HandleMatchHasEnded()
 {
+	GetWorldTimerManager().ClearTimer(MatchTimerHandle);
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(IngredientSubmittedListenerHandle);
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(DishFinishedListenerHandle);
 
@@ -299,6 +316,50 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 		ResultScreenDuration,
 		false
 	);
+}
+
+// TODO: 임시코드
+// 게임 끝내기 로직
+void AKCGameMode::HandleMatchTimeExpired()
+{
+	if (!IsMatchInProgress())
+	{
+		return;
+	}
+
+	EndGame(GetLeadingTeamId());
+}
+
+// TODO: 임시코드
+// 게임 끝날 때 이긴 팀 계산을 위한 로직
+// 팀이 여러개라는 가정하에 코드 작성
+int32 AKCGameMode::GetLeadingTeamId() const
+{
+	if (!KCGameState)
+	{
+		return INDEX_NONE;
+	}
+
+	int32 LeadingTeamId = INDEX_NONE;
+	int32 LeadingScore = MIN_int32;
+	bool bTie = false;
+
+	for (int32 TeamId = 0; TeamId < TeamCount; ++TeamId)
+	{
+		const int32 Score = KCGameState->GetTeamScore(TeamId);
+		if (Score > LeadingScore)
+		{
+			LeadingScore = Score;
+			LeadingTeamId = TeamId;
+			bTie = false;
+		}
+		else if (Score == LeadingScore)
+		{
+			bTie = true;
+		}
+	}
+
+	return bTie ? INDEX_NONE : LeadingTeamId;
 }
 
 void AKCGameMode::TravelBackToLobby()

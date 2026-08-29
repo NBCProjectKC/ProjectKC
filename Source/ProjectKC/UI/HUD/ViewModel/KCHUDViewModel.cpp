@@ -13,6 +13,7 @@
 #include "ProjectKC/Messages/Struct/KCPotIngredientsChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCPotProgressChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCScoreChangedStruct.h"
+#include "ProjectKC/Player/KCPlayerController.h"
 
 void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 {
@@ -53,10 +54,12 @@ void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 
 	SyncLocalTeamIdFromContext();
 	SyncFromGameState();
+	StartMatchTimerRefresh();
 }
 
 void UKCHUDViewModel::StopListening()
 {
+	StopMatchTimerRefresh();
 	UnbindLocalTeamPlayerState();
 	ScoreChangedHandle.Unregister();
 	PhaseChangedHandle.Unregister();
@@ -103,6 +106,19 @@ void UKCHUDViewModel::SetTeamScores(const TArray<int32>& NewTeamScores)
 	TeamScores = NewTeamScores;
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(TeamScores);
 	OnTeamScoresChangedNative.Broadcast(TeamScores);
+}
+
+void UKCHUDViewModel::SetRemainingMatchSeconds(int32 NewRemainingSeconds)
+{
+	NewRemainingSeconds = FMath::Max(0, NewRemainingSeconds);
+	if (RemainingMatchSeconds == NewRemainingSeconds)
+	{
+		return;
+	}
+
+	RemainingMatchSeconds = NewRemainingSeconds;
+	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(RemainingMatchSeconds);
+	OnMatchTimerChangedNative.Broadcast(RemainingMatchSeconds);
 }
 
 void UKCHUDViewModel::SetLocalTeamId(int32 NewTeamId)
@@ -254,6 +270,7 @@ void UKCHUDViewModel::SyncFromGameState()
 	SetCurrentPhase(GameState->GetGamePhase());
 	SetTeamScore(0, GameState->GetTeamScore(0));
 	SetTeamScore(1, GameState->GetTeamScore(1));
+	RefreshMatchTimer();
 
 	TeamPotIngredients.SetNum(2);
 	TeamPotIngredients[0] = GameState->GetPotIngredients(0);
@@ -268,6 +285,57 @@ void UKCHUDViewModel::SyncFromGameState()
 
 	SetRecipes(NewRecipes);
 	RebuildSubmittedStates();
+}
+
+void UKCHUDViewModel::RefreshMatchTimer()
+{
+	const UObject* WorldContextObject = ListeningWorldContext.Get();
+	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const AKCGameState* GameState = World ? World->GetGameState<AKCGameState>() : nullptr;
+	const AKCPlayerController* PlayerController = nullptr;
+
+	if (const UUserWidget* UserWidget = Cast<UUserWidget>(WorldContextObject))
+	{
+		PlayerController = Cast<AKCPlayerController>(UserWidget->GetOwningPlayer());
+	}
+
+	if (!PlayerController && World)
+	{
+		PlayerController = Cast<AKCPlayerController>(World->GetFirstPlayerController());
+	}
+
+	const int32 RemainingSeconds = GameState && PlayerController
+		? GameState->GetRemainingMatchSeconds(PlayerController->GetServerTime())
+		: 0;
+
+	SetRemainingMatchSeconds(RemainingSeconds);
+}
+
+void UKCHUDViewModel::StartMatchTimerRefresh()
+{
+	if (const UObject* WorldContextObject = ListeningWorldContext.Get())
+	{
+		if (UWorld* World = WorldContextObject->GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				MatchTimerRefreshHandle,
+				this,
+				&ThisClass::RefreshMatchTimer,
+				0.2f,
+				true);
+		}
+	}
+}
+
+void UKCHUDViewModel::StopMatchTimerRefresh()
+{
+	if (const UObject* WorldContextObject = ListeningWorldContext.Get())
+	{
+		if (UWorld* World = WorldContextObject->GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(MatchTimerRefreshHandle);
+		}
+	}
 }
 
 void UKCHUDViewModel::SyncLocalTeamIdFromContext()

@@ -1,5 +1,6 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
@@ -22,6 +23,7 @@ void UKCHUDWidget::NativeConstruct()
 
 	HUDViewModel->StartListening(this);
 	HUDViewModel->OnTeamScoresChangedNative.AddUObject(this, &ThisClass::HandleTeamScoresChanged);
+	HUDViewModel->OnMatchTimerChangedNative.AddUObject(this, &ThisClass::HandleMatchTimerChanged);
 	HUDViewModel->OnRecipesChangedNative.AddUObject(this, &ThisClass::HandleRecipesChanged);
 	HUDViewModel->OnPotProgressChangedNative.AddUObject(this, &ThisClass::HandlePotProgressChanged);
 	RefreshHUD();
@@ -32,6 +34,7 @@ void UKCHUDWidget::NativeDestruct()
 	if (HUDViewModel)
 	{
 		HUDViewModel->OnTeamScoresChangedNative.RemoveAll(this);
+		HUDViewModel->OnMatchTimerChangedNative.RemoveAll(this);
 		HUDViewModel->OnRecipesChangedNative.RemoveAll(this);
 		HUDViewModel->OnPotProgressChangedNative.RemoveAll(this);
 		HUDViewModel->StopListening();
@@ -58,6 +61,7 @@ void UKCHUDWidget::HandlePotProgressChanged(int32 TeamId, const FKCPotProgressVi
 void UKCHUDWidget::RefreshHUD()
 {
 	RefreshScore();
+	ApplyMatchTimerText(HUDViewModel ? HUDViewModel->GetRemainingMatchSeconds() : 0);
 	RefreshRecipes();
 	RefreshPotProgresses();
 }
@@ -78,6 +82,41 @@ void UKCHUDWidget::RefreshScore()
 	Team1ScoreText->SetText(FText::AsNumber(LeftScore));
 	Team2ScoreText->SetText(FText::AsNumber(RightScore));
 	
+}
+
+void UKCHUDWidget::HandleMatchTimerChanged(int32 RemainingSeconds)
+{
+	ApplyMatchTimerText(RemainingSeconds);
+}
+
+void UKCHUDWidget::ApplyMatchTimerText(int32 RemainingSeconds)
+{
+	UTextBlock* TimerTextBlock = ResolveTimerTextBlock();
+	if (!TimerTextBlock)
+	{
+		return;
+	}
+
+	const int32 ClampedSeconds = FMath::Max(0, RemainingSeconds);
+	TimerTextBlock->SetText(FText::FromString(FString::Printf(
+		TEXT("%02d:%02d"),
+		ClampedSeconds / 60,
+		ClampedSeconds % 60)));
+}
+
+UTextBlock* UKCHUDWidget::ResolveTimerTextBlock()
+{
+	if (Timer)
+	{
+		return Timer.Get();
+	}
+
+	if (WidgetTree)
+	{
+		Timer = WidgetTree->FindWidget<UTextBlock>(TEXT("Timer"));
+	}
+
+	return Timer.Get();
 }
 
 void UKCHUDWidget::RefreshRecipes()
