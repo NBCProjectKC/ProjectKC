@@ -8,7 +8,7 @@
 #include "KCHUDViewModel.generated.h"
 
 class UTexture2D;
-class UDataTable;
+class AKCLobbyPlayerState;
 struct FKCActiveRecipesChangedStruct;
 struct FKCGamePhaseChangedStruct;
 struct FKCPotIngredientsChangedStruct;
@@ -103,9 +103,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void StopListening();
 
-	UFUNCTION(BlueprintCallable, Category = "KC|UI")
-	void SetRecipeDataTable(UDataTable* InRecipeDataTable);
-
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	EKCGamePhaseType GetCurrentPhase() const { return CurrentPhase; }
 
@@ -126,6 +123,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	const TArray<FKCRecipeViewData>& GetRecipes() const { return Recipes; }
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	int32 GetLocalTeamId() const { return LocalTeamId; }
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetLocalTeamId(int32 NewTeamId);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetRecipes(const TArray<FKCRecipeViewData>& NewRecipes);
@@ -165,10 +168,17 @@ protected:
 	void OnPotIngredientsChanged(int32 TeamId);
 
 private:
+	UFUNCTION()
+	void HandleLocalTeamIdChanged(int32 NewTeamId);
+
 	void HandleScoreChanged(FGameplayTag Channel, const FKCScoreChangedStruct& Message);
 	void HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message);
 	void HandleActiveRecipesChanged(FGameplayTag Channel, const FKCActiveRecipesChangedStruct& Message);
 	void HandlePotIngredientsChanged(FGameplayTag Channel, const FKCPotIngredientsChangedStruct& Message);
+	void SyncFromGameState();
+	void SyncLocalTeamIdFromContext();
+	void BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState);
+	void UnbindLocalTeamPlayerState();
 	void RebuildSubmittedStates();
 	FKCRecipeViewData BuildRecipeViewData(FName RecipeRowName) const;
 	static FText MakeDisplayNameFromTag(const FGameplayTag& Tag);
@@ -182,16 +192,17 @@ private:
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCRecipeViewData> Recipes;
 
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	int32 LocalTeamId = 0;
+
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCPotProgressViewData> PotProgresses;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UDataTable> RecipeDataTable;
 
 	UPROPERTY(Transient)
 	TArray<FGameplayTagContainer> TeamPotIngredients;
 
 	TWeakObjectPtr<UObject> ListeningWorldContext;
+	TWeakObjectPtr<AKCLobbyPlayerState> BoundLocalTeamPlayerState;
 	FGameplayMessageListenerHandle ScoreChangedHandle;
 	FGameplayMessageListenerHandle PhaseChangedHandle;
 	FGameplayMessageListenerHandle ActiveRecipesChangedHandle;

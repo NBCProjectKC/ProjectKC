@@ -1,7 +1,5 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
 
-#include <string>
-
 #include "Components/TextBlock.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
@@ -22,7 +20,6 @@ void UKCHUDWidget::NativeConstruct()
 		HUDViewModel = NewObject<UKCHUDViewModel>(this);
 	}
 
-	HUDViewModel->SetRecipeDataTable(RecipeDataTable);
 	HUDViewModel->StartListening(this);
 	HUDViewModel->OnTeamScoresChangedNative.AddUObject(this, &ThisClass::HandleTeamScoresChanged);
 	HUDViewModel->OnRecipesChangedNative.AddUObject(this, &ThisClass::HandleRecipesChanged);
