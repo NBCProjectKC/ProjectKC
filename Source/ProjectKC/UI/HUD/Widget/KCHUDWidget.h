@@ -38,6 +38,7 @@ protected:
 
 private:
 	void HandleTeamScoresChanged(const TArray<int32>& TeamScores);
+	void HandleMatchTimerChanged(int32 RemainingSeconds);
 	void HandleRecipesChanged();
 	void HandlePotProgressChanged(int32 TeamId, const FKCPotProgressViewData& PotProgress);
 	void RefreshHUD();
@@ -45,6 +46,8 @@ private:
 	void RefreshRecipes();
 	void RefreshPotProgresses();
 	void RefreshPotProgress(int32 TeamId);
+	void ApplyMatchTimerText(int32 RemainingSeconds);
+	UTextBlock* ResolveTimerTextBlock();
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -52,6 +55,9 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team2ScoreText;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Timer;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UKCHUDPotProgressWidget> WBP_Team1PotProgress;

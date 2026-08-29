@@ -23,6 +23,7 @@ void AKCGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AKCGameState, ActiveRecipeRowNames);
 	DOREPLIFETIME(AKCGameState, bIsFarmingOpen);
 	DOREPLIFETIME(AKCGameState, MatchStartServerTime);
+	DOREPLIFETIME(AKCGameState, MatchEndServerTime);
 }
 
 void AKCGameState::InitializeTeamCount(int32 InTeamCount)
@@ -98,6 +99,16 @@ void AKCGameState::SetActiveRecipes(const TArray<FName>& InRecipeRowNames)
 int32 AKCGameState::GetTeamScore(int32 TeamId) const
 {
 	return TeamScores.IsValidIndex(TeamId) ? TeamScores[TeamId] : 0;
+}
+
+int32 AKCGameState::GetRemainingMatchSeconds(float CurrentServerTime) const
+{
+	if (!HasMatchTimerStarted())
+	{
+		return 0;
+	}
+
+	return FMath::Max(0, FMath::CeilToInt(MatchEndServerTime - CurrentServerTime));
 }
 
 FGameplayTagContainer AKCGameState::GetPotIngredients(int32 TeamId) const

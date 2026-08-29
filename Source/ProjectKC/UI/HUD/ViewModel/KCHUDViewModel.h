@@ -5,6 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "ProjectKC/GameSystem/KCGamePhaseType.h"
 #include "ProjectKC/UI/Common/Core/KCViewModelBase.h"
+#include "TimerManager.h"
 #include "KCHUDViewModel.generated.h"
 
 class UTexture2D;
@@ -71,6 +72,7 @@ struct FKCRecipeViewData
 
 DECLARE_MULTICAST_DELEGATE(FKCRecipesChangedNativeDelegate);
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCTeamScoresChangedNativeDelegate, const TArray<int32>&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FKCMatchTimerChangedNativeDelegate, int32);
 
 USTRUCT(BlueprintType)
 struct FKCPotProgressViewData
@@ -123,6 +125,12 @@ public:
 	void SetTeamScores(const TArray<int32>& NewTeamScores);
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	int32 GetRemainingMatchSeconds() const { return RemainingMatchSeconds; }
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetRemainingMatchSeconds(int32 NewRemainingSeconds);
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	const TArray<FKCRecipeViewData>& GetRecipes() const { return Recipes; }
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
@@ -153,6 +161,7 @@ public:
 
 	FKCTeamScoresChangedNativeDelegate OnTeamScoresChangedNative;
 	FKCRecipesChangedNativeDelegate OnRecipesChangedNative;
+	FKCMatchTimerChangedNativeDelegate OnMatchTimerChangedNative;
 	FKCPotProgressChangedNativeDelegate OnPotProgressChangedNative;
 
 protected:
@@ -178,6 +187,9 @@ private:
 	void HandlePotIngredientsChanged(FGameplayTag Channel, const FKCPotIngredientsChangedStruct& Message);
 	void HandlePotProgressChanged(FGameplayTag Channel, const FKCPotProgressChangedStruct& Message);
 	void SyncFromGameState();
+	void RefreshMatchTimer();
+	void StartMatchTimerRefresh();
+	void StopMatchTimerRefresh();
 	void SyncLocalTeamIdFromContext();
 	void BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState);
 	void UnbindLocalTeamPlayerState();
@@ -190,6 +202,9 @@ private:
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<int32> TeamScores;
+
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	int32 RemainingMatchSeconds = 0;
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCRecipeViewData> Recipes;
@@ -210,4 +225,5 @@ private:
 	FGameplayMessageListenerHandle ActiveRecipesChangedHandle;
 	FGameplayMessageListenerHandle PotIngredientsChangedHandle;
 	FGameplayMessageListenerHandle PotProgressChangedHandle;
+	FTimerHandle MatchTimerRefreshHandle;
 };

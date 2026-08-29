@@ -30,6 +30,13 @@ public:
 	float MatchStartServerTime = 0.0f;
 	void SetMatchStartServerTime(float InTime) { MatchStartServerTime = InTime; }
 	float GetMatchStartServerTime() const { return MatchStartServerTime; }
+
+	UPROPERTY(Replicated)
+	float MatchEndServerTime = 0.0f;
+	void SetMatchEndServerTime(float InTime) { MatchEndServerTime = InTime; }
+	float GetMatchEndServerTime() const { return MatchEndServerTime; }
+	bool HasMatchTimerStarted() const { return MatchEndServerTime > MatchStartServerTime; }
+	int32 GetRemainingMatchSeconds(float CurrentServerTime) const;
 	
 	// setter
 	void SetGamePhase(EKCGamePhaseType NewPhase);
