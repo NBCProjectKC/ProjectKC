@@ -6,6 +6,9 @@
 #include "GameSystem/KCGamePhaseType.h"
 #include "KCGameState.generated.h"
 
+class UDataTable;
+struct FKCRecipeStruct;
+
 /**
  * 공용 데이터 보관소
  * - 점수, 게임 페이즈, 냄비에 투입된 재료 등
@@ -21,6 +24,12 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	void InitializeTeamCount(int32 InTeamCount);
+	
+	// 매치 시작 시각 저장
+	UPROPERTY(Replicated)
+	float MatchStartServerTime = 0.0f;
+	void SetMatchStartServerTime(float InTime) { MatchStartServerTime = InTime; }
+	float GetMatchStartServerTime() const { return MatchStartServerTime; }
 	
 	// setter
 	void SetGamePhase(EKCGamePhaseType NewPhase);
@@ -45,6 +54,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|GameState")
 	const TArray<FName>& GetActiveRecipes() const { return ActiveRecipeRowNames; }
 	
+	// UI, GameMode : 레시피 이름으로 그 레시피의 정보 조회 함수
+	const FKCRecipeStruct* FindRecipeByRowName(FName RowName) const;
+
+	// GameMode : 레시피 랜덤 선정용 
+	TArray<FName> GetAllRecipeRowNames() const;
 	
 	// 접시 덮개 오픈 전 재료 습득 방어
 	void SetFarmingOpen(bool bOpen);
@@ -52,6 +66,11 @@ public:
     bool IsFarmingOpen() const { return bIsFarmingOpen; }
 
 protected:
+	// Recipe DT ptr
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe")
+	TObjectPtr<UDataTable> RecipeDataTable;
+	
+	// default phase : waiting
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentPhase)
 	EKCGamePhaseType CurrentPhase = EKCGamePhaseType::Waiting;
 

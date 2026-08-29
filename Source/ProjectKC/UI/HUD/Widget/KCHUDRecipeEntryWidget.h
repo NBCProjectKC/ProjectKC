@@ -7,6 +7,7 @@
 #include "KCHUDRecipeEntryWidget.generated.h"
 
 class UTextBlock;
+class UCheckBox;
 class UHorizontalBox;
 class UVerticalBox;
 class UKCColorStyle;
@@ -62,6 +63,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UVerticalBox> IngredientEntryContainer;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UVerticalBox> VB_TestIngredients;
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UProgressBar> Team1ProgressBar;
@@ -72,6 +76,7 @@ protected:
 private:
 	void RefreshDifficultyStars(int32 DifficultyStars);
 	void RefreshIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
+	void RefreshTestIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
 	void RefreshTeamProgressBars(const FKCRecipeViewData& Recipe);
 
 	UPROPERTY(Transient)

@@ -1,5 +1,6 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeEntryWidget.h"
 
+#include "Components/CheckBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
@@ -47,6 +48,7 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 	}
 
 	RefreshIngredientWidgets(Recipe.Ingredients);
+	RefreshTestIngredientWidgets(Recipe.Ingredients);
 }
 
 void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars)
@@ -121,6 +123,42 @@ void UKCHUDRecipeEntryWidget::RefreshIngredientWidgets(const TArray<FKCRecipeIng
 
 		IngredientWidget->SetIngredient(Ingredient);
 		IngredientEntryContainer->AddChildToVerticalBox(IngredientWidget);
+	}
+}
+
+void UKCHUDRecipeEntryWidget::RefreshTestIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients)
+{
+	if (!VB_TestIngredients)
+	{
+		return;
+	}
+
+	VB_TestIngredients->ClearChildren();
+
+	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
+	{
+		UHorizontalBox* RowWidget = NewObject<UHorizontalBox>(VB_TestIngredients);
+		if (!RowWidget)
+		{
+			continue;
+		}
+
+		UCheckBox* IngredientCheckBox = NewObject<UCheckBox>(RowWidget);
+		if (IngredientCheckBox)
+		{
+			IngredientCheckBox->SetIsChecked(Ingredient.bSubmitted);
+			IngredientCheckBox->SetIsEnabled(false);
+			RowWidget->AddChildToHorizontalBox(IngredientCheckBox);
+		}
+
+		UTextBlock* IngredientTextBlock = NewObject<UTextBlock>(RowWidget);
+		if (IngredientTextBlock)
+		{
+			IngredientTextBlock->SetText(Ingredient.DisplayName);
+			RowWidget->AddChildToHorizontalBox(IngredientTextBlock);
+		}
+
+		VB_TestIngredients->AddChildToVerticalBox(RowWidget);
 	}
 }
 

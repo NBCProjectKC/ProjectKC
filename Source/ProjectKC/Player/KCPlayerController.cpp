@@ -245,6 +245,17 @@ void AKCPlayerController::PlayerTick(const float DeltaSeconds)
 	if (IsLocalController())
 	{
 		UpdateCharacterFacing(DeltaSeconds);
+		
+		// 서버 시간 주기적으로 재동기화
+		if (!HasAuthority())
+		{
+			TimeSinceLastServerTimeSync += DeltaSeconds;
+			if (TimeSinceLastServerTimeSync > 5.0f)
+			{
+				ServerRequestServerTime(GetWorld()->GetTimeSeconds());
+				TimeSinceLastServerTimeSync = 0.0f;
+			}
+		}
 	}
 }
 
@@ -298,4 +309,32 @@ void AKCPlayerController::UpdateCharacterFacing(const float DeltaSeconds)
 	const FVector MousePlaneLocation =
 		MouseWorldLocation + MouseWorldDirection * DistanceToCharacterPlane;
 	PlayerCharacter->UpdateFacingDirection(MousePlaneLocation - CharacterLocation, DeltaSeconds);
+}
+
+void AKCPlayerController::ReceivedPlayer()
+{
+	Super::ReceivedPlayer();
+
+	if (IsLocalController())
+	{
+		ServerRequestServerTime(GetWorld()->GetTimeSeconds());
+	}
+}
+
+void AKCPlayerController::ServerRequestServerTime_Implementation(float TimeOfClientRequest)
+{
+	const float ServerTimeOfReceipt = GetWorld()->GetTimeSeconds();
+	ClientReportServerTime(TimeOfClientRequest, ServerTimeOfReceipt);
+}
+
+void AKCPlayerController::ClientReportServerTime_Implementation(float TimeOfClientRequest, float TimeServerReceivedClientRequest)
+{
+	const float RTT = GetWorld()->GetTimeSeconds() - TimeOfClientRequest;
+	const float CurrentServerTime = TimeServerReceivedClientRequest - RTT / 2.0f;
+	ClientServerDelta = CurrentServerTime - GetWorld()->GetTimeSeconds();
+}
+
+float AKCPlayerController::GetServerTime() const
+{
+	return HasAuthority() ? GetWorld()->GetTimeSeconds() : GetWorld()->GetTimeSeconds() + ClientServerDelta;
 }
