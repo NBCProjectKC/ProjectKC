@@ -14,6 +14,7 @@ class UDataTable;
 class UPrimitiveComponent;
 class UKCAbilitySystemComponent;
 class UKCCookingProgressAttributeSet;
+class UKCPotProgressBroadcasterComponent;
 struct FOnAttributeChangeData;
 struct FKCDishRuinedStruct;
 struct FKCRecipeCompletedStruct;
@@ -35,6 +36,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Pot")
 	EKCPotStateType GetPotState() const { return PotState; }
+
+	int32 GetAssignedTeamId() const { return AssignedTeamId; }
+	const UKCCookingProgressAttributeSet* GetCookingProgressAttributes() const { return CookingProgressAttributes; }
+	float GetActiveProgressSpeedPerSecond() const { return ActiveProgressSpeedPerSecond; }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Pot")
 	bool ResetPot();
@@ -65,6 +70,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Pot")
 	TObjectPtr<UKCCookingProgressAttributeSet> CookingProgressAttributes;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Pot")
+	TObjectPtr<UKCPotProgressBroadcasterComponent> PotProgressBroadcaster;
 
 	/** 0은 1팀, 1은 2팀이다. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "KC|Pot")

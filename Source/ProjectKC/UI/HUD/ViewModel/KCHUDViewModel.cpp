@@ -11,6 +11,7 @@
 #include "ProjectKC/Messages/Struct/KCActiveRecipesChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCGamePhaseChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCPotIngredientsChangedStruct.h"
+#include "ProjectKC/Messages/Struct/KCPotProgressChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCScoreChangedStruct.h"
 
 void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
@@ -45,6 +46,11 @@ void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 		this,
 		&ThisClass::HandlePotIngredientsChanged);
 
+	PotProgressChangedHandle = MessageSystem.RegisterListener<FKCPotProgressChangedStruct>(
+		KCGameplayTags::Message_Game_PotProgressChanged,
+		this,
+		&ThisClass::HandlePotProgressChanged);
+
 	SyncLocalTeamIdFromContext();
 	SyncFromGameState();
 }
@@ -56,6 +62,7 @@ void UKCHUDViewModel::StopListening()
 	PhaseChangedHandle.Unregister();
 	ActiveRecipesChangedHandle.Unregister();
 	PotIngredientsChangedHandle.Unregister();
+	PotProgressChangedHandle.Unregister();
 	ListeningWorldContext.Reset();
 }
 
@@ -220,6 +227,18 @@ void UKCHUDViewModel::HandlePotIngredientsChanged(FGameplayTag Channel, const FK
 	TeamPotIngredients[Message.TeamId] = Message.Ingredients;
 	RebuildSubmittedStates();
 	OnPotIngredientsChanged(Message.TeamId);
+}
+
+void UKCHUDViewModel::HandlePotProgressChanged(
+	FGameplayTag Channel,
+	const FKCPotProgressChangedStruct& Message)
+{
+	SetPotProgress(
+		Message.TeamId,
+		Message.ProgressPercent,
+		Message.RemainingSeconds,
+		Message.bVisible,
+		Message.bCompleted);
 }
 
 void UKCHUDViewModel::SyncFromGameState()

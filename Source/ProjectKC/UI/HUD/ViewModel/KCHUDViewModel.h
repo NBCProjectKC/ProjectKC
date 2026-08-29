@@ -12,6 +12,7 @@ class AKCLobbyPlayerState;
 struct FKCActiveRecipesChangedStruct;
 struct FKCGamePhaseChangedStruct;
 struct FKCPotIngredientsChangedStruct;
+struct FKCPotProgressChangedStruct;
 struct FKCScoreChangedStruct;
 
 USTRUCT(BlueprintType)
@@ -175,6 +176,7 @@ private:
 	void HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message);
 	void HandleActiveRecipesChanged(FGameplayTag Channel, const FKCActiveRecipesChangedStruct& Message);
 	void HandlePotIngredientsChanged(FGameplayTag Channel, const FKCPotIngredientsChangedStruct& Message);
+	void HandlePotProgressChanged(FGameplayTag Channel, const FKCPotProgressChangedStruct& Message);
 	void SyncFromGameState();
 	void SyncLocalTeamIdFromContext();
 	void BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState);
@@ -207,4 +209,5 @@ private:
 	FGameplayMessageListenerHandle PhaseChangedHandle;
 	FGameplayMessageListenerHandle ActiveRecipesChangedHandle;
 	FGameplayMessageListenerHandle PotIngredientsChangedHandle;
+	FGameplayMessageListenerHandle PotProgressChangedHandle;
 };

@@ -26,13 +26,21 @@ void UKCHUDPotProgressWidget::NativeDestruct()
 
 void UKCHUDPotProgressWidget::SetPotProgress(const FKCPotProgressViewData& PotProgress)
 {
-	// if (!PotProgress.bVisible)
-	// {
-	// 	HidePotProgress();
-	// 	return;
-	// }
+	if (!PotProgress.bVisible && !PotProgress.bCompleted)
+	{
+		if (bShowing && GetVisibility() != ESlateVisibility::Hidden &&
+			GetVisibility() != ESlateVisibility::Collapsed)
+		{
+			PlayHideAnimationThenHide();
+		}
+		else
+		{
+			HidePotProgress();
+		}
+		return;
+	}
 
-	// SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	ShowPotProgress();
 	ApplyProgressMaterial(PotProgress.ProgressPercent);
 	ApplyRemainingSeconds(PotProgress.RemainingSeconds);
 
@@ -60,6 +68,31 @@ void UKCHUDPotProgressWidget::HidePotProgress()
 	ApplyRemainingSeconds(0);
 	bCompletedAnimationPlayed = false;
 	SetVisibility(ESlateVisibility::Hidden);
+	bShowing = false;
+	bHideAnimationPlaying = false;
+}
+
+void UKCHUDPotProgressWidget::ShowPotProgress()
+{
+	if (bShowing && GetVisibility() != ESlateVisibility::Hidden &&
+		GetVisibility() != ESlateVisibility::Collapsed)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HideAfterCompletedAnimationTimerHandle);
+	}
+
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	bShowing = true;
+	bHideAnimationPlaying = false;
+
+	if (PopUp)
+	{
+		PlayAnimation(PopUp);
+	}
 }
 
 void UKCHUDPotProgressWidget::ApplyProgressMaterial(float ProgressPercent)
@@ -93,18 +126,28 @@ void UKCHUDPotProgressWidget::PlayCompletedAnimationThenHide()
 {
 	BP_OnPotProgressCompleted();
 
-	UWidgetAnimation* CompletedAnimation = GetCompletedAnimation();
-	if (!CompletedAnimation)
+	PlayHideAnimationThenHide();
+}
+
+void UKCHUDPotProgressWidget::PlayHideAnimationThenHide()
+{
+	if (bHideAnimationPlaying)
+	{
+		return;
+	}
+
+	if (!Pop)
 	{
 		HidePotProgress();
 		return;
 	}
 
-	PlayAnimation(CompletedAnimation);
+	bHideAnimationPlaying = true;
+	PlayAnimation(Pop);
 
 	if (UWorld* World = GetWorld())
 	{
-		const float AnimationDuration = FMath::Max(CompletedAnimation->GetEndTime(), 0.01f);
+		const float AnimationDuration = FMath::Max(Pop->GetEndTime(), 0.01f);
 		World->GetTimerManager().SetTimer(
 			HideAfterCompletedAnimationTimerHandle,
 			this,
@@ -112,9 +155,4 @@ void UKCHUDPotProgressWidget::PlayCompletedAnimationThenHide()
 			AnimationDuration,
 			false);
 	}
-}
-
-UWidgetAnimation* UKCHUDPotProgressWidget::GetCompletedAnimation() const
-{
-	return PopUp ? PopUp.Get() : Pop.Get();
 }

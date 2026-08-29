@@ -21,6 +21,7 @@
 #include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCIngredientSubmittedStruct.h"
+#include "ProjectKC/Pot/Component/KCPotProgressBroadcasterComponent.h"
 #include "TimerManager.h"
 
 namespace KCPot
@@ -50,6 +51,9 @@ AKCPotActor::AKCPotActor()
 
 	CookingProgressAttributes =
 		CreateDefaultSubobject<UKCCookingProgressAttributeSet>(TEXT("CookingProgress"));
+
+	PotProgressBroadcaster =
+		CreateDefaultSubobject<UKCPotProgressBroadcasterComponent>(TEXT("PotProgressBroadcaster"));
 }
 
 UAbilitySystemComponent* AKCPotActor::GetAbilitySystemComponent() const
@@ -189,6 +193,10 @@ void AKCPotActor::HandleDishRuined(
 	if (HasAuthority() && PotState == EKCPotStateType::Idle &&
 		Message.TeamId == AssignedTeamId)
 	{
+		if (PotProgressBroadcaster)
+		{
+			PotProgressBroadcaster->NotifyCookingHidden();
+		}
 		MulticastCookingRuined();
 	}
 }
@@ -318,6 +326,10 @@ void AKCPotActor::StartCooking(
 		&AKCPotActor::AdvanceCookingProgress,
 		KCPot::ProgressTickInterval,
 		true);
+	if (PotProgressBroadcaster)
+	{
+		PotProgressBroadcaster->NotifyCookingStarted();
+	}
 	MulticastCookingStarted();
 	ForceNetUpdate();
 }
@@ -335,6 +347,12 @@ void AKCPotActor::AdvanceCookingProgress()
 		CookingProgressAttributes->GetMaxCookingProgress())
 	{
 		CompleteCooking();
+		return;
+	}
+
+	if (PotProgressBroadcaster)
+	{
+		PotProgressBroadcaster->NotifyCookingProgress();
 	}
 }
 
@@ -342,6 +360,10 @@ void AKCPotActor::CompleteCooking()
 {
 	GetWorldTimerManager().ClearTimer(CookingTimerHandle);
 	PotState = EKCPotStateType::Completed;
+	if (PotProgressBroadcaster)
+	{
+		PotProgressBroadcaster->NotifyCookingCompleted();
+	}
 
 	FKCDishFinishedStruct Message;
 	Message.TeamId = AssignedTeamId;
