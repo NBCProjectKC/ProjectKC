@@ -9,6 +9,7 @@
 #include "OnlineSessionSettings.h"
 #include "Online/OnlineSessionNames.h"
 #include "Interfaces/OnlineIdentityInterface.h"
+#include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
@@ -188,6 +189,14 @@ bool UKCSessionSubsystem::SendSessionInviteToFriend(const FString& FriendUniqueN
 		return false;
 	}
 
+	// 세션 정원 초과 검사
+	FNamedOnlineSession* Session = SessionInterface->GetNamedSession(NAME_GameSession);
+	if (Session && Session->NumOpenPublicConnections <= 0)
+	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] SendSessionInviteToFriend Rejected: No open connections remaining in session!"));
+		return false;
+	}
+
 	ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer();
 	if (!LocalPlayer)
 	{
@@ -337,5 +346,18 @@ void UKCSessionSubsystem::ClearSavedLobbyData()
 	SavedLobbyPlayers.Empty();
 	ExpectedPlayerCount = 0;
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Cleared Saved Lobby Player Data"));
+}
+
+bool UKCSessionSubsystem::IsLobbyFull() const
+{
+	const UWorld* World = GetWorld();
+	const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
+	if (!GS)
+	{
+		return false;
+	}
+
+	const int32 MaxPlayers = (ExpectedPlayerCount > 0) ? ExpectedPlayerCount : 6;
+	return GS->PlayerArray.Num() >= MaxPlayers;
 }
 

@@ -66,6 +66,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetExpectedPlayerCount() const { return ExpectedPlayerCount; }
 
+	/** 현재 로비가 만석(정원 초과)인지 확인 */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	bool IsLobbyFull() const;
+
 public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Session|Events")
 	FOnKCCreateSessionCompleteDelegate OnCreateSessionComplete;

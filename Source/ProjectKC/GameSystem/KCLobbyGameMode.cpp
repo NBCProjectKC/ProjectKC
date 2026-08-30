@@ -52,6 +52,29 @@ void AKCLobbyGameMode::InitGame(const FString& MapName, const FString& Options, 
 	}
 }
 
+void AKCLobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+
+	// 현재 접속자 수 검사 (최대 필요 인원수 도달 시 접속 거부)
+	const int32 CurrentPlayerCount = GetNumPlayers();
+	if (CurrentPlayerCount >= RequiredPlayerCount)
+	{
+		ErrorMessage = TEXT("LOBBY_FULL: Maximum player capacity reached for this lobby session.");
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] PreLogin Rejected: Lobby is full! (Current: %d / %d, Address: %s)"),
+			CurrentPlayerCount, RequiredPlayerCount, *Address);
+		return;
+	}
+
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] PreLogin Accepted: (Current: %d / %d, Address: %s)"),
+		CurrentPlayerCount, RequiredPlayerCount, *Address);
+}
+
 AKCPlayerSlotActor* AKCLobbyGameMode::FindSlotByIndex(int32 SlotIndex) const
 {
 	if (SlotIndex < 0 || SlotIndex >= 6)

@@ -11,6 +11,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
+#include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -56,6 +57,15 @@ void UKCFriendWidget::Update(const FBPFriendInfo& FriendData)
 	// 3. 오프라인 상태에 따른 투명도 설정 (Offline: 0.25, Online: 1.0)
 	const float Opacity = (FriendData.OnlineState == EBPOnlinePresenceState::Offline) ? 0.25f : 1.0f;
 	SetRenderOpacity(Opacity);
+
+	// 4. 초대 버튼 활성화 상태 갱신 (오프라인이거나 로비가 만석이면 비활성화)
+	if (Button_Invite)
+	{
+		UKCSessionSubsystem* SessionSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UKCSessionSubsystem>() : nullptr;
+		const bool bIsOnline = (FriendData.OnlineState != EBPOnlinePresenceState::Offline);
+		const bool bLobbyHasSpace = SessionSubsystem ? !SessionSubsystem->IsLobbyFull() : true;
+		Button_Invite->SetIsEnabled(bIsOnline && bLobbyHasSpace);
+	}
 }
 
 void UKCFriendWidget::SetupFriend(const FString& InFriendName, const FString& InFriendUniqueNetId)
@@ -70,18 +80,25 @@ void UKCFriendWidget::SetupFriend(const FString& InFriendName, const FString& In
 
 void UKCFriendWidget::OnInviteClicked()
 {
+	// 1. 오프라인 친구 초대 차단
 	if (CachedFriendData.OnlineState == EBPOnlinePresenceState::Offline)
 	{
 		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] Cannot invite offline friend: %s"), *CachedFriendData.DisplayName);
 		return;
 	}
-	
-	APlayerController* PC = GetOwningPlayer();
-	if (!PC)
-	{
-		PC = UGameplayStatics::GetPlayerController(this, 0);
-	}
 
+	UKCSessionSubsystem* SessionSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UKCSessionSubsystem>() : nullptr;
+
+	// 2. 로비 정원 만석 시 초대 차단 
+	
+	if (SessionSubsystem && SessionSubsystem->IsLobbyFull())
+	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] Cannot invite friend '%s': Lobby is already full!"), *CachedFriendData.DisplayName);
+		return;
+	}
+	
+	// 3. 초대 전송
+	APlayerController* PC = GetOwningPlayer() ? GetOwningPlayer() : UGameplayStatics::GetPlayerController(this, 0);
 	if (PC && CachedFriendData.UniqueNetId.IsValid())
 	{
 		EBlueprintResultSwitch Result;
@@ -95,21 +112,18 @@ void UKCFriendWidget::OnInviteClicked()
 			UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] Failed to send invite to: %s"), *CachedFriendData.DisplayName);
 		}
 	}
-	else if (UGameInstance* GI = GetGameInstance())
+	else if (SessionSubsystem)
 	{
-		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		const bool bSent = SessionSubsystem->SendSessionInviteToFriend(FriendUniqueNetId);
+		if (bSent)
 		{
-			const bool bSent = SessionSubsystem->SendSessionInviteToFriend(FriendUniqueNetId);
-			if (bSent)
-			{
-				UE_LOG(LogKCSession, Log, TEXT("[KCFriendWidget] SendSessionInviteToFriend via Subsystem for '%s': SUCCESS"),
-					*CachedFriendData.DisplayName);
-			}
-			else
-			{
-				UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] SendSessionInviteToFriend via Subsystem for '%s': FAILED"),
-					*CachedFriendData.DisplayName);
-			}
+			UE_LOG(LogKCSession, Log, TEXT("[KCFriendWidget] SendSessionInviteToFriend via Subsystem for '%s': SUCCESS"),
+				*CachedFriendData.DisplayName);
+		}
+		else
+		{
+			UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] SendSessionInviteToFriend via Subsystem for '%s': FAILED"),
+				*CachedFriendData.DisplayName);
 		}
 	}
 }
