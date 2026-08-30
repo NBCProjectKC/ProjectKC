@@ -43,6 +43,7 @@ void UKCLobbyWidget::NativeConstruct()
 			PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);
 			OnReadyStatusUpdated(PS->IsReady());
 			OnTeamIdUpdated(PS->GetTeamId());
+			bPlayerStateBound = true;
 		}
 	}
 }
@@ -51,13 +52,19 @@ void UKCLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	// 클라이언트에서 PlayerState 복제 지연 대응 바인딩
-	if (APlayerController* PC = GetOwningPlayer())
+	// 클라이언트에서 PlayerState 복제 완료 시 즉시 바인딩 및 초기 UI 텍스트 갱신
+	if (!bPlayerStateBound)
 	{
-		if (AKCLobbyPlayerState* PS = PC->GetPlayerState<AKCLobbyPlayerState>())
+		if (APlayerController* PC = GetOwningPlayer())
 		{
-			PS->OnReadyStatusChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnReadyStatusUpdated);
-			PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);
+			if (AKCLobbyPlayerState* PS = PC->GetPlayerState<AKCLobbyPlayerState>())
+			{
+				PS->OnReadyStatusChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnReadyStatusUpdated);
+				PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);
+				OnReadyStatusUpdated(PS->IsReady());
+				OnTeamIdUpdated(PS->GetTeamId());
+				bPlayerStateBound = true;
+			}
 		}
 	}
 }
