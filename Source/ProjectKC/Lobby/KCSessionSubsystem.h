@@ -1,3 +1,8 @@
+/**
+ * @file KCSessionSubsystem.h
+ * @brief 스팀/온라인 세션 관리 및 로비-인게임 데이터 보존 서브시스템 정의
+ */
+
 #pragma once
 
 #include "CoreMinimal.h"
