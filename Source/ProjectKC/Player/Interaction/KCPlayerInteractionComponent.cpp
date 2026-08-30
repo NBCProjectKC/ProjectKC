@@ -44,14 +44,18 @@ AActor* UKCPlayerInteractionComponent::GetBestInteractable() const
 
 	for (UPrimitiveComponent* CandidateComponent : OverlappingTargetComponents)
 	{
-		if (!IsValidInteractionComponent(CandidateComponent, bRequireLineOfSight))
+		FVector ClosestInteractionPoint;
+		if (!IsValidInteractionComponent(
+			CandidateComponent,
+			bRequireLineOfSight,
+			&ClosestInteractionPoint))
 		{
 			continue;
 		}
 
 		AActor* CandidateActor = CandidateComponent->GetOwner();
 		const float DistanceSquared = FVector::DistSquared2D(
-			OwnerActor->GetActorLocation(), CandidateComponent->Bounds.Origin);
+			OwnerActor->GetActorLocation(), ClosestInteractionPoint);
 		if (DistanceSquared < BestDistanceSquared)
 		{
 			BestDistanceSquared = DistanceSquared;
@@ -108,7 +112,8 @@ UPrimitiveComponent* UKCPlayerInteractionComponent::FindInteractionComponent(
 
 bool UKCPlayerInteractionComponent::IsValidInteractionComponent(
 	UPrimitiveComponent* TargetComponent,
-	const bool bCheckLineOfSight) const
+	const bool bCheckLineOfSight,
+	FVector* OutClosestInteractionPoint) const
 {
 	const AActor* OwnerActor = GetOwner();
 	AActor* TargetActor = TargetComponent ? TargetComponent->GetOwner() : nullptr;
@@ -121,30 +126,47 @@ bool UKCPlayerInteractionComponent::IsValidInteractionComponent(
 	}
 
 	const FVector OwnerLocation = OwnerActor->GetActorLocation();
-	const FVector TargetLocation = TargetComponent->Bounds.Origin;
-	const FVector ToTarget = (TargetLocation - OwnerLocation).GetSafeNormal2D();
-	if (ToTarget.IsNearlyZero())
+	FVector ClosestInteractionPoint;
+	if (TargetComponent->GetClosestPointOnCollision(
+		OwnerLocation,
+		ClosestInteractionPoint) < 0.0f)
 	{
 		return false;
 	}
 
-	if (FVector::DistSquared2D(OwnerLocation, TargetLocation)
-		> FMath::Square(GetScaledSphereRadius()))
+	const FVector ToTarget = (ClosestInteractionPoint - OwnerLocation).GetSafeNormal2D();
+	if (!ToTarget.IsNearlyZero())
+	{
+		if (FVector::DistSquared2D(OwnerLocation, ClosestInteractionPoint)
+			> FMath::Square(GetScaledSphereRadius()))
+		{
+			return false;
+		}
+
+		const FVector OwnerForward = OwnerActor->GetActorForwardVector().GetSafeNormal2D();
+		if (FVector::DotProduct(OwnerForward, ToTarget) < MinimumForwardDot)
+		{
+			return false;
+		}
+	}
+
+	if (bCheckLineOfSight &&
+		!HasLineOfSightTo(TargetComponent, ClosestInteractionPoint))
 	{
 		return false;
 	}
 
-	const FVector OwnerForward = OwnerActor->GetActorForwardVector().GetSafeNormal2D();
-	if (FVector::DotProduct(OwnerForward, ToTarget) < MinimumForwardDot)
+	if (OutClosestInteractionPoint)
 	{
-		return false;
+		*OutClosestInteractionPoint = ClosestInteractionPoint;
 	}
 
-	return !bCheckLineOfSight || HasLineOfSightTo(TargetComponent);
+	return true;
 }
 
 bool UKCPlayerInteractionComponent::HasLineOfSightTo(
-	const UPrimitiveComponent* TargetComponent) const
+	const UPrimitiveComponent* TargetComponent,
+	const FVector& InteractionPoint) const
 {
 	const AActor* OwnerActor = GetOwner();
 	const AActor* TargetActor = TargetComponent ? TargetComponent->GetOwner() : nullptr;
@@ -159,7 +181,7 @@ bool UKCPlayerInteractionComponent::HasLineOfSightTo(
 	const bool bBlockingHit = World->LineTraceSingleByChannel(
 		HitResult,
 		OwnerActor->GetActorLocation(),
-		TargetComponent->Bounds.Origin,
+		InteractionPoint,
 		InteractionTraceChannel,
 		QueryParams);
 
