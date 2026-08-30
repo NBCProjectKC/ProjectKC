@@ -37,32 +37,35 @@ void AKCLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 
 void AKCLobbyPlayerState::SetSlotIndex(int32 InSlotIndex)
 {
-	if (HasAuthority())
+	if (HasAuthority() && SlotIndex != InSlotIndex)
 	{
 		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] '%s' SetSlotIndex: %d -> %d"), *GetPlayerName(), SlotIndex, InSlotIndex);
 		SlotIndex = InSlotIndex;
 		OnRep_SlotIndex();
+		ForceNetUpdate();
 	}
 }
 
 void AKCLobbyPlayerState::SetTeamId(int32 InTeamId)
 {
-	if (HasAuthority())
+	if (HasAuthority() && TeamId != InTeamId)
 	{
 		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] '%s' SetTeamId: %d -> %d"), *GetPlayerName(), TeamId, InTeamId);
 		TeamId = InTeamId;
 		OnRep_TeamId();
+		ForceNetUpdate();
 	}
 }
 
 void AKCLobbyPlayerState::SetIsReady(bool bNewReady)
 {
-	if (HasAuthority())
+	if (HasAuthority() && bReady != bNewReady)
 	{
 		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] '%s' SetIsReady: %s -> %s"),
 			*GetPlayerName(), bReady ? TEXT("TRUE") : TEXT("FALSE"), bNewReady ? TEXT("TRUE") : TEXT("FALSE"));
 		bReady = bNewReady;
 		OnRep_Ready();
+		ForceNetUpdate();
 	}
 }
 
