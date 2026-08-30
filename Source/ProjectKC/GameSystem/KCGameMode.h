@@ -72,6 +72,9 @@ protected:
 	// 한 판 종료 후 결과화면 보는 시간(= Ending Phase 시작부터 SeverTravel 하기까지의 시간)
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
 	float ResultScreenDuration = 10.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
+	float MatchDurationSeconds = 180.f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug")
 	bool bUseFixedRecipeList = true;
@@ -105,10 +108,13 @@ private:
 	bool IsTargetScoreReached(int32& OutWinningTeamId) const;
 	void CheckWinCondition();
 	void EndGame(int32 WinningTeamId);
+	void HandleMatchTimeExpired();
+	int32 GetLeadingTeamId() const;
 	
 	// 로비 세션으로 이동(EndGame() 내부에서 타이머 끝나면 실행됨)
 	void TravelBackToLobby();
 	FTimerHandle ResultScreenTimerHandle;
+	FTimerHandle MatchTimerHandle;
 	
 	FGameplayMessageListenerHandle IngredientSubmittedListenerHandle;
 	FGameplayMessageListenerHandle DishFinishedListenerHandle;

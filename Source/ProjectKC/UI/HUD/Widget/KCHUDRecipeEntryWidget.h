@@ -8,22 +8,11 @@
 
 class UTextBlock;
 class UCheckBox;
-class UHorizontalBox;
+class UPanelWidget;
 class UVerticalBox;
 class UKCColorStyle;
 class UTexture2D;
 class UProgressBar;
-class UKCHUDRecipeIngredientWidget;
-
-UCLASS(BlueprintType)
-class PROJECTKC_API UKCHUDRecipeIngredientListItem : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(BlueprintReadOnly, Category = "KC|UI")
-	FKCRecipeIngredientViewData Ingredient;
-};
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTKC_API UKCHUDRecipeEntryWidget : public UKCUserWidget, public IUserObjectListEntry
@@ -43,9 +32,6 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "KC|UI", meta = (DisplayName = "On Recipe Set"))
 	void BP_OnRecipeSet(const FKCRecipeViewData& Recipe);
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI")
-	TSubclassOf<UKCHUDRecipeIngredientWidget> IngredientWidgetClass;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Recipe")
 	TObjectPtr<UTexture2D> FilledStarTexture;
 
@@ -56,13 +42,10 @@ protected:
 	TObjectPtr<UTextBlock> FoodNameText;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UHorizontalBox> HB_Stars;
+	TObjectPtr<UPanelWidget> HB_Stars;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UHorizontalBox> HB_Ingredients;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
-	TObjectPtr<UVerticalBox> IngredientEntryContainer;
+	TObjectPtr<UPanelWidget> HB_Ingredients;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UVerticalBox> VB_TestIngredients;
@@ -75,10 +58,6 @@ protected:
 
 private:
 	void RefreshDifficultyStars(int32 DifficultyStars);
-	void RefreshIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
 	void RefreshTestIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
 	void RefreshTeamProgressBars(const FKCRecipeViewData& Recipe);
-
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<UKCHUDRecipeIngredientListItem>> IngredientItems;
 };

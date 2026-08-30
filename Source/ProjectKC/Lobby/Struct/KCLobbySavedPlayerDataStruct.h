@@ -18,6 +18,21 @@ struct PROJECTKC_API FKCLobbySavedPlayerDataStruct
 	GENERATED_BODY()
 
 public:
+	FKCLobbySavedPlayerDataStruct()
+		: PlayerName(TEXT(""))
+		, TeamId(0)
+		, SlotIndex(INDEX_NONE)
+	{
+	}
+
+	FKCLobbySavedPlayerDataStruct(const FString& InPlayerName, int32 InTeamId, int32 InSlotIndex)
+		: PlayerName(InPlayerName)
+		, TeamId(InTeamId)
+		, SlotIndex(InSlotIndex)
+	{
+	}
+
+public:
 	/** @brief 플레이어 표시 닉네임 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby")
 	FString PlayerName;
