@@ -5,6 +5,7 @@
 
 #include "ProjectKC/Lobby/UI/KCFriendWidget.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
+#include "ProjectKC/ProjectKC.h"
 #include "AdvancedSteamFriendsLibrary.h"
 #include "AdvancedFriendsLibrary.h"
 #include "Components/Button.h"
@@ -71,7 +72,7 @@ void UKCFriendWidget::OnInviteClicked()
 {
 	if (CachedFriendData.OnlineState == EBPOnlinePresenceState::Offline)
 	{
-		UKismetSystemLibrary::PrintString(this, TEXT("오프라인 친구는 초대할 수 없습니다."), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] Cannot invite offline friend: %s"), *CachedFriendData.DisplayName);
 		return;
 	}
 	
@@ -87,18 +88,29 @@ void UKCFriendWidget::OnInviteClicked()
 		UAdvancedFriendsLibrary::SendSessionInviteToFriend(PC, CachedFriendData.UniqueNetId, Result);
 		if (Result == EBlueprintResultSwitch::OnSuccess)
 		{
-			UKismetSystemLibrary::PrintString(this, TEXT("초대 메시지 전송 선공!"), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
+			UE_LOG(LogKCSession, Log, TEXT("[KCFriendWidget] Successfully sent invite to: %s"), *CachedFriendData.DisplayName);
 		}
 		else
 		{
-			UKismetSystemLibrary::PrintString(this, TEXT("초대 메시지 전송 실패.."), true, true, FLinearColor(0.0f, 0.66f, 1.0f, 1.0f), 2.0f);
+			UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] Failed to send invite to: %s"), *CachedFriendData.DisplayName);
 		}
 	}
 	else if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
 		{
-			SessionSubsystem->SendSessionInviteToFriend(FriendUniqueNetId);
+			const bool bSent = SessionSubsystem->SendSessionInviteToFriend(FriendUniqueNetId);
+			if (bSent)
+			{
+				UE_LOG(LogKCSession, Log, TEXT("[KCFriendWidget] SendSessionInviteToFriend via Subsystem for '%s': SUCCESS"),
+					*CachedFriendData.DisplayName);
+			}
+			else
+			{
+				UE_LOG(LogKCSession, Warning, TEXT("[KCFriendWidget] SendSessionInviteToFriend via Subsystem for '%s': FAILED"),
+					*CachedFriendData.DisplayName);
+			}
 		}
 	}
 }
+
