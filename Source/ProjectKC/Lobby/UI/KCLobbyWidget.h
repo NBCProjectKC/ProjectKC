@@ -85,4 +85,8 @@ protected:
 	/** @brief 플레이어 팀 ID 변경 시 호출되는 콜백 핸들러 */
 	UFUNCTION()
 	virtual void OnTeamIdUpdated(int32 NewTeamId);
+
+private:
+	/** @brief PlayerState와의 바인딩 및 초기화 완료 여부 */
+	bool bPlayerStateBound = false;
 };
