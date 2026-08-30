@@ -5,6 +5,7 @@
 
 #include "ProjectKC/Lobby/UI/KCFriendListWidget.h"
 #include "ProjectKC/Lobby/UI/KCFriendWidget.h"
+#include "ProjectKC/ProjectKC.h"
 #include "AdvancedFriendsLibrary.h"
 #include "Components/PanelWidget.h"
 #include "OnlineSubsystem.h"
@@ -23,7 +24,8 @@ void UKCFriendListWidget::NativeConstruct()
 
 	if (!FriendEntryWidgetClass)
 	{
-		FriendEntryWidgetClass = StaticLoadClass(UKCFriendWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
+		static UClass* LoadedClass = StaticLoadClass(UKCFriendWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
+		FriendEntryWidgetClass = LoadedClass;
 	}
 
 	// 1. 즉시 1회 친구 목록 갱신
@@ -57,15 +59,18 @@ void UKCFriendListWidget::RefreshFriendList()
 	IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
 	if (!OSS)
 	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] RefreshFriendList Failed: OnlineSubsystem is null"));
 		return;
 	}
 
 	IOnlineFriendsPtr FriendsInterface = OSS->GetFriendsInterface();
 	if (!FriendsInterface.IsValid())
 	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] RefreshFriendList Failed: FriendsInterface is invalid"));
 		return;
 	}
 
+	UE_LOG(LogKCSession, Verbose, TEXT("[KCFriendListWidget] Requesting ReadFriendsList..."));
 	FriendsInterface->ReadFriendsList(
 		0,
 		EFriendsLists::ToString(EFriendsLists::Default),
@@ -77,6 +82,7 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 {
 	if (!bWasSuccessful)
 	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] ReadFriendsList failed: %s"), *ErrorStr);
 		return;
 	}
 
@@ -89,6 +95,18 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 	TArray<FBPFriendInfo> FriendsList;
 	UAdvancedFriendsLibrary::GetStoredFriendsList(PC, FriendsList);
 
+	int32 OnlineCount = 0;
+	for (const FBPFriendInfo& Friend : FriendsList)
+	{
+		if (Friend.OnlineState != EBPOnlinePresenceState::Offline)
+		{
+			OnlineCount++;
+		}
+	}
+
+	UE_LOG(LogKCSession, Verbose, TEXT("[KCFriendListWidget] ReadFriendsList Complete: Found %d friends (%d online)"),
+		FriendsList.Num(), OnlineCount);
+
 	// 온라인 친구가 위로 오도록 정렬
 	FriendsList.Sort([](const FBPFriendInfo& A, const FBPFriendInfo& B)
 	{
@@ -97,24 +115,23 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 		return bAOnline > bBOnline;
 	});
 
-	if (!FriendList)
-	{
-		return;
-	}
-
-	if (!FriendEntryWidgetClass)
+	if (!FriendList || !FriendEntryWidgetClass)
 	{
 		return;
 	}
 
 	// 위젯 풀링: 부족하면 생성, 남으면 재사용
+	AddedFriendWidgets.Reserve(FriendsList.Num());
 	for (int32 i = 0; i < FriendsList.Num(); ++i)
 	{
 		UKCFriendWidget* EntryWidget = nullptr;
 		if (AddedFriendWidgets.IsValidIndex(i))
 		{
 			EntryWidget = AddedFriendWidgets[i];
-			EntryWidget->SetVisibility(ESlateVisibility::Visible);
+			if (EntryWidget)
+			{
+				EntryWidget->SetVisibility(ESlateVisibility::Visible);
+			}
 		}
 		else
 		{
@@ -141,3 +158,4 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 		}
 	}
 }
+

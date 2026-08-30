@@ -59,4 +59,12 @@ protected:
 
 	/** @brief 머리 위 3D 위젯 컴포넌트(KCPlayerInfoWidget)의 텍스트 및 가시성을 갱신합니다. */
 	void RefreshPlayerInfoWidget();
+
+private:
+	/** @brief 머리 위 3D 위젯 컴포넌트 캐싱 포인터 */
+	UPROPERTY(Transient)
+	TObjectPtr<UWidgetComponent> CachedWidgetComp;
+
+	/** @brief 위젯 지연 초기화 재시도 타이머 핸들 */
+	FTimerHandle WidgetRefreshRetryTimerHandle;
 };

@@ -26,6 +26,7 @@ public:
 
 	//~AGameModeBase Interface
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
@@ -89,6 +90,12 @@ protected:
 private:
 	/** @brief 슬롯 액터들이 수집되었는지 확인하고 없으면 즉시 수집/정렬 */
 	void EnsureSlotsCollected();
+
+	/** @brief 슬롯 인덱스(0~5)로 슬롯 액터를 검색하여 반환 */
+	AKCPlayerSlotActor* FindSlotByIndex(int32 SlotIndex) const;
+
+	/** @brief 플레이어 스테이트를 특정 슬롯 액터에 배정하고 슬롯/팀 동기화 */
+	void AssignPlayerToSlot(AKCPlayerSlotActor* TargetSlot, class AKCLobbyPlayerState* PS);
 
 	/** @brief 신규 접속자를 비어있는 첫 번째 유효 슬롯에 배정 */
 	void AssignPlayerToAvailableSlot(APlayerController* NewPlayer);

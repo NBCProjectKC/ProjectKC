@@ -19,6 +19,38 @@ struct PROJECTKC_API FKCPlayerInfoStruct
 	GENERATED_BODY()
 
 public:
+	/** @brief 기본 생성자 */
+	FKCPlayerInfoStruct()
+		: PlayerName(TEXT(""))
+		, PlayerState(nullptr)
+		, bReady(false)
+		, UniqueNetId(TEXT(""))
+	{
+	}
+
+	/** @brief 편의 생성자 */
+	FKCPlayerInfoStruct(const FString& InName, bool bInReady, APlayerState* InPS = nullptr, const FString& InNetId = TEXT(""))
+		: PlayerName(InName)
+		, PlayerState(InPS)
+		, bReady(bInReady)
+		, UniqueNetId(InNetId)
+	{
+	}
+
+	bool operator==(const FKCPlayerInfoStruct& Other) const
+	{
+		return PlayerName == Other.PlayerName
+			&& PlayerState == Other.PlayerState
+			&& bReady == Other.bReady
+			&& UniqueNetId == Other.UniqueNetId;
+	}
+
+	bool operator!=(const FKCPlayerInfoStruct& Other) const
+	{
+		return !(*this == Other);
+	}
+
+public:
 	/** @brief 플레이어 표시 닉네임 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby")
 	FString PlayerName;

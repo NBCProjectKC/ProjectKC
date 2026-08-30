@@ -1,3 +1,8 @@
+/**
+ * @file KCSessionSubsystem.h
+ * @brief 스팀/온라인 세션 관리 및 로비-인게임 데이터 보존 서브시스템 정의
+ */
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -60,6 +65,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetExpectedPlayerCount() const { return ExpectedPlayerCount; }
+
+	/** 현재 로비가 만석(정원 초과)인지 확인 */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	bool IsLobbyFull() const;
 
 public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Session|Events")
