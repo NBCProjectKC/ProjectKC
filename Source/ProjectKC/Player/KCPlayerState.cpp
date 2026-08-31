@@ -20,6 +20,7 @@ void AKCPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AKCPlayerState, bReady);
 	DOREPLIFETIME(AKCPlayerState, TeamId);
 	DOREPLIFETIME(AKCPlayerState, SlotIndex);
+	DOREPLIFETIME(AKCPlayerState, GamePlayerName);
 }
 
 void AKCPlayerState::CopyProperties(APlayerState* PlayerState)
@@ -32,6 +33,7 @@ void AKCPlayerState::CopyProperties(APlayerState* PlayerState)
 			this->TeamId, this->SlotIndex, *TargetPS->GetName());
 		TargetPS->SetTeamId(this->TeamId);
 		TargetPS->SetSlotIndex(this->SlotIndex);
+		TargetPS->SetGamePlayerName(this->GamePlayerName);
 	}
 }
 
@@ -46,6 +48,7 @@ void AKCPlayerState::OverrideWith(APlayerState* PlayerState)
 
 		SetTeamId(InactivePS->TeamId);
 		SetSlotIndex(InactivePS->SlotIndex);
+		SetGamePlayerName(InactivePS->GamePlayerName);
 	}
 }
 
@@ -83,6 +86,21 @@ void AKCPlayerState::SetIsReady(bool bNewReady)
 	}
 }
 
+FString AKCPlayerState::GetGamePlayerName() const
+{
+	return GamePlayerName.IsEmpty() ? GetPlayerName() : GamePlayerName;
+}
+
+void AKCPlayerState::SetGamePlayerName(const FString& InPlayerName)
+{
+	if (HasAuthority() && GamePlayerName != InPlayerName)
+	{
+		GamePlayerName = InPlayerName;
+		OnRep_GamePlayerName();
+		ForceNetUpdate();
+	}
+}
+
 void AKCPlayerState::ToggleReady()
 {
 	if (HasAuthority())
@@ -112,6 +130,11 @@ void AKCPlayerState::OnRep_SlotIndex()
 	OnSlotIndexChanged.Broadcast(SlotIndex);
 }
 
+void AKCPlayerState::OnRep_GamePlayerName()
+{
+	OnGamePlayerNameChanged.Broadcast(GetGamePlayerName());
+}
+
 void AKCPlayerState::BeginPlay()
 {
 	Super::BeginPlay();
@@ -138,12 +161,14 @@ void AKCPlayerState::TryRestoreSavedLobbyData()
 		{
 			if (UKCSessionSubsystem* Subsystem = GI->GetSubsystem<UKCSessionSubsystem>())
 			{
+				FString SavedPlayerName;
 				int32 SavedTeamId = 0;
 				int32 SavedSlotIndex = INDEX_NONE;
-				if (Subsystem->GetSavedLobbyPlayerData(MyNetIdStr, SavedTeamId, SavedSlotIndex))
+				if (Subsystem->GetSavedLobbyPlayerData(MyNetIdStr, SavedPlayerName, SavedTeamId, SavedSlotIndex))
 				{
-					UE_LOG(LogKCLobby, Log, TEXT("[KCPlayerState] TryRestoreSavedLobbyData: Successfully restored TeamId=%d, SlotIndex=%d for Player '%s' (UniqueId='%s')"),
-						SavedTeamId, SavedSlotIndex, *GetPlayerName(), *MyNetIdStr);
+					UE_LOG(LogKCLobby, Log, TEXT("[KCPlayerState] TryRestoreSavedLobbyData: Successfully restored Name='%s', TeamId=%d, SlotIndex=%d for Player '%s' (UniqueId='%s')"),
+						*SavedPlayerName, SavedTeamId, SavedSlotIndex, *GetPlayerName(), *MyNetIdStr);
+					SetGamePlayerName(SavedPlayerName);
 					SetTeamId(SavedTeamId);
 					SetSlotIndex(SavedSlotIndex);
 				}

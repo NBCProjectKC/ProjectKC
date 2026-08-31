@@ -1,6 +1,7 @@
 #include "ProjectKC/UI/World/Player/Widget/KCPlayerOverHeadWidget.h"
 
 #include "Components/TextBlock.h"
+#include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/World/Player/ViewModel/KCPlayerOverHeadViewModel.h"
 
 void UKCPlayerOverHeadWidget::NativeConstruct()
@@ -73,10 +74,17 @@ void UKCPlayerOverHeadWidget::RefreshFromViewModel()
 	{
 		PlayerNameText->SetText(PlayerOverHeadViewModel->GetPlayerName());
 	}
+	RefreshTeamColor();
 
 	SetVisibility(PlayerOverHeadViewModel->IsOverHeadVisible()
 		? ESlateVisibility::SelfHitTestInvisible
 		: ESlateVisibility::Hidden);
+}
+
+void UKCPlayerOverHeadWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
+{
+	Super::NativeApplyColorStyle(InColorStyle);
+	RefreshTeamColor();
 }
 
 void UKCPlayerOverHeadWidget::HandlePlayerNameChanged(const FText& NewPlayerName)
@@ -97,4 +105,19 @@ void UKCPlayerOverHeadWidget::HandleVisibilityChanged(bool bNewVisible)
 	SetVisibility(bNewVisible
 		? ESlateVisibility::SelfHitTestInvisible
 		: ESlateVisibility::Hidden);
+}
+
+void UKCPlayerOverHeadWidget::RefreshTeamColor()
+{
+	if (!PlayerNameText || !PlayerOverHeadViewModel)
+	{
+		return;
+	}
+
+	const UKCColorStyle* CurrentColorStyle = GetColorStyle();
+	const int32 TeamId = PlayerOverHeadViewModel->GetTeamId();
+	if (CurrentColorStyle && CurrentColorStyle->TeamColors.IsValidIndex(TeamId))
+	{
+		PlayerNameText->SetColorAndOpacity(FSlateColor(CurrentColorStyle->TeamColors[TeamId]));
+	}
 }

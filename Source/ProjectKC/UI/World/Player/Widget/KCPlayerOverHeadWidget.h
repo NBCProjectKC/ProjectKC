@@ -5,6 +5,7 @@
 #include "KCPlayerOverHeadWidget.generated.h"
 
 class UTextBlock;
+class UKCColorStyle;
 class UKCPlayerOverHeadViewModel;
 
 UCLASS(Abstract, Blueprintable)
@@ -23,6 +24,8 @@ public:
 	UKCPlayerOverHeadViewModel* GetViewModel() const { return PlayerOverHeadViewModel; }
 
 protected:
+	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UTextBlock> PlayerNameText;
 
@@ -33,6 +36,7 @@ private:
 	void BindViewModel();
 	void UnbindViewModel();
 	void RefreshFromViewModel();
+	void RefreshTeamColor();
 	void HandlePlayerNameChanged(const FText& NewPlayerName);
 	void HandleTeamIdChanged(int32 NewTeamId);
 	void HandleVisibilityChanged(bool bNewVisible);

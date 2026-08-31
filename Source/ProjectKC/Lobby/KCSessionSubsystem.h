@@ -51,9 +51,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
 	void SaveLobbyPlayerData(const FString& UniqueNetId, const FString& PlayerName, int32 InTeamId, int32 InSlotIndex);
 
-	/** 인게임에서 플레이어 팀/슬롯 정보 조회 */
+	/** 인게임에서 플레이어 이름/팀/슬롯 정보 조회 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
-	bool GetSavedLobbyPlayerData(const FString& UniqueNetId, int32& OutTeamId, int32& OutSlotIndex) const;
+	bool GetSavedLobbyPlayerData(const FString& UniqueNetId, FString& OutPlayerName, int32& OutTeamId, int32& OutSlotIndex) const;
 
 	/** 저장된 로비 플레이어 데이터 초기화 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
