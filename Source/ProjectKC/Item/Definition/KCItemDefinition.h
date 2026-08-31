@@ -56,4 +56,10 @@ public:
 	bool IsUsable() const;
 
 	bool Validate(FString& OutError) const;
+	
+	// AssetManager 인식용 Item 타입 추가
+	virtual FPrimaryAssetId GetPrimaryAssetId() const override
+	{
+		return FPrimaryAssetId(TEXT("Item"), GetFName());
+	}
 };

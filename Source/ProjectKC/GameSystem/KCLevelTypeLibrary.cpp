@@ -25,3 +25,16 @@ EKCLevelType UKCLevelTypeLibrary::GetLevelType(FName LevelName)
 
 	return EKCLevelType::None;
 }
+
+EKCLevelType UKCLevelTypeLibrary::GetLevelTypeFromWorld(const UWorld* World)
+{
+	if (!World)
+	{
+		return EKCLevelType::None;
+	}
+
+	FString MapName = World->GetMapName();
+	MapName.RemoveFromStart(World->StreamingLevelsPrefix);
+
+	return GetLevelType(FName(*MapName));
+}
