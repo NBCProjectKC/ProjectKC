@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/UI/Common/Core/KCViewModelBase.h"
+#include "ProjectKC/UI/World/Player/Struct/KCPlayerDisplayInfoStruct.h"
 #include "KCPlayerOverHeadViewModel.generated.h"
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCPlayerOverHeadNameChangedNativeDelegate, const FText&);
@@ -32,11 +33,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetOverHeadVisible(bool bNewVisible);
 
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	const FKCPlayerDisplayInfoStruct& GetPlayerDisplayInfo() const { return PlayerDisplayInfo; }
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetPlayerDisplayInfo(const FKCPlayerDisplayInfoStruct& NewDisplayInfo);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void ClearPlayerDisplayInfo();
+
 	FKCPlayerOverHeadNameChangedNativeDelegate OnPlayerNameChangedNative;
 	FKCPlayerOverHeadTeamIdChangedNativeDelegate OnTeamIdChangedNative;
 	FKCPlayerOverHeadVisibilityChangedNativeDelegate OnVisibilityChangedNative;
 
 private:
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	FKCPlayerDisplayInfoStruct PlayerDisplayInfo;
+
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	FText PlayerName;
 

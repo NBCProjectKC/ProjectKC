@@ -35,3 +35,24 @@ void UKCPlayerOverHeadViewModel::SetOverHeadVisible(bool bNewVisible)
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(bOverHeadVisible);
 	OnVisibilityChangedNative.Broadcast(bOverHeadVisible);
 }
+
+void UKCPlayerOverHeadViewModel::SetPlayerDisplayInfo(
+	const FKCPlayerDisplayInfoStruct& NewDisplayInfo)
+{
+	if (PlayerDisplayInfo == NewDisplayInfo)
+	{
+		return;
+	}
+
+	PlayerDisplayInfo = NewDisplayInfo;
+	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(PlayerDisplayInfo);
+
+	SetPlayerName(PlayerDisplayInfo.DisplayName);
+	SetTeamId(PlayerDisplayInfo.TeamId);
+	SetOverHeadVisible(PlayerDisplayInfo.bVisible);
+}
+
+void UKCPlayerOverHeadViewModel::ClearPlayerDisplayInfo()
+{
+	SetPlayerDisplayInfo(FKCPlayerDisplayInfoStruct());
+}
