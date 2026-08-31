@@ -47,7 +47,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Session")
 	bool SendSessionInviteToFriend(const FString& FriendUniqueNetIdStr);
 
-	/** 로비에서 매치 시작 시 플레이어 팀/슬롯 정보 저장 */
+	/** 로비에서 매치 시작 시 또는 인게임 이탈 시 플레이어 팀/슬롯 정보 저장 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
 	void SaveLobbyPlayerData(const FString& UniqueNetId, const FString& PlayerName, int32 InTeamId, int32 InSlotIndex);
 

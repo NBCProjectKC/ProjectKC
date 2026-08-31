@@ -28,12 +28,10 @@ void AKCLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 
 	if (AKCLobbyPlayerState* TargetPS = Cast<AKCLobbyPlayerState>(PlayerState))
 	{
-		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] CopyProperties: Copying TeamId=%d, SlotIndex=%d, HasTransform=%s to new PlayerState '%s'"),
-			this->TeamId, this->SlotIndex, this->bHasSavedTransform ? TEXT("TRUE") : TEXT("FALSE"), *TargetPS->GetName());
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] CopyProperties: Copying TeamId=%d, SlotIndex=%d to new PlayerState '%s'"),
+			this->TeamId, this->SlotIndex, *TargetPS->GetName());
 		TargetPS->SetTeamId(this->TeamId);
 		TargetPS->SetSlotIndex(this->SlotIndex);
-		TargetPS->SavedTransform = this->SavedTransform;
-		TargetPS->bHasSavedTransform = this->bHasSavedTransform;
 	}
 }
 
@@ -43,40 +41,12 @@ void AKCLobbyPlayerState::OverrideWith(APlayerState* PlayerState)
 
 	if (AKCLobbyPlayerState* InactivePS = Cast<AKCLobbyPlayerState>(PlayerState))
 	{
-		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] OverrideWith: Restoring Inactive PlayerState '%s' (TeamId=%d, SlotIndex=%d, HasTransform=%s)"),
-			*InactivePS->GetPlayerName(), InactivePS->TeamId, InactivePS->SlotIndex,
-			InactivePS->bHasSavedTransform ? TEXT("TRUE") : TEXT("FALSE"));
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] OverrideWith: Restoring Inactive PlayerState '%s' (TeamId=%d, SlotIndex=%d)"),
+			*InactivePS->GetPlayerName(), InactivePS->TeamId, InactivePS->SlotIndex);
 
 		SetTeamId(InactivePS->TeamId);
 		SetSlotIndex(InactivePS->SlotIndex);
-		this->SavedTransform = InactivePS->SavedTransform;
-		this->bHasSavedTransform = InactivePS->bHasSavedTransform;
 	}
-}
-
-void AKCLobbyPlayerState::SavePlayerTransform(const FTransform& InTransform)
-{
-	SavedTransform = InTransform;
-	bHasSavedTransform = true;
-	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] '%s' SavePlayerTransform: %s"),
-		*GetPlayerName(), *InTransform.ToString());
-}
-
-bool AKCLobbyPlayerState::GetSavedTransform(FTransform& OutTransform) const
-{
-	if (bHasSavedTransform)
-	{
-		OutTransform = SavedTransform;
-		return true;
-	}
-	return false;
-}
-
-void AKCLobbyPlayerState::ClearSavedTransform()
-{
-	SavedTransform = FTransform::Identity;
-	bHasSavedTransform = false;
-	UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] '%s' ClearSavedTransform"), *GetPlayerName());
 }
 
 void AKCLobbyPlayerState::SetSlotIndex(int32 InSlotIndex)

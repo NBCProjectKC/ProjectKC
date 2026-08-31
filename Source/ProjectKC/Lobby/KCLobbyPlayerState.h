@@ -32,17 +32,6 @@ public:
 	//~End of APlayerState interface
 
 	/** @brief 튕기기 전 마지막 캐릭터 위치/회전 저장 (재접속 리스폰용) */
-	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Reconnect")
-	void SavePlayerTransform(const FTransform& InTransform);
-
-	/** @brief 저장된 마지막 위치/회전 반환 */
-	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Reconnect")
-	bool GetSavedTransform(FTransform& OutTransform) const;
-
-	/** @brief 저장된 위치 데이터 초기화 */
-	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Reconnect")
-	void ClearSavedTransform();
-
 	/** @brief 플레이어의 스팀 고유 ID 문자열 반환 */
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Reconnect")
 	FString GetUniquePlayerIdString() const
@@ -118,13 +107,6 @@ protected:
 
 	virtual void BeginPlay() override;
 	virtual void OnRep_PlayerName() override;
-
-	/** @brief 재접속 시 이전 위치에 스폰하기 위한 저장된 Transform */
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "KC|Lobby|Reconnect")
-	FTransform SavedTransform;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "KC|Lobby|Reconnect")
-	bool bHasSavedTransform = false;
 
 	/** @brief KCSessionSubsystem에 저장된 이전 팀/슬롯 정보가 있다면 자동 복원 */
 	void TryRestoreSavedLobbyData();
