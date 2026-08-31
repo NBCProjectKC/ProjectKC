@@ -1,3 +1,8 @@
+/**
+ * @file KCSessionSubsystem.h
+ * @brief 스팀/온라인 세션 관리 및 로비-인게임 데이터 보존 서브시스템 정의
+ */
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -42,13 +47,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Session")
 	bool SendSessionInviteToFriend(const FString& FriendUniqueNetIdStr);
 
-	/** 로비에서 매치 시작 시 플레이어 팀/슬롯 정보 저장 */
+	/** 로비에서 매치 시작 시 또는 인게임 이탈 시 플레이어 팀/슬롯 정보 저장 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
-	void SaveLobbyPlayerData(const FString& PlayerName, int32 InTeamId, int32 InSlotIndex);
+	void SaveLobbyPlayerData(const FString& UniqueNetId, const FString& PlayerName, int32 InTeamId, int32 InSlotIndex);
 
 	/** 인게임에서 플레이어 팀/슬롯 정보 조회 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
-	bool GetSavedLobbyPlayerData(const FString& PlayerName, int32& OutTeamId, int32& OutSlotIndex) const;
+	bool GetSavedLobbyPlayerData(const FString& UniqueNetId, int32& OutTeamId, int32& OutSlotIndex) const;
 
 	/** 저장된 로비 플레이어 데이터 초기화 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
@@ -60,6 +65,30 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetExpectedPlayerCount() const { return ExpectedPlayerCount; }
+
+	/** 현재 로비가 만석(정원 초과)인지 확인 */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	bool IsLobbyFull() const;
+
+	/** 세션 결과 캐싱 (재접속 지원용) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Session|Reconnect")
+	void CacheSessionResult(const FBlueprintSessionResult& SessionResult);
+
+	/** 캐싱된 유효한 세션이 있는지 여부 */
+	UFUNCTION(BlueprintPure, Category = "KC|Session|Reconnect")
+	bool HasCachedSession() const { return bHasCachedSession; }
+
+	/** 캐싱된 세션 검색 결과 반환 */
+	UFUNCTION(BlueprintPure, Category = "KC|Session|Reconnect")
+	FBlueprintSessionResult GetCachedSessionResult() const { return CachedLastSessionResult; }
+
+	/** 캐싱된 직전 세션으로 다이렉트 재접속 시도 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Session|Reconnect")
+	void RejoinLastSession();
+
+	/** 캐싱된 세션 정보 삭제 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Session|Reconnect")
+	void ClearCachedSession();
 
 public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Session|Events")
@@ -93,6 +122,13 @@ private:
 	// Pending Join State (이전 세션 정리 후 자동 참가를 위한 상태값)
 	FBlueprintSessionResult PendingSessionToJoin;
 	bool bJoiningPendingSessionAfterDestroy = false;
+
+	// Cached Session for Direct Reconnect
+	UPROPERTY()
+	FBlueprintSessionResult CachedLastSessionResult;
+
+	UPROPERTY()
+	bool bHasCachedSession = false;
 
 	// Internal Callbacks
 	void HandleCreateSessionComplete(FName SessionName, bool bWasSuccessful);

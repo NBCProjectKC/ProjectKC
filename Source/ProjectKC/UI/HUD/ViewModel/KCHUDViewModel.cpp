@@ -1,13 +1,19 @@
 #include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
 
-#include "Engine/DataTable.h"
+#include "Blueprint/UserWidget.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+#include "ProjectKC/GameSystem/KCGameState.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeStruct.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeTierType.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCActiveRecipesChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCGamePhaseChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCPotIngredientsChangedStruct.h"
+#include "ProjectKC/Messages/Struct/KCPotProgressChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCScoreChangedStruct.h"
+#include "ProjectKC/Player/KCPlayerController.h"
 
 void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 {
@@ -40,20 +46,27 @@ void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 		KCGameplayTags::Message_Game_PotIngredientsChanged,
 		this,
 		&ThisClass::HandlePotIngredientsChanged);
+
+	PotProgressChangedHandle = MessageSystem.RegisterListener<FKCPotProgressChangedStruct>(
+		KCGameplayTags::Message_Game_PotProgressChanged,
+		this,
+		&ThisClass::HandlePotProgressChanged);
+
+	SyncLocalTeamIdFromContext();
+	SyncFromGameState();
+	StartMatchTimerRefresh();
 }
 
 void UKCHUDViewModel::StopListening()
 {
+	StopMatchTimerRefresh();
+	UnbindLocalTeamPlayerState();
 	ScoreChangedHandle.Unregister();
 	PhaseChangedHandle.Unregister();
 	ActiveRecipesChangedHandle.Unregister();
 	PotIngredientsChangedHandle.Unregister();
+	PotProgressChangedHandle.Unregister();
 	ListeningWorldContext.Reset();
-}
-
-void UKCHUDViewModel::SetRecipeDataTable(UDataTable* InRecipeDataTable)
-{
-	RecipeDataTable = InRecipeDataTable;
 }
 
 void UKCHUDViewModel::SetCurrentPhase(EKCGamePhaseType NewPhase)
@@ -93,6 +106,36 @@ void UKCHUDViewModel::SetTeamScores(const TArray<int32>& NewTeamScores)
 	TeamScores = NewTeamScores;
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(TeamScores);
 	OnTeamScoresChangedNative.Broadcast(TeamScores);
+}
+
+void UKCHUDViewModel::SetRemainingMatchSeconds(int32 NewRemainingSeconds)
+{
+	NewRemainingSeconds = FMath::Max(0, NewRemainingSeconds);
+	if (RemainingMatchSeconds == NewRemainingSeconds)
+	{
+		return;
+	}
+
+	RemainingMatchSeconds = NewRemainingSeconds;
+	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(RemainingMatchSeconds);
+	OnMatchTimerChangedNative.Broadcast(RemainingMatchSeconds);
+}
+
+void UKCHUDViewModel::SetLocalTeamId(int32 NewTeamId)
+{
+	if (NewTeamId < 0)
+	{
+		NewTeamId = 0;
+	}
+
+	if (LocalTeamId == NewTeamId)
+	{
+		return;
+	}
+
+	LocalTeamId = NewTeamId;
+	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(LocalTeamId);
+	RebuildSubmittedStates();
 }
 
 void UKCHUDViewModel::SetRecipes(const TArray<FKCRecipeViewData>& NewRecipes)
@@ -142,6 +185,11 @@ void UKCHUDViewModel::SetPotProgress(
 	OnPotProgressChangedNative.Broadcast(TeamId, PotProgresses[TeamId]);
 }
 
+void UKCHUDViewModel::HandleLocalTeamIdChanged(int32 NewTeamId)
+{
+	SetLocalTeamId(NewTeamId);
+}
+
 void UKCHUDViewModel::HandleScoreChanged(FGameplayTag Channel, const FKCScoreChangedStruct& Message)
 {
 	TArray<int32> NewTeamScores = TeamScores;
@@ -163,6 +211,8 @@ void UKCHUDViewModel::HandleGamePhaseChanged(FGameplayTag Channel, const FKCGame
 
 void UKCHUDViewModel::HandleActiveRecipesChanged(FGameplayTag Channel, const FKCActiveRecipesChangedStruct& Message)
 {
+	SyncLocalTeamIdFromContext();
+
 	TArray<FKCRecipeViewData> NewRecipes;
 	NewRecipes.Reserve(Message.RecipeRowNames.Num());
 
@@ -178,6 +228,8 @@ void UKCHUDViewModel::HandleActiveRecipesChanged(FGameplayTag Channel, const FKC
 
 void UKCHUDViewModel::HandlePotIngredientsChanged(FGameplayTag Channel, const FKCPotIngredientsChangedStruct& Message)
 {
+	SyncLocalTeamIdFromContext();
+
 	if (Message.TeamId < 0)
 	{
 		return;
@@ -191,6 +243,149 @@ void UKCHUDViewModel::HandlePotIngredientsChanged(FGameplayTag Channel, const FK
 	TeamPotIngredients[Message.TeamId] = Message.Ingredients;
 	RebuildSubmittedStates();
 	OnPotIngredientsChanged(Message.TeamId);
+}
+
+void UKCHUDViewModel::HandlePotProgressChanged(
+	FGameplayTag Channel,
+	const FKCPotProgressChangedStruct& Message)
+{
+	SetPotProgress(
+		Message.TeamId,
+		Message.ProgressPercent,
+		Message.RemainingSeconds,
+		Message.bVisible,
+		Message.bCompleted);
+}
+
+void UKCHUDViewModel::SyncFromGameState()
+{
+	const UObject* WorldContextObject = ListeningWorldContext.Get();
+	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const AKCGameState* GameState = World ? World->GetGameState<AKCGameState>() : nullptr;
+	if (!GameState)
+	{
+		return;
+	}
+
+	SetCurrentPhase(GameState->GetGamePhase());
+	SetTeamScore(0, GameState->GetTeamScore(0));
+	SetTeamScore(1, GameState->GetTeamScore(1));
+	RefreshMatchTimer();
+
+	TeamPotIngredients.SetNum(2);
+	TeamPotIngredients[0] = GameState->GetPotIngredients(0);
+	TeamPotIngredients[1] = GameState->GetPotIngredients(1);
+
+	TArray<FKCRecipeViewData> NewRecipes;
+	NewRecipes.Reserve(GameState->GetActiveRecipes().Num());
+	for (const FName& RecipeRowName : GameState->GetActiveRecipes())
+	{
+		NewRecipes.Add(BuildRecipeViewData(RecipeRowName));
+	}
+
+	SetRecipes(NewRecipes);
+	RebuildSubmittedStates();
+}
+
+void UKCHUDViewModel::RefreshMatchTimer()
+{
+	const UObject* WorldContextObject = ListeningWorldContext.Get();
+	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const AKCGameState* GameState = World ? World->GetGameState<AKCGameState>() : nullptr;
+	const AKCPlayerController* PlayerController = nullptr;
+
+	if (const UUserWidget* UserWidget = Cast<UUserWidget>(WorldContextObject))
+	{
+		PlayerController = Cast<AKCPlayerController>(UserWidget->GetOwningPlayer());
+	}
+
+	if (!PlayerController && World)
+	{
+		PlayerController = Cast<AKCPlayerController>(World->GetFirstPlayerController());
+	}
+
+	const int32 RemainingSeconds = GameState && PlayerController
+		? GameState->GetRemainingMatchSeconds(PlayerController->GetServerTime())
+		: 0;
+
+	SetRemainingMatchSeconds(RemainingSeconds);
+}
+
+void UKCHUDViewModel::StartMatchTimerRefresh()
+{
+	if (const UObject* WorldContextObject = ListeningWorldContext.Get())
+	{
+		if (UWorld* World = WorldContextObject->GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				MatchTimerRefreshHandle,
+				this,
+				&ThisClass::RefreshMatchTimer,
+				0.2f,
+				true);
+		}
+	}
+}
+
+void UKCHUDViewModel::StopMatchTimerRefresh()
+{
+	if (const UObject* WorldContextObject = ListeningWorldContext.Get())
+	{
+		if (UWorld* World = WorldContextObject->GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(MatchTimerRefreshHandle);
+		}
+	}
+}
+
+void UKCHUDViewModel::SyncLocalTeamIdFromContext()
+{
+	UObject* WorldContextObject = ListeningWorldContext.Get();
+	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	APlayerController* PlayerController = nullptr;
+
+	if (UUserWidget* UserWidget = Cast<UUserWidget>(WorldContextObject))
+	{
+		PlayerController = UserWidget->GetOwningPlayer();
+	}
+
+	if (!PlayerController && World)
+	{
+		PlayerController = World->GetFirstPlayerController();
+	}
+
+	AKCLobbyPlayerState* PlayerState = PlayerController
+		? PlayerController->GetPlayerState<AKCLobbyPlayerState>()
+		: nullptr;
+
+	BindLocalTeamPlayerState(PlayerState);
+	SetLocalTeamId(PlayerState ? PlayerState->GetTeamId() : 0);
+}
+
+void UKCHUDViewModel::BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState)
+{
+	if (BoundLocalTeamPlayerState.Get() == PlayerState)
+	{
+		return;
+	}
+
+	UnbindLocalTeamPlayerState();
+	BoundLocalTeamPlayerState = PlayerState;
+
+	if (PlayerState)
+	{
+		PlayerState->OnTeamIdChanged.AddUniqueDynamic(this, &ThisClass::HandleLocalTeamIdChanged);
+	}
+}
+
+void UKCHUDViewModel::UnbindLocalTeamPlayerState()
+{
+	if (AKCLobbyPlayerState* PlayerState = BoundLocalTeamPlayerState.Get())
+	{
+		PlayerState->OnTeamIdChanged.RemoveDynamic(this, &ThisClass::HandleLocalTeamIdChanged);
+	}
+
+	BoundLocalTeamPlayerState.Reset();
 }
 
 void UKCHUDViewModel::RebuildSubmittedStates()
@@ -212,6 +407,10 @@ void UKCHUDViewModel::RebuildSubmittedStates()
 			const bool bSubmittedByTeam1 = TeamPotIngredients.IsValidIndex(1) &&
 				TeamPotIngredients[1].HasTagExact(Ingredient.IngredientId);
 
+			Ingredient.bSubmitted = TeamPotIngredients.IsValidIndex(LocalTeamId) &&
+				TeamPotIngredients[LocalTeamId].HasTagExact(Ingredient.IngredientId);
+			Ingredient.SubmittedTeamId = Ingredient.bSubmitted ? LocalTeamId : INDEX_NONE;
+
 			if (bSubmittedByTeam0)
 			{
 				++Team0SubmittedCount;
@@ -220,16 +419,6 @@ void UKCHUDViewModel::RebuildSubmittedStates()
 			if (bSubmittedByTeam1)
 			{
 				++Team1SubmittedCount;
-			}
-
-			for (int32 TeamId = 0; TeamId < TeamPotIngredients.Num(); ++TeamId)
-			{
-				if (TeamPotIngredients[TeamId].HasTagExact(Ingredient.IngredientId))
-				{
-					Ingredient.bSubmitted = true;
-					Ingredient.SubmittedTeamId = TeamId;
-					break;
-				}
 			}
 		}
 
@@ -258,13 +447,14 @@ FKCRecipeViewData UKCHUDViewModel::BuildRecipeViewData(FName RecipeRowName) cons
 	RecipeViewData.RecipeRowName = RecipeRowName;
 	RecipeViewData.DisplayName = FText::FromName(RecipeRowName);
 
-	const FKCRecipeStruct* Recipe = RecipeDataTable
-		? RecipeDataTable->FindRow<FKCRecipeStruct>(RecipeRowName, TEXT("KCHUDViewModel"))
-		: nullptr;
+	const UObject* WorldContextObject = ListeningWorldContext.Get();
+	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const AKCGameState* GameState = World ? World->GetGameState<AKCGameState>() : nullptr;
+	const FKCRecipeStruct* Recipe = GameState ? GameState->FindRecipeByRowName(RecipeRowName) : nullptr;
 
 	if (!Recipe)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("KCHUDViewModel: RecipeDataTable is missing or row '%s' was not found. This UI lookup is temporary until recipe ownership is unified."), *RecipeRowName.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("KCHUDViewModel: GameState recipe row '%s' was not found."), *RecipeRowName.ToString());
 		return RecipeViewData;
 	}
 

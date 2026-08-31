@@ -5,6 +5,7 @@
 
 #include "ProjectKC/Lobby/UI/KCFriendListWidget.h"
 #include "ProjectKC/Lobby/UI/KCFriendWidget.h"
+#include "ProjectKC/ProjectKC.h"
 #include "AdvancedFriendsLibrary.h"
 #include "Components/PanelWidget.h"
 #include "OnlineSubsystem.h"
@@ -21,9 +22,9 @@ void UKCFriendListWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (!FriendEntryWidgetClass)
+	if (!FriendEntryWidgetClass.Get())
 	{
-		FriendEntryWidgetClass = StaticLoadClass(UKCFriendWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
+		FriendEntryWidgetClass = LoadClass<UKCFriendWidget>(nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
 	}
 
 	// 1. 즉시 1회 친구 목록 갱신
@@ -54,29 +55,51 @@ void UKCFriendListWidget::NativeDestruct()
 
 void UKCFriendListWidget::RefreshFriendList()
 {
+	if (!IsValid(this))
+	{
+		return;
+	}
+
 	IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
 	if (!OSS)
 	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] RefreshFriendList Failed: OnlineSubsystem is null"));
 		return;
 	}
 
 	IOnlineFriendsPtr FriendsInterface = OSS->GetFriendsInterface();
 	if (!FriendsInterface.IsValid())
 	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] RefreshFriendList Failed: FriendsInterface is invalid"));
 		return;
 	}
 
+	UE_LOG(LogKCSession, Verbose, TEXT("[KCFriendListWidget] Requesting ReadFriendsList..."));
+
+	TWeakObjectPtr<UKCFriendListWidget> WeakThis(this);
 	FriendsInterface->ReadFriendsList(
 		0,
 		EFriendsLists::ToString(EFriendsLists::Default),
-		FOnReadFriendsListComplete::CreateUObject(this, &UKCFriendListWidget::HandleReadFriendsListComplete)
+		FOnReadFriendsListComplete::CreateLambda([WeakThis](int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->HandleReadFriendsListComplete(LocalUserNum, bWasSuccessful, ListName, ErrorStr);
+			}
+		})
 	);
 }
 
 void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
 {
+	if (!IsValid(this) || !FriendList)
+	{
+		return;
+	}
+
 	if (!bWasSuccessful)
 	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] ReadFriendsList failed: %s"), *ErrorStr);
 		return;
 	}
 
@@ -89,6 +112,18 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 	TArray<FBPFriendInfo> FriendsList;
 	UAdvancedFriendsLibrary::GetStoredFriendsList(PC, FriendsList);
 
+	int32 OnlineCount = 0;
+	for (const FBPFriendInfo& Friend : FriendsList)
+	{
+		if (Friend.OnlineState != EBPOnlinePresenceState::Offline)
+		{
+			OnlineCount++;
+		}
+	}
+
+	UE_LOG(LogKCSession, Verbose, TEXT("[KCFriendListWidget] ReadFriendsList Complete: Found %d friends (%d online)"),
+		FriendsList.Num(), OnlineCount);
+
 	// 온라인 친구가 위로 오도록 정렬
 	FriendsList.Sort([](const FBPFriendInfo& A, const FBPFriendInfo& B)
 	{
@@ -97,28 +132,35 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 		return bAOnline > bBOnline;
 	});
 
-	if (!FriendList)
+	UClass* EntryClass = FriendEntryWidgetClass.Get();
+	if (!EntryClass)
 	{
-		return;
+		EntryClass = LoadClass<UKCFriendWidget>(nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
+		FriendEntryWidgetClass = EntryClass;
 	}
 
-	if (!FriendEntryWidgetClass)
+	if (!EntryClass)
 	{
+		UE_LOG(LogKCSession, Error, TEXT("[KCFriendListWidget] FriendEntryWidgetClass is null!"));
 		return;
 	}
 
 	// 위젯 풀링: 부족하면 생성, 남으면 재사용
+	AddedFriendWidgets.Reserve(FriendsList.Num());
 	for (int32 i = 0; i < FriendsList.Num(); ++i)
 	{
 		UKCFriendWidget* EntryWidget = nullptr;
 		if (AddedFriendWidgets.IsValidIndex(i))
 		{
 			EntryWidget = AddedFriendWidgets[i];
-			EntryWidget->SetVisibility(ESlateVisibility::Visible);
+			if (EntryWidget)
+			{
+				EntryWidget->SetVisibility(ESlateVisibility::Visible);
+			}
 		}
 		else
 		{
-			EntryWidget = CreateWidget<UKCFriendWidget>(this, FriendEntryWidgetClass);
+			EntryWidget = CreateWidget<UKCFriendWidget>(this, EntryClass);
 			if (EntryWidget)
 			{
 				FriendList->AddChild(EntryWidget);
@@ -141,3 +183,4 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 		}
 	}
 }
+

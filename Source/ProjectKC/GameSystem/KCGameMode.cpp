@@ -9,12 +9,13 @@
 #include "Recipe/KCDishRuinedStruct.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
+#include "ProjectKC/ProjectKC.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
 #include "KCLevelTypeLibrary.h"
-#include "ProjectKC/Lobby/KCSessionSubsystem.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "TimerManager.h"
 
 
 AKCGameMode::AKCGameMode()
@@ -49,13 +50,30 @@ void AKCGameMode::HandleMatchHasStarted()
 	if (KCGameState)
 	{
 		KCGameState->InitializeTeamCount(TeamCount);
-		KCGameState->SetActiveRecipes(SelectActiveRecipes());
-		KCGameState->SetGamePhase(EKCGamePhaseType::Playing);
+		KCGameState->SetActiveRecipes(SelectActiveRecipes()); // 그 판의 레시피 룰렛
+		KCGameState->SetGamePhase(EKCGamePhaseType::Playing); // phase 변경
+	
+		// TODO 임시 코드
+		// GameState의 서버시간 설정
+		const float ServerNow = GetWorld()->GetTimeSeconds();
+		const float SafeMatchDuration = FMath::Max(1.0f, MatchDurationSeconds);
+		KCGameState->SetMatchStartServerTime(ServerNow); // 매치 시작 후 타이머 세팅
+		KCGameState->SetMatchEndServerTime(ServerNow + SafeMatchDuration);
 	}
+
+	// TODO 임시 코드
+	// Timer 끝날 때 게임 종료 처리 
+	GetWorldTimerManager().SetTimer(
+		MatchTimerHandle,
+		this,
+		&AKCGameMode::HandleMatchTimeExpired,
+		FMath::Max(1.0f, MatchDurationSeconds),
+		false);
 }
 
 void AKCGameMode::HandleMatchHasEnded()
 {
+	GetWorldTimerManager().ClearTimer(MatchTimerHandle);
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(IngredientSubmittedListenerHandle);
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(DishFinishedListenerHandle);
 
@@ -65,36 +83,35 @@ void AKCGameMode::HandleMatchHasEnded()
 // 레시피 선정 로직
 TArray<FName> AKCGameMode::SelectActiveRecipes() const
 {
-	TArray<FName> Result;
-
-	if (!RecipeDataTable)
+	// 디버깅용 특정 레시피 고정
+	if (bUseFixedRecipeList && FixedRecipeList.Num() > 0)
 	{
-		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: RecipeDataTable이 설정되지 않았습니다."));
-		return Result;
+		UE_LOG(LogTemp, Log, TEXT("SelectActiveRecipes: 고정 레시피 목록 사용 (%d개)"), FixedRecipeList.Num());
+		return FixedRecipeList;
 	}
 
-	TArray<FName> Candidates = RecipeDataTable->GetRowNames();
+	if (!KCGameState)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: KCGameState가 없습니다."));
+		return TArray<FName>();
+	}
+
+	TArray<FName> Candidates = KCGameState->GetAllRecipeRowNames();
 	if (Candidates.Num() == 0)
 	{
-		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: RecipeDataTable이 비어있습니다."));
-		return Result;
+		UE_LOG(LogTemp, Error, TEXT("SelectActiveRecipes: 레시피 DataTable이 비어있습니다."));
+		return TArray<FName>();
 	}
-	
-	// Debug
-	const int32 Seed = bUseFixedRecipeSeed
-		? FixedRecipeSeed
-		: static_cast<int32>(FDateTime::Now().GetTicks());
-	FRandomStream RandomStream(Seed);
-	
-	// random
+
+	// Random
 	const int32 PickCount = FMath::Min(ActiveRecipeCount, Candidates.Num());
+	TArray<FName> Result;
 	for (int32 i = 0; i < PickCount; ++i)
 	{
 		const int32 RandomIndex = FMath::RandRange(0, Candidates.Num() - 1);
 		Result.Add(Candidates[RandomIndex]);
 		Candidates.RemoveAtSwap(RandomIndex);
 	}
-
 	return Result;
 }
 
@@ -166,7 +183,7 @@ bool AKCGameMode::HasAnyViableRecipe(const FGameplayTagContainer& CurrentIngredi
 
 	for (const FName& RowName : KCGameState->GetActiveRecipes())
 	{
-		const FKCRecipeStruct* Recipe = FindRecipeByRowName(RowName);
+		const FKCRecipeStruct* Recipe = KCGameState->FindRecipeByRowName(RowName);
 		if (!Recipe)
 		{
 			continue;
@@ -197,7 +214,7 @@ bool AKCGameMode::FindCompletedRecipe(const FGameplayTagContainer& CurrentIngred
 
 	for (const FName& RowName : KCGameState->GetActiveRecipes())
 	{
-		const FKCRecipeStruct* Recipe = FindRecipeByRowName(RowName);
+		const FKCRecipeStruct* Recipe = KCGameState->FindRecipeByRowName(RowName);
 		if (!Recipe)
 		{
 			continue;
@@ -233,7 +250,7 @@ void AKCGameMode::OnDishFinished(FGameplayTag Channel, const FKCDishFinishedStru
 		return;
 	}
 
-	const FKCRecipeStruct* Recipe = FindRecipeByRowName(Message.RecipeRowName);
+	const FKCRecipeStruct* Recipe = KCGameState->FindRecipeByRowName(Message.RecipeRowName);
 	if (!Recipe)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("OnDishFinished: 레시피 '%s'를 찾을 수 없습니다."), *Message.RecipeRowName.ToString());
@@ -301,15 +318,48 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 	);
 }
 
-
-const FKCRecipeStruct* AKCGameMode::FindRecipeByRowName(FName RowName) const
+// TODO: 임시코드
+// 게임 끝내기 로직
+void AKCGameMode::HandleMatchTimeExpired()
 {
-	if (!RecipeDataTable)
+	if (!IsMatchInProgress())
 	{
-		return nullptr;
+		return;
 	}
 
-	return RecipeDataTable->FindRow<FKCRecipeStruct>(RowName, TEXT("FindRecipeByRowName"));
+	EndGame(GetLeadingTeamId());
+}
+
+// TODO: 임시코드
+// 게임 끝날 때 이긴 팀 계산을 위한 로직
+// 팀이 여러개라는 가정하에 코드 작성
+int32 AKCGameMode::GetLeadingTeamId() const
+{
+	if (!KCGameState)
+	{
+		return INDEX_NONE;
+	}
+
+	int32 LeadingTeamId = INDEX_NONE;
+	int32 LeadingScore = MIN_int32;
+	bool bTie = false;
+
+	for (int32 TeamId = 0; TeamId < TeamCount; ++TeamId)
+	{
+		const int32 Score = KCGameState->GetTeamScore(TeamId);
+		if (Score > LeadingScore)
+		{
+			LeadingScore = Score;
+			LeadingTeamId = TeamId;
+			bTie = false;
+		}
+		else if (Score == LeadingScore)
+		{
+			bTie = true;
+		}
+	}
+
+	return bTie ? INDEX_NONE : LeadingTeamId;
 }
 
 void AKCGameMode::TravelBackToLobby()
@@ -333,24 +383,27 @@ void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, F
 }
 
 // 플레이어 이탈 시 정보 백업
+// 플레이어 이탈 시 팀 및 슬롯 정보 백업
 void AKCGameMode::Logout(AController* Exiting)
 {
 	if (Exiting)
 	{
 		if (AKCLobbyPlayerState* KCPS = Exiting->GetPlayerState<AKCLobbyPlayerState>())
 		{
+			// 세션 서브시스템에 팀/슬롯 영구 백업 (UniqueNetId 키 기반)
 			if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
 			{
-				SessionSub->SaveLobbyPlayerData(KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
-				UE_LOG(LogTemp, Warning, TEXT("[GasRange] 플레이어 이탈: %s, TeamId=%d, SlotIndex=%d 자리 보존"),
-					*KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
+				SessionSub->SaveLobbyPlayerData(KCPS->GetUniquePlayerIdString(), KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
+				UE_LOG(LogKCLobby, Warning, TEXT("[GasRange] 플레이어 이탈: UniqueId='%s', Name='%s', TeamId=%d, SlotIndex=%d (정보 백업 완료)"),
+					*KCPS->GetUniquePlayerIdString(), *KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
 			}
 		}
 	}
 
 	Super::Logout(Exiting);
 }
-// 재접속 시 정보 복원
+
+// 재접속 시 팀 및 슬롯 정보 복원
 void AKCGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
@@ -366,21 +419,26 @@ void AKCGameMode::PostLogin(APlayerController* NewPlayer)
 		return;
 	}
 
+	// UniqueNetId 우선 조회 (스팀 접속 첫 프레임부터 100% 즉시 복원)
 	if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
 	{
+		const FString NetIdStr = KCPS->GetUniquePlayerIdString();
+		const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
+
 		int32 SavedTeamId = 0;
 		int32 SavedSlotIndex = INDEX_NONE;
-		if (SessionSub->GetSavedLobbyPlayerData(KCPS->GetPlayerName(), SavedTeamId, SavedSlotIndex))
+
+		if (!QueryKey.IsEmpty() && SessionSub->GetSavedLobbyPlayerData(QueryKey, SavedTeamId, SavedSlotIndex))
 		{
 			KCPS->SetTeamId(SavedTeamId);
 			KCPS->SetSlotIndex(SavedSlotIndex);
-			UE_LOG(LogTemp, Log, TEXT("[GasRange] 플레이어 재접속: %s, TeamId=%d, SlotIndex=%d 복원 (명시적 백업)"),
-				*KCPS->GetPlayerName(), SavedTeamId, SavedSlotIndex);
+			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 재접속: Key='%s', TeamId=%d, SlotIndex=%d 즉시 복원 성공"),
+				*QueryKey, SavedTeamId, SavedSlotIndex);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Log, TEXT("[GasRange] 플레이어 접속: %s, 저장된 데이터 없음 (CopyProperties 자동복원에 의존)"),
-				*KCPS->GetPlayerName());
+			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 접속: Key='%s', 세션 백업 데이터 없음 (신규 난입)"),
+				*QueryKey);
 		}
 	}
 }
@@ -410,4 +468,9 @@ void AKCGameMode::Debug_WinMatch(int32 WinningTeamId)
 {
 	UE_LOG(LogTemp, Log, TEXT("[Debug] Team %d 즉시 승리 처리"), WinningTeamId);
 	EndGame(WinningTeamId);
+}
+// 테스트용 레시피 고정 옵션 구현함수
+TArray<FName> AKCGameMode::GetRecipeRowNameOptions() const
+{
+	return DebugRecipeDataTable ? DebugRecipeDataTable->GetRowNames() : TArray<FName>();
 }

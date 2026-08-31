@@ -35,7 +35,7 @@ public:
 protected:
 	//~UUserWidget interface
 	virtual void NativeConstruct() override;
-	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual void NativeDestruct() override;
 	//~End of UUserWidget interface
 
 	/** @brief 친구 목록 열기/닫기 토글 버튼 바인딩 */
@@ -85,4 +85,17 @@ protected:
 	/** @brief 플레이어 팀 ID 변경 시 호출되는 콜백 핸들러 */
 	UFUNCTION()
 	virtual void OnTeamIdUpdated(int32 NewTeamId);
+
+private:
+	/** @brief PlayerState에 안전하게 바인딩을 시도합니다. 바인딩 성공 시 true 반환 */
+	bool TryBindPlayerState();
+
+	/** @brief PlayerState와의 바인딩 및 초기화 완료 여부 */
+	bool bPlayerStateBound = false;
+
+	/** @brief PlayerState 바인딩 재시도 타이머 핸들 (NativeTick 대신 0.05초 간격 경량 타이머 사용) */
+	FTimerHandle PlayerStateBindRetryTimerHandle;
+
+	/** @brief 재시도 횟수 제한 */
+	int32 BindRetryCount = 0;
 };

@@ -3,12 +3,12 @@
 #include "Components/CheckBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
+#include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/VerticalBox.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
-#include "ProjectKC/UI/HUD/Widget/KCHUDRecipeIngredientWidget.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeListWidget.h"
 
 void UKCHUDRecipeEntryWidget::NativePreConstruct()
@@ -29,6 +29,11 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 {
 	BP_OnRecipeSet(Recipe);
 
+	if (HB_Ingredients)
+	{
+		HB_Ingredients->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
 	if (FoodNameText)
 	{
 		FoodNameText->SetText(Recipe.DisplayName.IsEmpty() ? FText::FromName(Recipe.RecipeRowName) : Recipe.DisplayName);
@@ -37,17 +42,6 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 	RefreshDifficultyStars(Recipe.DifficultyStars);
 	RefreshTeamProgressBars(Recipe);
 
-	IngredientItems.Reset();
-	IngredientItems.Reserve(Recipe.Ingredients.Num());
-
-	for (const FKCRecipeIngredientViewData& Ingredient : Recipe.Ingredients)
-	{
-		UKCHUDRecipeIngredientListItem* Item = NewObject<UKCHUDRecipeIngredientListItem>(this);
-		Item->Ingredient = Ingredient;
-		IngredientItems.Add(Item);
-	}
-
-	RefreshIngredientWidgets(Recipe.Ingredients);
 	RefreshTestIngredientWidgets(Recipe.Ingredients);
 }
 
@@ -80,85 +74,46 @@ void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars
 	}
 }
 
-void UKCHUDRecipeEntryWidget::RefreshIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients)
-{
-	if (!IngredientWidgetClass)
-	{
-		return;
-	}
-
-	if (HB_Ingredients)
-	{
-		HB_Ingredients->ClearChildren();
-
-		for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
-		{
-			UKCHUDRecipeIngredientWidget* IngredientWidget = CreateWidget<UKCHUDRecipeIngredientWidget>(this, IngredientWidgetClass);
-			if (!IngredientWidget)
-			{
-				continue;
-			}
-
-			IngredientWidget->SetIngredient(Ingredient);
-			HB_Ingredients->AddChildToHorizontalBox(IngredientWidget);
-		}
-
-		return;
-	}
-
-	if (!IngredientEntryContainer)
-	{
-		return;
-	}
-
-	IngredientEntryContainer->ClearChildren();
-
-	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
-	{
-		UKCHUDRecipeIngredientWidget* IngredientWidget = CreateWidget<UKCHUDRecipeIngredientWidget>(this, IngredientWidgetClass);
-		if (!IngredientWidget)
-		{
-			continue;
-		}
-
-		IngredientWidget->SetIngredient(Ingredient);
-		IngredientEntryContainer->AddChildToVerticalBox(IngredientWidget);
-	}
-}
-
 void UKCHUDRecipeEntryWidget::RefreshTestIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients)
 {
 	if (!VB_TestIngredients)
 	{
 		return;
 	}
-
-	VB_TestIngredients->ClearChildren();
-
-	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
+	int32 IngredientIndex = 0;
+	for (int32 ChildIndex = 0; ChildIndex < VB_TestIngredients->GetChildrenCount(); ++ChildIndex)
 	{
-		UHorizontalBox* RowWidget = NewObject<UHorizontalBox>(VB_TestIngredients);
+		UWidget* RowWidget = VB_TestIngredients->GetChildAt(ChildIndex);
 		if (!RowWidget)
 		{
 			continue;
 		}
 
-		UCheckBox* IngredientCheckBox = NewObject<UCheckBox>(RowWidget);
-		if (IngredientCheckBox)
+		const bool bHasIngredient = Ingredients.IsValidIndex(IngredientIndex);
+		
+		RowWidget->SetVisibility(bHasIngredient
+			? ESlateVisibility::SelfHitTestInvisible
+			: ESlateVisibility::Collapsed);
+
+		UHorizontalBox* RowPanel = Cast<UHorizontalBox>(RowWidget);
+		if (!bHasIngredient || !RowPanel)
+		{	
+			continue;
+		}
+
+		const FKCRecipeIngredientViewData& Ingredient = Ingredients[IngredientIndex];
+		if (UCheckBox* IngredientCheckBox = Cast<UCheckBox>(RowPanel->GetChildAt(0)))
 		{
 			IngredientCheckBox->SetIsChecked(Ingredient.bSubmitted);
 			IngredientCheckBox->SetIsEnabled(false);
-			RowWidget->AddChildToHorizontalBox(IngredientCheckBox);
 		}
 
-		UTextBlock* IngredientTextBlock = NewObject<UTextBlock>(RowWidget);
-		if (IngredientTextBlock)
+		if (UTextBlock* IngredientTextBlock = Cast<UTextBlock>(RowPanel->GetChildAt(1)))
 		{
 			IngredientTextBlock->SetText(Ingredient.DisplayName);
-			RowWidget->AddChildToHorizontalBox(IngredientTextBlock);
 		}
-
-		VB_TestIngredients->AddChildToVerticalBox(RowWidget);
+		
+		++IngredientIndex;
 	}
 }
 

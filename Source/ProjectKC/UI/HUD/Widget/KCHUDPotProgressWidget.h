@@ -29,7 +29,7 @@ protected:
 	FKCPotProgressViewData PreviewPotProgress;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Material")
-	FName ProgressParameterName = TEXT("Progress");
+	FName ProgressParameterName = TEXT("Radial_wipe");
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UImage> Team1PotProgress;
@@ -47,11 +47,14 @@ protected:
 	void BP_OnPotProgressCompleted();
 
 private:
+	void ShowPotProgress();
 	void ApplyProgressMaterial(float ProgressPercent);
 	void ApplyRemainingSeconds(int32 RemainingSeconds);
 	void PlayCompletedAnimationThenHide();
-	UWidgetAnimation* GetCompletedAnimation() const;
+	void PlayHideAnimationThenHide();
 
 	FTimerHandle HideAfterCompletedAnimationTimerHandle;
 	bool bCompletedAnimationPlayed = false;
+	bool bShowing = false;
+	bool bHideAnimationPlaying = false;
 };
