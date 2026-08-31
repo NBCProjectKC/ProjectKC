@@ -31,8 +31,10 @@ private:
 		bool bCheckLineOfSight) const;
 	bool IsValidInteractionComponent(
 		UPrimitiveComponent* TargetComponent,
-		bool bCheckLineOfSight) const;
-	bool HasLineOfSightTo(const UPrimitiveComponent* TargetComponent) const;
+		bool bCheckLineOfSight,
+		FVector* OutClosestInteractionPoint = nullptr) const;
+	bool HasLineOfSightTo(const UPrimitiveComponent* TargetComponent,
+		const FVector& InteractionPoint) const;
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	FName InteractableComponentTag = TEXT("Interactable");
