@@ -27,10 +27,7 @@ void UKCLevelTransitionSubsystem::OnLevelLoaded(UWorld* LoadedWorld)
 		return;
 	}
 	
-	FString MapName = LoadedWorld->GetMapName();
-    MapName.RemoveFromStart(LoadedWorld->StreamingLevelsPrefix);
-
-	const EKCLevelType NewLevelType = UKCLevelTypeLibrary::GetLevelType(FName(*MapName));
+	const EKCLevelType NewLevelType = UKCLevelTypeLibrary::GetLevelTypeFromWorld(LoadedWorld);
 
 	FKCLevelChangedStruct Message;
 	Message.NewLevelType = NewLevelType;
@@ -38,5 +35,5 @@ void UKCLevelTransitionSubsystem::OnLevelLoaded(UWorld* LoadedWorld)
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Level_Changed, Message);
 
 	UE_LOG(LogTemp, Log, TEXT("[LevelTransition] 레벨 전환 감지: %s (Type=%d)"),
-		*MapName, static_cast<int32>(NewLevelType));
+		*LoadedWorld->GetMapName(), static_cast<int32>(NewLevelType));
 }

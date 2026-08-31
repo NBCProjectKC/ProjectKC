@@ -23,7 +23,6 @@ AKCLobbyGameMode::AKCLobbyGameMode()
 	DefaultPawnClass = nullptr;
 
 	RequiredPlayerCount = 6;
-	BattleLevelName = TEXT("L_GasRange");
 }
 
 void AKCLobbyGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
@@ -620,7 +619,7 @@ void AKCLobbyGameMode::StartGame()
 
 			if (UWorld* World = WeakThis->GetWorld())
 			{
-				FString TravelURL = WeakThis->BattleLevelName.IsEmpty() ? TEXT("L_GasRange") : WeakThis->BattleLevelName;
+				FString TravelURL = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::GasRange).ToString();
 				TravelURL += TEXT("?listen");
 				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Executing ServerTravel to: %s"), *TravelURL);
 				World->ServerTravel(TravelURL);
@@ -630,4 +629,4 @@ void AKCLobbyGameMode::StartGame()
 		false
 	);
 }
-
+
