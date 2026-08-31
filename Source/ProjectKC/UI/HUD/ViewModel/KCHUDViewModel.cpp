@@ -1,11 +1,13 @@
 #include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Engine/AssetManager.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "ProjectKC/GameSystem/KCGameState.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeStruct.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeTierType.h"
+#include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCActiveRecipesChangedStruct.h"
@@ -160,6 +162,7 @@ void UKCHUDViewModel::SetPotProgress(
 	int32 TeamId,
 	float ProgressPercent,
 	int32 RemainingSeconds,
+	FName RecipeRowName,
 	bool bVisible,
 	bool bCompleted)
 {
@@ -177,11 +180,13 @@ void UKCHUDViewModel::SetPotProgress(
 	FKCPotProgressViewData& PotProgress = NewPotProgresses[TeamId];
 	PotProgress.ProgressPercent = FMath::Clamp(ProgressPercent, 0.0f, 1.0f);
 	PotProgress.RemainingSeconds = FMath::Max(0, RemainingSeconds);
+	PotProgress.RecipeRowName = RecipeRowName;
 	PotProgress.bVisible = bVisible;
 	PotProgress.bCompleted = bCompleted;
 
 	PotProgresses = NewPotProgresses;
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(PotProgresses);
+	RebuildCookingStates();
 	OnPotProgressChangedNative.Broadcast(TeamId, PotProgresses[TeamId]);
 }
 
@@ -253,6 +258,7 @@ void UKCHUDViewModel::HandlePotProgressChanged(
 		Message.TeamId,
 		Message.ProgressPercent,
 		Message.RemainingSeconds,
+		Message.RecipeRowName,
 		Message.bVisible,
 		Message.bCompleted);
 }
@@ -401,12 +407,16 @@ void UKCHUDViewModel::RebuildSubmittedStates()
 		{
 			Ingredient.bSubmitted = false;
 			Ingredient.SubmittedTeamId = INDEX_NONE;
+			Ingredient.bSubmittedByTeam0 = false;
+			Ingredient.bSubmittedByTeam1 = false;
 
 			const bool bSubmittedByTeam0 = TeamPotIngredients.IsValidIndex(0) &&
 				TeamPotIngredients[0].HasTagExact(Ingredient.IngredientId);
 			const bool bSubmittedByTeam1 = TeamPotIngredients.IsValidIndex(1) &&
 				TeamPotIngredients[1].HasTagExact(Ingredient.IngredientId);
 
+			Ingredient.bSubmittedByTeam0 = bSubmittedByTeam0;
+			Ingredient.bSubmittedByTeam1 = bSubmittedByTeam1;
 			Ingredient.bSubmitted = TeamPotIngredients.IsValidIndex(LocalTeamId) &&
 				TeamPotIngredients[LocalTeamId].HasTagExact(Ingredient.IngredientId);
 			Ingredient.SubmittedTeamId = Ingredient.bSubmitted ? LocalTeamId : INDEX_NONE;
@@ -436,6 +446,37 @@ void UKCHUDViewModel::RebuildSubmittedStates()
 		Recipe.Team1Progress = Team1SubmittedCount / RequiredIngredientCount;
 		Recipe.bTeam0ProgressVisible = Team0SubmittedCount > 0;
 		Recipe.bTeam1ProgressVisible = Team1SubmittedCount > 0;
+	}
+
+	SetRecipes(NewRecipes);
+}
+
+void UKCHUDViewModel::RebuildCookingStates()
+{
+	TArray<FKCRecipeViewData> NewRecipes = Recipes;
+
+	for (FKCRecipeViewData& Recipe : NewRecipes)
+	{
+		Recipe.bTeam0Cooking = false;
+		Recipe.bTeam1Cooking = false;
+
+		if (PotProgresses.IsValidIndex(0))
+		{
+			const FKCPotProgressViewData& Team0PotProgress = PotProgresses[0];
+			Recipe.bTeam0Cooking =
+				Team0PotProgress.bVisible &&
+				!Team0PotProgress.bCompleted &&
+				Team0PotProgress.RecipeRowName == Recipe.RecipeRowName;
+		}
+
+		if (PotProgresses.IsValidIndex(1))
+		{
+			const FKCPotProgressViewData& Team1PotProgress = PotProgresses[1];
+			Recipe.bTeam1Cooking =
+				Team1PotProgress.bVisible &&
+				!Team1PotProgress.bCompleted &&
+				Team1PotProgress.RecipeRowName == Recipe.RecipeRowName;
+		}
 	}
 
 	SetRecipes(NewRecipes);
@@ -481,10 +522,46 @@ FKCRecipeViewData UKCHUDViewModel::BuildRecipeViewData(FName RecipeRowName) cons
 		FKCRecipeIngredientViewData IngredientViewData;
 		IngredientViewData.IngredientId = IngredientTag;
 		IngredientViewData.DisplayName = MakeDisplayNameFromTag(IngredientTag);
+		IngredientViewData.Icon = FindIngredientIcon(IngredientTag);
 		RecipeViewData.Ingredients.Add(IngredientViewData);
 	}
 
 	return RecipeViewData;
+}
+
+TSoftObjectPtr<UTexture2D> UKCHUDViewModel::FindIngredientIcon(const FGameplayTag& IngredientTag) const
+{
+	if (!IngredientTag.IsValid())
+	{
+		return nullptr;
+	}
+
+	if (const TSoftObjectPtr<UTexture2D>* CachedIcon = IngredientIconCache.Find(IngredientTag))
+	{
+		return *CachedIcon;
+	}
+
+	TSoftObjectPtr<UTexture2D> FoundIcon;
+	UAssetManager& AssetManager = UAssetManager::Get();
+
+	TArray<FPrimaryAssetId> ItemAssetIds;
+	AssetManager.GetPrimaryAssetIdList(FPrimaryAssetType(TEXT("Item")), ItemAssetIds);
+
+	for (const FPrimaryAssetId& ItemAssetId : ItemAssetIds)
+	{
+		const FSoftObjectPath ItemPath = AssetManager.GetPrimaryAssetPath(ItemAssetId);
+		const UKCItemDefinition* ItemDefinition = Cast<UKCItemDefinition>(ItemPath.TryLoad());
+		if (!ItemDefinition || ItemDefinition->ItemId != IngredientTag)
+		{
+			continue;
+		}
+
+		FoundIcon = ItemDefinition->Icon;
+		break;
+	}
+
+	IngredientIconCache.Add(IngredientTag, FoundIcon);
+	return FoundIcon;
 }
 
 FText UKCHUDViewModel::MakeDisplayNameFromTag(const FGameplayTag& Tag)

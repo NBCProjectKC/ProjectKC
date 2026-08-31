@@ -9,6 +9,7 @@
 #include "KCHUDViewModel.generated.h"
 
 class UTexture2D;
+class UKCItemDefinition;
 class AKCPlayerState;
 struct FKCActiveRecipesChangedStruct;
 struct FKCGamePhaseChangedStruct;
@@ -35,6 +36,12 @@ struct FKCRecipeIngredientViewData
 
 	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
 	int32 SubmittedTeamId = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bSubmittedByTeam0 = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bSubmittedByTeam1 = false;
 };
 
 USTRUCT(BlueprintType)
@@ -68,6 +75,12 @@ struct FKCRecipeViewData
 
 	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
 	bool bTeam1ProgressVisible = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bTeam0Cooking = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	bool bTeam1Cooking = false;
 };
 
 DECLARE_MULTICAST_DELEGATE(FKCRecipesChangedNativeDelegate);
@@ -84,6 +97,9 @@ struct FKCPotProgressViewData
 
 	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
 	int32 RemainingSeconds = 0;
+
+	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
+	FName RecipeRowName = NAME_None;
 
 	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
 	bool bVisible = false;
@@ -156,6 +172,7 @@ public:
 		int32 TeamId,
 		float ProgressPercent,
 		int32 RemainingSeconds,
+		FName RecipeRowName,
 		bool bVisible,
 		bool bCompleted);
 
@@ -194,7 +211,9 @@ private:
 	void BindLocalTeamPlayerState(AKCPlayerState* PlayerState);
 	void UnbindLocalTeamPlayerState();
 	void RebuildSubmittedStates();
+	void RebuildCookingStates();
 	FKCRecipeViewData BuildRecipeViewData(FName RecipeRowName) const;
+	TSoftObjectPtr<UTexture2D> FindIngredientIcon(const FGameplayTag& IngredientTag) const;
 	static FText MakeDisplayNameFromTag(const FGameplayTag& Tag);
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
@@ -217,6 +236,8 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FGameplayTagContainer> TeamPotIngredients;
+
+	mutable TMap<FGameplayTag, TSoftObjectPtr<UTexture2D>> IngredientIconCache;
 
 	TWeakObjectPtr<UObject> ListeningWorldContext;
 	TWeakObjectPtr<AKCPlayerState> BoundLocalTeamPlayerState;
