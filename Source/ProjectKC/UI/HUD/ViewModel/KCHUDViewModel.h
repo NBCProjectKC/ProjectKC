@@ -9,7 +9,7 @@
 #include "KCHUDViewModel.generated.h"
 
 class UTexture2D;
-class AKCLobbyPlayerState;
+class AKCPlayerState;
 struct FKCActiveRecipesChangedStruct;
 struct FKCGamePhaseChangedStruct;
 struct FKCPotIngredientsChangedStruct;
@@ -191,7 +191,7 @@ private:
 	void StartMatchTimerRefresh();
 	void StopMatchTimerRefresh();
 	void SyncLocalTeamIdFromContext();
-	void BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState);
+	void BindLocalTeamPlayerState(AKCPlayerState* PlayerState);
 	void UnbindLocalTeamPlayerState();
 	void RebuildSubmittedStates();
 	FKCRecipeViewData BuildRecipeViewData(FName RecipeRowName) const;
@@ -219,7 +219,7 @@ private:
 	TArray<FGameplayTagContainer> TeamPotIngredients;
 
 	TWeakObjectPtr<UObject> ListeningWorldContext;
-	TWeakObjectPtr<AKCLobbyPlayerState> BoundLocalTeamPlayerState;
+	TWeakObjectPtr<AKCPlayerState> BoundLocalTeamPlayerState;
 	FGameplayMessageListenerHandle ScoreChangedHandle;
 	FGameplayMessageListenerHandle PhaseChangedHandle;
 	FGameplayMessageListenerHandle ActiveRecipesChangedHandle;

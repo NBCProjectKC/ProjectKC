@@ -20,7 +20,7 @@
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -411,8 +411,8 @@ void AKCPlayerCharacter::PawnClientRestart()
 
 void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
 {
-	AKCLobbyPlayerState* TeamPlayerState =
-		GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* TeamPlayerState =
+		GetPlayerState<AKCPlayerState>();
 	BindTeamAppearanceToPlayerState(TeamPlayerState);
 
 	if (!TeamPlayerState)
@@ -426,7 +426,7 @@ void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
 }
 
 void AKCPlayerCharacter::BindTeamAppearanceToPlayerState(
-	AKCLobbyPlayerState* InPlayerState)
+	AKCPlayerState* InPlayerState)
 {
 	if (BoundTeamPlayerState.Get() != InPlayerState)
 	{
@@ -449,7 +449,7 @@ void AKCPlayerCharacter::BindTeamAppearanceToPlayerState(
 
 void AKCPlayerCharacter::UnbindTeamAppearanceFromPlayerState()
 {
-	if (AKCLobbyPlayerState* TeamPlayerState = BoundTeamPlayerState.Get())
+	if (AKCPlayerState* TeamPlayerState = BoundTeamPlayerState.Get())
 	{
 		TeamPlayerState->OnTeamIdChanged.RemoveDynamic(
 			this,

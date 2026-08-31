@@ -97,7 +97,7 @@ private:
 	AKCPlayerSlotActor* FindSlotByIndex(int32 SlotIndex) const;
 
 	/** @brief 플레이어 스테이트를 특정 슬롯 액터에 배정하고 슬롯/팀 동기화 */
-	void AssignPlayerToSlot(AKCPlayerSlotActor* TargetSlot, class AKCLobbyPlayerState* PS);
+	void AssignPlayerToSlot(AKCPlayerSlotActor* TargetSlot, class AKCPlayerState* PS);
 
 	/** @brief 신규 접속자를 비어있는 첫 번째 유효 슬롯에 배정 */
 	void AssignPlayerToAvailableSlot(APlayerController* NewPlayer);

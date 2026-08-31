@@ -10,7 +10,7 @@
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
 #include "ProjectKC/ProjectKC.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
@@ -24,7 +24,7 @@ AKCGameMode::AKCGameMode()
 	
 	DefaultPawnClass = AKCPlayerCharacter::StaticClass();
 	PlayerControllerClass = AKCPlayerController::StaticClass();
-	PlayerStateClass = AKCLobbyPlayerState::StaticClass();
+	PlayerStateClass = AKCPlayerState::StaticClass();
 	HUDClass = nullptr;
 }
 
@@ -382,13 +382,12 @@ void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, F
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, Message);
 }
 
-// 플레이어 이탈 시 정보 백업
 // 플레이어 이탈 시 팀 및 슬롯 정보 백업
 void AKCGameMode::Logout(AController* Exiting)
 {
 	if (Exiting)
 	{
-		if (AKCLobbyPlayerState* KCPS = Exiting->GetPlayerState<AKCLobbyPlayerState>())
+		if (AKCPlayerState* KCPS = Exiting->GetPlayerState<AKCPlayerState>())
 		{
 			// 세션 서브시스템에 팀/슬롯 영구 백업 (UniqueNetId 키 기반)
 			if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
@@ -413,7 +412,7 @@ void AKCGameMode::PostLogin(APlayerController* NewPlayer)
 		return;
 	}
 
-	AKCLobbyPlayerState* KCPS = NewPlayer->GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* KCPS = NewPlayer->GetPlayerState<AKCPlayerState>();
 	if (!KCPS)
 	{
 		return;
