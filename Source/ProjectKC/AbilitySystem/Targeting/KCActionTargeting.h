@@ -45,6 +45,9 @@ class PROJECTKC_API UKCActionTargeting : public UObject
 public:
 	virtual bool Validate(FString& OutError) const;
 
+	/** 수집된 FKCActionTarget이 실제 충돌 HitResult를 제공하는 방식인지. */
+	virtual bool ProducesHitResults() const { return false; }
+
 	/** 활성화가 이벤트로 대상을 넘겨줘야 하는 방식인지 알려 준다. */
 	virtual bool RequiresActivationTarget() const { return false; }
 
@@ -72,6 +75,8 @@ class PROJECTKC_API UKCTraceWindowTargeting : public UKCActionTargeting
 	GENERATED_BODY()
 
 public:
+	virtual bool ProducesHitResults() const override { return true; }
+
 	/** 활성화 중 추적할 실제 런타임 Source를 해석한다. */
 	virtual bool ResolveTraceSource(
 		const FKCActionTargetingContext& Context,

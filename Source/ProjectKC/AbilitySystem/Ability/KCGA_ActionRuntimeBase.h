@@ -5,6 +5,8 @@
 #include "KCGA_ActionRuntimeBase.generated.h"
 
 class UKCAbilityTask_ActionTraceWindow;
+class AKCWorldItemActor;
+enum class EKCItemDurabilityConsumeMode : uint8;
 struct FKCActionTarget;
 struct FKCActionTargetingContext;
 
@@ -23,6 +25,13 @@ public:
 	void NotifySocketTraceWindowEnd();
 
 protected:
+	virtual bool CanActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -55,11 +64,25 @@ private:
 
 	FKCActionTargetingContext BuildTargetingContext() const;
 	void ExecuteTargets(const TArray<FKCActionTarget>& Targets);
+	AKCWorldItemActor* ResolveSourceItem(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo) const;
+	bool TryConsumeActiveItemDurability(
+		EKCItemDurabilityConsumeMode ConsumeMode,
+		float ConsumptionScale = 1.0f);
+	void StartActiveDurabilityDrain();
+	void StopActiveDurabilityDrain(bool bConsumeRemainingTime);
+	void TickActiveDurabilityDrain();
 
 	TWeakObjectPtr<AActor> ActivationTarget;
 	FHitResult ActivationHitResult;
 	bool bHasActivationHitResult = false;
 	bool bFinishingAction = false;
+	bool bDurabilityConsumedThisActivation = false;
+	bool bDurabilityDrainActive = false;
+	double LastDurabilityDrainTimeSeconds = 0.0;
+	FTimerHandle DurabilityDrainTimerHandle;
+	TWeakObjectPtr<AKCWorldItemActor> ActiveDurabilityItem;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UKCAbilityTask_ActionTraceWindow> ActiveTraceTask;

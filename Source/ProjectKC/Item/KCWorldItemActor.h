@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "GameplayAbilitySpecHandle.h"
 #include "ProjectKC/Interaction/Interface/KCInteractableInterface.h"
+#include "ProjectKC/Item/Struct/KCItemDurabilityStruct.h"
 #include "KCWorldItemActor.generated.h"
 
 class AActor;
@@ -40,6 +41,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	AActor*,
 	NewHolder);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FKCItemDurabilityChangedSignature,
+	float,
+	PreviousDurability,
+	float,
+	CurrentDurability);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FKCItemBrokenSignature);
+
 /**
  * 인벤토리 없이 월드와 손 사이를 오가는 아이템 기반 Actor다.
  * 플레이어 입력을 소유하지 않으며 Pickup/Drop/Use 계약만 제공한다.
@@ -71,6 +81,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	bool IsUsable() const;
 
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Durability")
+	bool UsesDurability() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Durability")
+	bool IsBroken() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Durability")
+	float GetCurrentDurability() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Durability")
+	float GetMaximumDurability() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Durability")
+	float GetDurabilityNormalized() const;
+
+	/** 서버의 실제 사용 수명주기가 정확한 소모 시점에 호출한다. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item|Durability")
+	bool TryConsumeDurability(
+		EKCItemDurabilityConsumeMode ConsumeMode,
+		float ConsumptionScale = 1.0f);
+
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	EKCWorldItemState GetItemState() const;
 
@@ -86,6 +117,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Item")
 	FKCWorldItemStateChangedSignature OnItemStateChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "KC|Item|Durability")
+	FKCItemDurabilityChangedSignature OnDurabilityChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "KC|Item|Durability")
+	FKCItemBrokenSignature OnItemBroken;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(
@@ -96,6 +133,13 @@ protected:
 
 	UFUNCTION()
 	void OnRep_ItemDefinition();
+
+	UFUNCTION()
+	void OnRep_CurrentDurability(float PreviousDurability);
+
+	/** 서버가 파괴 직전에 호출하며 현재 관련 클라이언트에서 연출을 재생한다. */
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayBreakEffects(FVector_NetQuantize BreakLocation, FRotator BreakRotation);
 
 	UPROPERTY(
 		EditInstanceOnly,
@@ -129,9 +173,19 @@ private:
 	void RefreshReplicatedAttachment();
 	void ApplyStatePresentation();
 	void BroadcastStateChanged();
+	void ResetDurability();
+	void SetCurrentDurability(float NewDurability);
+	void BroadcastDurabilityChanged(float PreviousDurability);
+	void HandleBroken();
+	void DestroyBrokenItem();
+	bool ShouldDestroyWhenBroken() const;
 
 	UPROPERTY(ReplicatedUsing = OnRep_RuntimeState)
 	FKCWorldItemRuntimeState RuntimeState;
 
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentDurability)
+	float CurrentDurability = FKCItemDurabilityStruct::MaximumDurability;
+
 	bool bDefinitionValid = false;
+	bool bBreakDestructionScheduled = false;
 };

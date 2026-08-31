@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
+#include "ProjectKC/Item/Struct/KCItemDurabilityStruct.h"
 #include "ProjectKC/Item/Struct/KCItemPresentationStruct.h"
 #include "KCItemDefinition.generated.h"
 
@@ -51,6 +52,13 @@ public:
 		BlueprintReadOnly,
 		Category = "Item")
 	TObjectPtr<UKCAbilityDefinition> UseAction;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Item",
+		meta = (ShowOnlyInnerProperties))
+	FKCItemDurabilityStruct Durability;
 
 	UFUNCTION(BlueprintPure, Category = "Item")
 	bool IsUsable() const;
