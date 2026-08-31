@@ -9,12 +9,12 @@
 #include "Recipe/KCDishRuinedStruct.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
+#include "ProjectKC/ProjectKC.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "Player/KCPlayerCharacter.h"
 #include "Player/KCPlayerController.h"
 #include "KCLevelTypeLibrary.h"
-#include "ProjectKC/Lobby/KCSessionSubsystem.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
 #include "TimerManager.h"
 
 
@@ -383,24 +383,27 @@ void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, F
 }
 
 // 플레이어 이탈 시 정보 백업
+// 플레이어 이탈 시 팀 및 슬롯 정보 백업
 void AKCGameMode::Logout(AController* Exiting)
 {
 	if (Exiting)
 	{
 		if (AKCLobbyPlayerState* KCPS = Exiting->GetPlayerState<AKCLobbyPlayerState>())
 		{
+			// 세션 서브시스템에 팀/슬롯 영구 백업 (UniqueNetId 키 기반)
 			if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
 			{
-				SessionSub->SaveLobbyPlayerData(KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
-				UE_LOG(LogTemp, Warning, TEXT("[GasRange] 플레이어 이탈: %s, TeamId=%d, SlotIndex=%d 자리 보존"),
-					*KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
+				SessionSub->SaveLobbyPlayerData(KCPS->GetUniquePlayerIdString(), KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
+				UE_LOG(LogKCLobby, Warning, TEXT("[GasRange] 플레이어 이탈: UniqueId='%s', Name='%s', TeamId=%d, SlotIndex=%d (정보 백업 완료)"),
+					*KCPS->GetUniquePlayerIdString(), *KCPS->GetPlayerName(), KCPS->GetTeamId(), KCPS->GetSlotIndex());
 			}
 		}
 	}
 
 	Super::Logout(Exiting);
 }
-// 재접속 시 정보 복원
+
+// 재접속 시 팀 및 슬롯 정보 복원
 void AKCGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
@@ -416,21 +419,26 @@ void AKCGameMode::PostLogin(APlayerController* NewPlayer)
 		return;
 	}
 
+	// UniqueNetId 우선 조회 (스팀 접속 첫 프레임부터 100% 즉시 복원)
 	if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
 	{
+		const FString NetIdStr = KCPS->GetUniquePlayerIdString();
+		const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
+
 		int32 SavedTeamId = 0;
 		int32 SavedSlotIndex = INDEX_NONE;
-		if (SessionSub->GetSavedLobbyPlayerData(KCPS->GetPlayerName(), SavedTeamId, SavedSlotIndex))
+
+		if (!QueryKey.IsEmpty() && SessionSub->GetSavedLobbyPlayerData(QueryKey, SavedTeamId, SavedSlotIndex))
 		{
 			KCPS->SetTeamId(SavedTeamId);
 			KCPS->SetSlotIndex(SavedSlotIndex);
-			UE_LOG(LogTemp, Log, TEXT("[GasRange] 플레이어 재접속: %s, TeamId=%d, SlotIndex=%d 복원 (명시적 백업)"),
-				*KCPS->GetPlayerName(), SavedTeamId, SavedSlotIndex);
+			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 재접속: Key='%s', TeamId=%d, SlotIndex=%d 즉시 복원 성공"),
+				*QueryKey, SavedTeamId, SavedSlotIndex);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Log, TEXT("[GasRange] 플레이어 접속: %s, 저장된 데이터 없음 (CopyProperties 자동복원에 의존)"),
-				*KCPS->GetPlayerName());
+			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 접속: Key='%s', 세션 백업 데이터 없음 (신규 난입)"),
+				*QueryKey);
 		}
 	}
 }

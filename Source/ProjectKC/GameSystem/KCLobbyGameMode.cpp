@@ -193,14 +193,18 @@ void AKCLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AKCLobbyGameMode::Logout(AController* Exiting)
 {
-	Super::Logout(Exiting);
-
 	const FString PlayerName = (Exiting && Exiting->PlayerState) ? Exiting->PlayerState->GetPlayerName() : TEXT("Unknown");
 	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Logout - Player: %s (Controller: %s)"),
 		*PlayerName, Exiting ? *Exiting->GetName() : TEXT("null"));
 
-	// 퇴장한 플레이어의 슬롯만 비움 (다른 플레이어는 자리 유지)
+	// 1. Super::Logout 호출 전에 슬롯 비우기 (Super::Logout 이후에는 Exiting->PlayerState가 분리됨)
 	RemovePlayerFromSlot(Exiting);
+
+	// 2. 엔진 기본 Logout 호출 (GameState->PlayerArray에서 제거됨)
+	Super::Logout(Exiting);
+
+	// 3. 나간 플레이어가 완전히 제거된 후 최신 인원수/준비 상태로 방장 버튼 즉시 갱신
+	UpdateLobbyReadyState();
 }
 
 void AKCLobbyGameMode::SetRequiredPlayerCount(int32 InCount)
@@ -363,21 +367,33 @@ void AKCLobbyGameMode::RemovePlayerFromSlot(AController* Exiting)
 	}
 
 	AKCLobbyPlayerState* ExitingPS = Exiting->GetPlayerState<AKCLobbyPlayerState>();
-	if (!ExitingPS)
+	int32 SlotIdx = INDEX_NONE;
+
+	if (ExitingPS)
 	{
-		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyGameMode] RemovePlayerFromSlot: PlayerState is null for %s"), *Exiting->GetName());
-		return;
+		SlotIdx = ExitingPS->GetSlotIndex();
+		ExitingPS->SetSlotIndex(INDEX_NONE);
+		ExitingPS->SetIsReady(false);
 	}
 
-	const int32 SlotIdx = ExitingPS->GetSlotIndex();
 	if (AKCPlayerSlotActor* Slot = FindSlotByIndex(SlotIdx))
 	{
 		Slot->ClearSlot();
-		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Cleared Slot %d for exiting player '%s'"), SlotIdx, *ExitingPS->GetPlayerName());
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Cleared Slot %d for exiting player '%s'"),
+			SlotIdx, ExitingPS ? *ExitingPS->GetPlayerName() : *Exiting->GetName());
 	}
-
-	ExitingPS->SetSlotIndex(INDEX_NONE);
-	UpdateLobbyReadyState();
+	else
+	{
+		for (AKCPlayerSlotActor* LobbySlot : LobbySlots)
+		{
+			if (LobbySlot && LobbySlot->IsOccupied() && ExitingPS && LobbySlot->GetOccupyingPlayerState() == ExitingPS)
+			{
+				LobbySlot->ClearSlot();
+				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Cleared Slot %d (found by PlayerState) for exiting player '%s'"),
+					LobbySlot->GetSlotIndex(), *ExitingPS->GetPlayerName());
+			}
+		}
+	}
 }
 
 bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlotIndex)
@@ -526,11 +542,17 @@ void AKCLobbyGameMode::UpdateLobbyReadyState()
 	// 방장에게 StartGame 버튼 활성화 전달
 	if (UWorld* World = GetWorld())
 	{
-		if (APlayerController* HostPC = World->GetFirstPlayerController())
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 		{
-			if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(HostPC))
+			if (APlayerController* PC = It->Get())
 			{
-				LobbyPC->Client_SetStartGameButtonEnabled(bAllReady);
+				if (PC->IsLocalController())
+				{
+					if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(PC))
+					{
+						LobbyPC->Client_SetStartGameButtonEnabled(bAllReady);
+					}
+				}
 			}
 		}
 	}
@@ -559,7 +581,7 @@ void AKCLobbyGameMode::StartGame()
 				{
 					if (LobbyPS->GetSlotIndex() != INDEX_NONE)
 					{
-						Subsystem->SaveLobbyPlayerData(LobbyPS->GetPlayerName(), LobbyPS->GetTeamId(), LobbyPS->GetSlotIndex());
+						Subsystem->SaveLobbyPlayerData(LobbyPS->GetUniquePlayerIdString(), LobbyPS->GetPlayerName(), LobbyPS->GetTeamId(), LobbyPS->GetSlotIndex());
 						ActiveCount++;
 					}
 				}
