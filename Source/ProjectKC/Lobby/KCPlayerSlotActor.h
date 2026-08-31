@@ -113,4 +113,7 @@ protected:
 	/** @brief SlotState 복제 수신 시 호출 */
 	UFUNCTION()
 	virtual void OnRep_SlotState();
+
+	/** @brief 현재 스폰되어 있는 캐릭터를 안전하게 파괴하고 포인터를 초기화합니다. */
+	void DestroySpawnedCharacter();
 };

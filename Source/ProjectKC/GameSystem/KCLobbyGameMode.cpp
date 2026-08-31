@@ -8,10 +8,10 @@
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
+#include "ProjectKC/ProjectKC.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetSystemLibrary.h"
 #include "TimerManager.h"
 
 AKCLobbyGameMode::AKCLobbyGameMode()
@@ -30,6 +30,8 @@ void AKCLobbyGameMode::InitGame(const FString& MapName, const FString& Options, 
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] InitGame - MapName: %s, Options: %s"), *MapName, *Options);
+
 	FString PlayersOption = UGameplayStatics::ParseOption(Options, TEXT("Players"));
 	if (PlayersOption.IsEmpty())
 	{
@@ -44,6 +46,71 @@ void AKCLobbyGameMode::InitGame(const FString& MapName, const FString& Options, 
 			SetRequiredPlayerCount(ParsedCount);
 		}
 	}
+	else
+	{
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] No Players option found. Defaulting RequiredPlayerCount to %d"), RequiredPlayerCount);
+	}
+}
+
+void AKCLobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+
+	// 현재 접속자 수 검사 (최대 필요 인원수 도달 시 접속 거부)
+	const int32 CurrentPlayerCount = GetNumPlayers();
+	if (CurrentPlayerCount >= RequiredPlayerCount)
+	{
+		ErrorMessage = TEXT("LOBBY_FULL: Maximum player capacity reached for this lobby session.");
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] PreLogin Rejected: Lobby is full! (Current: %d / %d, Address: %s)"),
+			CurrentPlayerCount, RequiredPlayerCount, *Address);
+		return;
+	}
+
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] PreLogin Accepted: (Current: %d / %d, Address: %s)"),
+		CurrentPlayerCount, RequiredPlayerCount, *Address);
+}
+
+AKCPlayerSlotActor* AKCLobbyGameMode::FindSlotByIndex(int32 SlotIndex) const
+{
+	if (SlotIndex < 0 || SlotIndex >= 6)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] FindSlotByIndex: SlotIndex %d out of bounds (0-5)"), SlotIndex);
+		return nullptr;
+	}
+
+	for (AKCPlayerSlotActor* Slot : LobbySlots)
+	{
+		if (Slot && Slot->GetSlotIndex() == SlotIndex)
+		{
+			return Slot;
+		}
+	}
+
+	return nullptr;
+}
+
+void AKCLobbyGameMode::AssignPlayerToSlot(AKCPlayerSlotActor* TargetSlot, AKCLobbyPlayerState* PS)
+{
+	if (!TargetSlot || !PS)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] AssignPlayerToSlot Failed: TargetSlot (%s) or PlayerState (%s) is null"),
+			TargetSlot ? *TargetSlot->GetName() : TEXT("null"),
+			PS ? *PS->GetName() : TEXT("null"));
+		return;
+	}
+
+	const FKCPlayerInfoStruct Info(PS->GetPlayerName(), PS->IsReady(), PS);
+	TargetSlot->AssignPlayer(Info);
+	PS->SetSlotIndex(TargetSlot->GetSlotIndex());
+	PS->SetTeamId(TargetSlot->GetSlotTeamId());
+
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Assigned Player '%s' to Slot %d (Team %d)"),
+		*PS->GetPlayerName(), TargetSlot->GetSlotIndex(), TargetSlot->GetSlotTeamId());
 }
 
 void AKCLobbyGameMode::EnsureSlotsCollected()
@@ -67,12 +134,19 @@ void AKCLobbyGameMode::EnsureSlotsCollected()
 		return A.GetName() < B.GetName();
 	});
 
+	LobbySlots.Reset(FoundActors.Num());
 	for (AActor* Actor : FoundActors)
 	{
 		if (AKCPlayerSlotActor* Slot = Cast<AKCPlayerSlotActor>(Actor))
 		{
 			LobbySlots.Add(Slot);
 		}
+	}
+
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] EnsureSlotsCollected: Found and collected %d Slot Actors in level"), LobbySlots.Num());
+	if (LobbySlots.Num() != 6)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Expected 6 Slot Actors, but found %d. Please check the lobby map placement."), LobbySlots.Num());
 	}
 
 	ApplySlotOpenCloseRules();
@@ -82,15 +156,20 @@ void AKCLobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] BeginPlay started. RequiredPlayerCount: %d"), RequiredPlayerCount);
+
 	// 1. 슬롯 액터 수집 보장
 	EnsureSlotsCollected();
 
 	// 2. 이미 접속해 있는 모든 PlayerController(방장 등)를 슬롯에 배정
-	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	if (UWorld* World = GetWorld())
 	{
-		if (APlayerController* PC = It->Get())
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 		{
-			AssignPlayerToAvailableSlot(PC);
+			if (APlayerController* PC = It->Get())
+			{
+				AssignPlayerToAvailableSlot(PC);
+			}
 		}
 	}
 
@@ -100,6 +179,10 @@ void AKCLobbyGameMode::BeginPlay()
 void AKCLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
+
+	const FString PlayerName = (NewPlayer && NewPlayer->PlayerState) ? NewPlayer->PlayerState->GetPlayerName() : TEXT("Unknown");
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] PostLogin - Player: %s (Controller: %s)"),
+		*PlayerName, NewPlayer ? *NewPlayer->GetName() : TEXT("null"));
 
 	// 1. 슬롯 수집 보장 (PostLogin이 BeginPlay보다 먼저 불릴 때 대비)
 	EnsureSlotsCollected();
@@ -112,13 +195,21 @@ void AKCLobbyGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
 
+	const FString PlayerName = (Exiting && Exiting->PlayerState) ? Exiting->PlayerState->GetPlayerName() : TEXT("Unknown");
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Logout - Player: %s (Controller: %s)"),
+		*PlayerName, Exiting ? *Exiting->GetName() : TEXT("null"));
+
 	// 퇴장한 플레이어의 슬롯만 비움 (다른 플레이어는 자리 유지)
 	RemovePlayerFromSlot(Exiting);
 }
 
 void AKCLobbyGameMode::SetRequiredPlayerCount(int32 InCount)
 {
+	const int32 OldCount = RequiredPlayerCount;
 	RequiredPlayerCount = FMath::Clamp((InCount / 2) * 2, 2, 6);
+
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] SetRequiredPlayerCount: %d -> %d (Input: %d)"),
+		OldCount, RequiredPlayerCount, InCount);
 
 	ApplySlotOpenCloseRules();
 	UpdateLobbyReadyState();
@@ -127,7 +218,7 @@ void AKCLobbyGameMode::SetRequiredPlayerCount(int32 InCount)
 void AKCLobbyGameMode::Debug_SetLobbyPlayers(int32 InCount)
 {
 	SetRequiredPlayerCount(InCount);
-	UE_LOG(LogTemp, Warning, TEXT("Debug_SetLobbyPlayers: RequiredPlayerCount set to %d"), RequiredPlayerCount);
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Debug_SetLobbyPlayers Executed: RequiredPlayerCount set to %d"), RequiredPlayerCount);
 }
 
 void AKCLobbyGameMode::ApplySlotOpenCloseRules()
@@ -156,6 +247,8 @@ void AKCLobbyGameMode::ApplySlotOpenCloseRules()
 		}
 
 		Slot->SetSlotClosed(!bShouldOpen);
+		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyGameMode] Slot %d (Team %d) -> %s"),
+			SlotIdx, Slot->GetSlotTeamId(), bShouldOpen ? TEXT("OPEN") : TEXT("CLOSED"));
 	}
 }
 
@@ -163,21 +256,24 @@ void AKCLobbyGameMode::AssignPlayerToAvailableSlot(APlayerController* NewPlayer)
 {
 	if (!NewPlayer)
 	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] AssignPlayerToAvailableSlot Failed: NewPlayer is null"));
 		return;
 	}
 
 	AKCLobbyPlayerState* NewPS = NewPlayer->GetPlayerState<AKCLobbyPlayerState>();
 	if (!NewPS)
 	{
+		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyGameMode] PlayerState not ready yet for %s. Retrying in 0.05s..."), *NewPlayer->GetName());
 		FTimerHandle RetryTimerHandle;
-		TWeakObjectPtr<APlayerController> WeakPlayer = NewPlayer;
+		TWeakObjectPtr<AKCLobbyGameMode> WeakThis(this);
+		TWeakObjectPtr<APlayerController> WeakPlayer(NewPlayer);
 		GetWorldTimerManager().SetTimer(
 			RetryTimerHandle,
-			[this, WeakPlayer]()
+			[WeakThis, WeakPlayer]()
 			{
-				if (WeakPlayer.IsValid())
+				if (WeakThis.IsValid() && WeakPlayer.IsValid())
 				{
-					AssignPlayerToAvailableSlot(WeakPlayer.Get());
+					WeakThis->AssignPlayerToAvailableSlot(WeakPlayer.Get());
 				}
 			},
 			0.05f,
@@ -186,23 +282,19 @@ void AKCLobbyGameMode::AssignPlayerToAvailableSlot(APlayerController* NewPlayer)
 		return;
 	}
 
-	// 이미 슬롯에 배정되어 있다면 중복 배정 방지
+	// 이미 슬롯에 배정되어 있다면 중복 배정 방지 및 정보 동기화
 	if (NewPS->GetSlotIndex() != INDEX_NONE)
 	{
-		for (AKCPlayerSlotActor* Slot : LobbySlots)
+		if (AKCPlayerSlotActor* Slot = FindSlotByIndex(NewPS->GetSlotIndex()))
 		{
-			if (Slot && Slot->GetSlotIndex() == NewPS->GetSlotIndex())
+			if (!Slot->IsOccupied())
 			{
-				if (!Slot->IsOccupied())
-				{
-					FKCPlayerInfoStruct Info;
-					Info.PlayerName = NewPS->GetPlayerName();
-					Info.bReady = NewPS->IsReady();
-					Info.PlayerState = NewPS;
-					Slot->AssignPlayer(Info);
-				}
-				return;
+				const FKCPlayerInfoStruct Info(NewPS->GetPlayerName(), NewPS->IsReady(), NewPS);
+				Slot->AssignPlayer(Info);
+				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Player '%s' already had SlotIndex %d. Synchronized slot data."),
+					*NewPS->GetPlayerName(), NewPS->GetSlotIndex());
 			}
+			return;
 		}
 	}
 
@@ -252,14 +344,12 @@ void AKCLobbyGameMode::AssignPlayerToAvailableSlot(APlayerController* NewPlayer)
 	// 슬롯에 배정
 	if (ChosenSlot)
 	{
-		FKCPlayerInfoStruct Info;
-		Info.PlayerName = NewPS->GetPlayerName();
-		Info.bReady = NewPS->IsReady();
-		Info.PlayerState = NewPS;
-
-		ChosenSlot->AssignPlayer(Info);
-		NewPS->SetSlotIndex(ChosenSlot->GetSlotIndex());
-		NewPS->SetTeamId(ChosenSlot->GetSlotTeamId());
+		AssignPlayerToSlot(ChosenSlot, NewPS);
+	}
+	else
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Could not find an available slot for Player '%s' (Team0: %d, Team1: %d, MaxPerTeam: %d)"),
+			*NewPS->GetPlayerName(), Team0Count, Team1Count, PlayersPerTeam);
 	}
 
 	UpdateLobbyReadyState();
@@ -275,17 +365,15 @@ void AKCLobbyGameMode::RemovePlayerFromSlot(AController* Exiting)
 	AKCLobbyPlayerState* ExitingPS = Exiting->GetPlayerState<AKCLobbyPlayerState>();
 	if (!ExitingPS)
 	{
+		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyGameMode] RemovePlayerFromSlot: PlayerState is null for %s"), *Exiting->GetName());
 		return;
 	}
 
 	const int32 SlotIdx = ExitingPS->GetSlotIndex();
-	for (AKCPlayerSlotActor* Slot : LobbySlots)
+	if (AKCPlayerSlotActor* Slot = FindSlotByIndex(SlotIdx))
 	{
-		if (Slot && Slot->GetSlotIndex() == SlotIdx)
-		{
-			Slot->ClearSlot();
-			break;
-		}
+		Slot->ClearSlot();
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Cleared Slot %d for exiting player '%s'"), SlotIdx, *ExitingPS->GetPlayerName());
 	}
 
 	ExitingPS->SetSlotIndex(INDEX_NONE);
@@ -296,74 +384,64 @@ bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlo
 {
 	if (!Controller)
 	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] MovePlayerToSlot Failed: Controller is null"));
+		return false;
+	}
+
+	if (TargetSlotIndex < 0 || TargetSlotIndex >= 6)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] MovePlayerToSlot Failed: Invalid SlotIndex %d"), TargetSlotIndex);
 		return false;
 	}
 
 	AKCLobbyPlayerState* PS = Controller->GetPlayerState<AKCLobbyPlayerState>();
 	if (!PS)
 	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] MovePlayerToSlot Failed: PlayerState is null for %s"), *Controller->GetName());
 		return false;
 	}
 	
 	// 플레이어 상태가 준비 상태면 이동 불가
 	if (PS->IsReady())
 	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] MovePlayerToSlot Rejected: Player '%s' is Ready"), *PS->GetPlayerName());
 		return false;
 	}
 
 	EnsureSlotsCollected();
 
 	// 1. 목표 슬롯 탐색 (SlotIndex 매칭)
-	AKCPlayerSlotActor* TargetSlot = nullptr;
-	for (AKCPlayerSlotActor* Slot : LobbySlots)
-	{
-		if (Slot && Slot->GetSlotIndex() == TargetSlotIndex)
-		{
-			TargetSlot = Slot;
-			break;
-		}
-	}
-
+	AKCPlayerSlotActor* TargetSlot = FindSlotByIndex(TargetSlotIndex);
 	if (!TargetSlot)
 	{
-		UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("Move Failed: Slot %d not found!"), TargetSlotIndex), true, true, FLinearColor::Red, 2.5f);
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Move Failed: Slot %d not found!"), TargetSlotIndex);
 		return false;
 	}
 
 	if (TargetSlot->IsClosed())
 	{
-		UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("Move Failed: Slot %d is Closed!"), TargetSlotIndex), true, true, FLinearColor::Red, 2.5f);
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Move Failed: Slot %d is Closed!"), TargetSlotIndex);
 		return false;
 	}
 
 	if (TargetSlot->IsOccupied())
 	{
-		UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("Move Failed: Slot %d is Occupied!"), TargetSlotIndex), true, true, FLinearColor::Red, 2.5f);
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Move Failed: Slot %d is Occupied!"), TargetSlotIndex);
 		return false;
 	}
 
 	// 2. 기존 슬롯 비우기
 	const int32 PrevSlotIdx = PS->GetSlotIndex();
-	for (AKCPlayerSlotActor* Slot : LobbySlots)
+	if (AKCPlayerSlotActor* PrevSlot = FindSlotByIndex(PrevSlotIdx))
 	{
-		if (Slot && Slot->GetSlotIndex() == PrevSlotIdx)
-		{
-			Slot->ClearSlot();
-			break;
-		}
+		PrevSlot->ClearSlot();
 	}
 
 	// 3. 새 슬롯에 배정
-	FKCPlayerInfoStruct Info;
-	Info.PlayerName = PS->GetPlayerName();
-	Info.bReady = PS->IsReady();
-	Info.PlayerState = PS;
+	AssignPlayerToSlot(TargetSlot, PS);
 
-	TargetSlot->AssignPlayer(Info);
-	PS->SetSlotIndex(TargetSlotIndex);
-	PS->SetTeamId(TargetSlot->GetSlotTeamId());
-
-	UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("Moved to Slot %d (Team %d)!"), TargetSlotIndex, TargetSlot->GetSlotTeamId()), true, true, FLinearColor::Green, 2.5f);
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Player '%s' moved from Slot %d to Slot %d (Team %d)"),
+		*PS->GetPlayerName(), PrevSlotIdx, TargetSlotIndex, TargetSlot->GetSlotTeamId());
 
 	UpdateLobbyReadyState();
 	return true;
@@ -373,31 +451,29 @@ void AKCLobbyGameMode::HandlePlayerReadyToggled(AController* Controller)
 {
 	if (!Controller)
 	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] HandlePlayerReadyToggled Failed: Controller is null"));
 		return;
 	}
 
 	AKCLobbyPlayerState* PS = Controller->GetPlayerState<AKCLobbyPlayerState>();
 	if (!PS)
 	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] HandlePlayerReadyToggled Failed: PlayerState is null for %s"), *Controller->GetName());
 		return;
 	}
 
 	// 레디 상태 토글
 	PS->ToggleReady();
 
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Player '%s' Ready status changed to: %s"),
+		*PS->GetPlayerName(), PS->IsReady() ? TEXT("READY") : TEXT("NOT READY"));
+
 	// 해당 플레이어가 앉아있는 슬롯 정보만 안전하게 갱신
 	const int32 SlotIdx = PS->GetSlotIndex();
-	for (AKCPlayerSlotActor* Slot : LobbySlots)
+	if (AKCPlayerSlotActor* Slot = FindSlotByIndex(SlotIdx))
 	{
-		if (Slot && Slot->GetSlotIndex() == SlotIdx)
-		{
-			FKCPlayerInfoStruct Info;
-			Info.PlayerName = PS->GetPlayerName();
-			Info.bReady = PS->IsReady();
-			Info.PlayerState = PS;
-			Slot->AssignPlayer(Info);
-			break;
-		}
+		const FKCPlayerInfoStruct Info(PS->GetPlayerName(), PS->IsReady(), PS);
+		Slot->AssignPlayer(Info);
 	}
 
 	UpdateLobbyReadyState();
@@ -427,21 +503,25 @@ void AKCLobbyGameMode::UpdateLobbyReadyState()
 		return;
 	}
 
-	ConnectedPlayers.Empty();
+	ConnectedPlayers.Reset(GameState->PlayerArray.Num());
 
+	int32 ReadyCount = 0;
 	for (APlayerState* PS : GameState->PlayerArray)
 	{
 		if (AKCLobbyPlayerState* LobbyPS = Cast<AKCLobbyPlayerState>(PS))
 		{
-			FKCPlayerInfoStruct Info;
-			Info.PlayerName = LobbyPS->GetPlayerName();
-			Info.bReady = LobbyPS->IsReady();
-			Info.PlayerState = LobbyPS;
-			ConnectedPlayers.Add(Info);
+			ConnectedPlayers.Emplace(LobbyPS->GetPlayerName(), LobbyPS->IsReady(), LobbyPS);
+			if (LobbyPS->IsReady())
+			{
+				ReadyCount++;
+			}
 		}
 	}
 
 	const bool bAllReady = CheckAllPlayersReady();
+
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] UpdateLobbyReadyState - Connected: %d / %d, Ready: %d, AllReady: %s"),
+		ConnectedPlayers.Num(), RequiredPlayerCount, ReadyCount, bAllReady ? TEXT("TRUE") : TEXT("FALSE"));
 
 	// 방장에게 StartGame 버튼 활성화 전달
 	if (UWorld* World = GetWorld())
@@ -458,8 +538,15 @@ void AKCLobbyGameMode::UpdateLobbyReadyState()
 
 void AKCLobbyGameMode::StartGame()
 {
+	UGameInstance* GI = GetGameInstance();
+	if (!GI)
+	{
+		UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyGameMode] StartGame Failed: GameInstance is null"));
+		return;
+	}
+
 	// 1. KCSessionSubsystem에 로비 플레이어 데이터(TeamId, SlotIndex, 인원수) 영구 보존
-	if (UKCSessionSubsystem* Subsystem = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
+	if (UKCSessionSubsystem* Subsystem = GI->GetSubsystem<UKCSessionSubsystem>())
 	{
 		Subsystem->ClearSavedLobbyData();
 
@@ -479,7 +566,7 @@ void AKCLobbyGameMode::StartGame()
 			}
 		}
 		Subsystem->SetExpectedPlayerCount(ActiveCount);
-		UE_LOG(LogTemp, Log, TEXT("[KCLobbyGameMode] StartGame: Saved %d active players data into KCSessionSubsystem"), ActiveCount);
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] StartGame: Saved %d active players data into KCSessionSubsystem"), ActiveCount);
 	}
 
 	// 2. 클라이언트들에게 매치 시작 알림
@@ -487,24 +574,38 @@ void AKCLobbyGameMode::StartGame()
 	{
 		for (APlayerState* PS : GameState->PlayerArray)
 		{
-			if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(PS->GetOwner()))
+			if (PS)
 			{
-				LobbyPC->Client_OnMatchBegin();
+				if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(PS->GetOwner()))
+				{
+					LobbyPC->Client_OnMatchBegin();
+				}
 			}
 		}
 	}
 
 	// 3. 인게임 레벨로 ServerTravel 이동
 	FTimerHandle TravelTimerHandle;
+	TWeakObjectPtr<AKCLobbyGameMode> WeakThis(this);
 	GetWorldTimerManager().SetTimer(
 		TravelTimerHandle,
-		[this]()
+		[WeakThis]()
 		{
-			FString TravelURL = BattleLevelName.IsEmpty() ? TEXT("L_GasRange") : BattleLevelName;
-			TravelURL += TEXT("?listen");
-			GetWorld()->ServerTravel(TravelURL);
+			if (!WeakThis.IsValid())
+			{
+				return;
+			}
+
+			if (UWorld* World = WeakThis->GetWorld())
+			{
+				FString TravelURL = WeakThis->BattleLevelName.IsEmpty() ? TEXT("L_GasRange") : WeakThis->BattleLevelName;
+				TravelURL += TEXT("?listen");
+				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Executing ServerTravel to: %s"), *TravelURL);
+				World->ServerTravel(TravelURL);
+			}
 		},
 		1.0f,
 		false
 	);
 }
+
