@@ -6,7 +6,7 @@
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
 #include "ProjectKC/Lobby/UI/KCFriendListWidget.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Components/Button.h"
@@ -87,7 +87,7 @@ bool UKCLobbyWidget::TryBindPlayerState()
 
 	if (APlayerController* PC = GetOwningPlayer())
 	{
-		if (AKCLobbyPlayerState* PS = PC->GetPlayerState<AKCLobbyPlayerState>())
+		if (AKCPlayerState* PS = PC->GetPlayerState<AKCPlayerState>())
 		{
 			PS->OnReadyStatusChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnReadyStatusUpdated);
 			PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);

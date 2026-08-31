@@ -4,7 +4,7 @@
  */
 
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
@@ -19,7 +19,7 @@ AKCLobbyGameMode::AKCLobbyGameMode()
 	bUseSeamlessTravel = true;
 
 	PlayerControllerClass = AKCLobbyPlayerController::StaticClass();
-	PlayerStateClass = AKCLobbyPlayerState::StaticClass();
+	PlayerStateClass = AKCPlayerState::StaticClass();
 	DefaultPawnClass = nullptr;
 
 	RequiredPlayerCount = 6;
@@ -93,7 +93,7 @@ AKCPlayerSlotActor* AKCLobbyGameMode::FindSlotByIndex(int32 SlotIndex) const
 	return nullptr;
 }
 
-void AKCLobbyGameMode::AssignPlayerToSlot(AKCPlayerSlotActor* TargetSlot, AKCLobbyPlayerState* PS)
+void AKCLobbyGameMode::AssignPlayerToSlot(AKCPlayerSlotActor* TargetSlot, AKCPlayerState* PS)
 {
 	if (!TargetSlot || !PS)
 	{
@@ -263,7 +263,7 @@ void AKCLobbyGameMode::AssignPlayerToAvailableSlot(APlayerController* NewPlayer)
 		return;
 	}
 
-	AKCLobbyPlayerState* NewPS = NewPlayer->GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* NewPS = NewPlayer->GetPlayerState<AKCPlayerState>();
 	if (!NewPS)
 	{
 		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyGameMode] PlayerState not ready yet for %s. Retrying in 0.05s..."), *NewPlayer->GetName());
@@ -365,7 +365,7 @@ void AKCLobbyGameMode::RemovePlayerFromSlot(AController* Exiting)
 		return;
 	}
 
-	AKCLobbyPlayerState* ExitingPS = Exiting->GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* ExitingPS = Exiting->GetPlayerState<AKCPlayerState>();
 	int32 SlotIdx = INDEX_NONE;
 
 	if (ExitingPS)
@@ -409,7 +409,7 @@ bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlo
 		return false;
 	}
 
-	AKCLobbyPlayerState* PS = Controller->GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* PS = Controller->GetPlayerState<AKCPlayerState>();
 	if (!PS)
 	{
 		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] MovePlayerToSlot Failed: PlayerState is null for %s"), *Controller->GetName());
@@ -470,7 +470,7 @@ void AKCLobbyGameMode::HandlePlayerReadyToggled(AController* Controller)
 		return;
 	}
 
-	AKCLobbyPlayerState* PS = Controller->GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* PS = Controller->GetPlayerState<AKCPlayerState>();
 	if (!PS)
 	{
 		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] HandlePlayerReadyToggled Failed: PlayerState is null for %s"), *Controller->GetName());
@@ -523,7 +523,7 @@ void AKCLobbyGameMode::UpdateLobbyReadyState()
 	int32 ReadyCount = 0;
 	for (APlayerState* PS : GameState->PlayerArray)
 	{
-		if (AKCLobbyPlayerState* LobbyPS = Cast<AKCLobbyPlayerState>(PS))
+		if (AKCPlayerState* LobbyPS = Cast<AKCPlayerState>(PS))
 		{
 			ConnectedPlayers.Emplace(LobbyPS->GetPlayerName(), LobbyPS->IsReady(), LobbyPS);
 			if (LobbyPS->IsReady())
@@ -576,7 +576,7 @@ void AKCLobbyGameMode::StartGame()
 		{
 			for (APlayerState* PS : GameState->PlayerArray)
 			{
-				if (AKCLobbyPlayerState* LobbyPS = Cast<AKCLobbyPlayerState>(PS))
+				if (AKCPlayerState* LobbyPS = Cast<AKCPlayerState>(PS))
 				{
 					if (LobbyPS->GetSlotIndex() != INDEX_NONE)
 					{
