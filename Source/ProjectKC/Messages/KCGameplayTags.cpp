@@ -34,6 +34,7 @@ namespace KCGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Game_PotIngredientsChanged, "Message.Game.PotIngredientsChanged", "팀별 냄비 재료 목록이 갱신될 때 클라이언트 UI용으로 브로드캐스트되는 메시지 채널입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Game_PotProgressChanged, "Message.Game.PotProgressChanged", "팀별 냄비 조리 진행도가 갱신될 때 클라이언트 UI용으로 브로드캐스트되는 메시지 채널입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Ingredient_Submitted, "Message.Ingredient.Submitted", "냄비에 재료가 투입될 때 서버에서 브로드캐스트되는 메시지 채널입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Level_Changed, "Message.Level.Changed", "레벨이 전환되었을 때 브로드캐스트되는 메시지 채널입니다.");
 	
 	/* =========================================================================
 	 *  Recipe Completed or Ruind Messages
