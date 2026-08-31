@@ -33,6 +33,7 @@ void UKCPotProgressBroadcasterComponent::NotifyCookingStarted()
 
 	MulticastPotProgressStarted(
 		PotActor->GetAssignedTeamId(),
+		PotActor->GetActiveRecipeRowName(),
 		GetRemainingCookingSeconds(
 			PotActor->GetCookingProgressAttributes(),
 			PotActor->GetActiveProgressSpeedPerSecond()));
@@ -48,6 +49,7 @@ void UKCPotProgressBroadcasterComponent::NotifyCookingProgress()
 
 	MulticastPotProgressUpdated(
 		PotActor->GetAssignedTeamId(),
+		PotActor->GetActiveRecipeRowName(),
 		GetCookingProgressPercent(PotActor->GetCookingProgressAttributes()),
 		GetRemainingCookingSeconds(
 			PotActor->GetCookingProgressAttributes(),
@@ -62,7 +64,7 @@ void UKCPotProgressBroadcasterComponent::NotifyCookingCompleted()
 		return;
 	}
 
-	MulticastPotProgressCompleted(PotActor->GetAssignedTeamId());
+	MulticastPotProgressCompleted(PotActor->GetAssignedTeamId(), PotActor->GetActiveRecipeRowName());
 }
 
 void UKCPotProgressBroadcasterComponent::NotifyCookingHidden()
@@ -78,33 +80,37 @@ void UKCPotProgressBroadcasterComponent::NotifyCookingHidden()
 
 void UKCPotProgressBroadcasterComponent::MulticastPotProgressStarted_Implementation(
 	int32 TeamId,
+	FName RecipeRowName,
 	int32 RemainingSeconds)
 {
-	BroadcastPotProgress(TeamId, 0.0f, RemainingSeconds, true, false);
+	BroadcastPotProgress(TeamId, RecipeRowName, 0.0f, RemainingSeconds, true, false);
 }
 
 void UKCPotProgressBroadcasterComponent::MulticastPotProgressUpdated_Implementation(
 	int32 TeamId,
+	FName RecipeRowName,
 	float ProgressPercent,
 	int32 RemainingSeconds)
 {
-	BroadcastPotProgress(TeamId, ProgressPercent, RemainingSeconds, true, false);
+	BroadcastPotProgress(TeamId, RecipeRowName, ProgressPercent, RemainingSeconds, true, false);
 }
 
 void UKCPotProgressBroadcasterComponent::MulticastPotProgressCompleted_Implementation(
-	int32 TeamId)
+	int32 TeamId,
+	FName RecipeRowName)
 {
-	BroadcastPotProgress(TeamId, 1.0f, 0, true, true);
+	BroadcastPotProgress(TeamId, RecipeRowName, 1.0f, 0, true, true);
 }
 
 void UKCPotProgressBroadcasterComponent::MulticastPotProgressHidden_Implementation(
 	int32 TeamId)
 {
-	BroadcastPotProgress(TeamId, 0.0f, 0, false, false);
+	BroadcastPotProgress(TeamId, NAME_None, 0.0f, 0, false, false);
 }
 
 void UKCPotProgressBroadcasterComponent::BroadcastPotProgress(
 	int32 TeamId,
+	FName RecipeRowName,
 	float ProgressPercent,
 	int32 RemainingSeconds,
 	bool bVisible,
@@ -112,6 +118,7 @@ void UKCPotProgressBroadcasterComponent::BroadcastPotProgress(
 {
 	FKCPotProgressChangedStruct Message;
 	Message.TeamId = TeamId;
+	Message.RecipeRowName = RecipeRowName;
 	Message.ProgressPercent = FMath::Clamp(ProgressPercent, 0.0f, 1.0f);
 	Message.RemainingSeconds = FMath::Max(0, RemainingSeconds);
 	Message.bVisible = bVisible;

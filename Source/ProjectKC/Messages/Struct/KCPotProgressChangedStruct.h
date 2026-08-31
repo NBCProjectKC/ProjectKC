@@ -12,6 +12,9 @@ struct FKCPotProgressChangedStruct
 	int32 TeamId = INDEX_NONE;
 
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Game")
+	FName RecipeRowName = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "KC|Game")
 	float ProgressPercent = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Game")
