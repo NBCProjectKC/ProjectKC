@@ -424,15 +424,17 @@ void AKCGameMode::PostLogin(APlayerController* NewPlayer)
 		const FString NetIdStr = KCPS->GetUniquePlayerIdString();
 		const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
 
+		FString SavedPlayerName;
 		int32 SavedTeamId = 0;
 		int32 SavedSlotIndex = INDEX_NONE;
 
-		if (!QueryKey.IsEmpty() && SessionSub->GetSavedLobbyPlayerData(QueryKey, SavedTeamId, SavedSlotIndex))
+		if (!QueryKey.IsEmpty() && SessionSub->GetSavedLobbyPlayerData(QueryKey, SavedPlayerName, SavedTeamId, SavedSlotIndex))
 		{
+			KCPS->SetGamePlayerName(SavedPlayerName);
 			KCPS->SetTeamId(SavedTeamId);
 			KCPS->SetSlotIndex(SavedSlotIndex);
-			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 재접속: Key='%s', TeamId=%d, SlotIndex=%d 즉시 복원 성공"),
-				*QueryKey, SavedTeamId, SavedSlotIndex);
+			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 재접속: Key='%s', Name='%s', TeamId=%d, SlotIndex=%d 즉시 복원 성공"),
+				*QueryKey, *SavedPlayerName, SavedTeamId, SavedSlotIndex);
 		}
 		else
 		{

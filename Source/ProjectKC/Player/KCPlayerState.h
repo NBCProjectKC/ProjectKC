@@ -12,6 +12,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCReadyStatusChangedDelegate, bool, bNewReady);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCTeamIdChangedDelegate, int32, NewTeamId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCSlotIndexChangedDelegate, int32, NewSlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCGamePlayerNameChangedDelegate, const FString&, NewPlayerName);
 
 /**
  * @class AKCPlayerState
@@ -59,6 +60,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	bool IsReady() const { return bReady; }
 
+	/** @brief 인게임 UI에 표시할 최종 플레이어 이름을 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Player")
+	FString GetGamePlayerName() const;
+
+	/** @brief 서버 권한으로 인게임 UI 표시 이름을 변경합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Player")
+	void SetGamePlayerName(const FString& InPlayerName);
+
 	/** @brief 서버 권한으로 준비 완료 여부를 설정합니다. */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
 	void SetIsReady(bool bNewReady);
@@ -80,6 +89,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Events")
 	FOnKCSlotIndexChangedDelegate OnSlotIndexChanged;
 
+	/** @brief 인게임 UI 표시 이름이 변경되었을 때 브로드캐스트되는 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "KC|Player|Events")
+	FOnKCGamePlayerNameChangedDelegate OnGamePlayerNameChanged;
+
 protected:
 	/** @brief 플레이어 준비 완료 상태 (네트워크 복제) */
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
@@ -93,6 +106,10 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_SlotIndex, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
 	int32 SlotIndex = INDEX_NONE;
 
+	/** @brief 인게임 UI에 표시할 최종 플레이어 이름 */
+	UPROPERTY(ReplicatedUsing = OnRep_GamePlayerName, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Player")
+	FString GamePlayerName;
+
 	/** @brief bReady 프로퍼티 복제 수신 시 호출 */
 	UFUNCTION()
 	virtual void OnRep_Ready();
@@ -104,6 +121,10 @@ protected:
 	/** @brief SlotIndex 프로퍼티 복제 수신 시 호출 */
 	UFUNCTION()
 	virtual void OnRep_SlotIndex();
+
+	/** @brief GamePlayerName 프로퍼티 복제 수신 시 호출 */
+	UFUNCTION()
+	virtual void OnRep_GamePlayerName();
 
 	virtual void BeginPlay() override;
 	virtual void OnRep_PlayerName() override;

@@ -19,6 +19,7 @@ class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
+class UKCPlayerOverHeadComponent;
 class UKCPlayerInteractionComponent;
 class USceneComponent;
 class USpringArmComponent;
@@ -99,9 +100,13 @@ private:
 	void ConfigureDriverMesh();
 	void RefreshTeamAppearanceBinding();
 	void UnbindTeamAppearanceFromPlayerState();
+	void RefreshPlayerOverHead();
 
 	UFUNCTION()
 	void HandleTeamIdChanged(int32 NewTeamId);
+
+	UFUNCTION()
+	void HandleGamePlayerNameChanged(const FString& NewPlayerName);
 
 	void InitializeAbilityActorInfo();
 	void GrantDefaultAbilities();
@@ -155,6 +160,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerInteractionComponent> InteractionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|UI",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerOverHeadComponent> PlayerOverHeadComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
 		meta = (AllowPrivateAccess = "true"))
