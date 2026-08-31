@@ -28,11 +28,55 @@ void AKCLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 
 	if (AKCLobbyPlayerState* TargetPS = Cast<AKCLobbyPlayerState>(PlayerState))
 	{
-		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] CopyProperties: Copying TeamId=%d, SlotIndex=%d to new PlayerState '%s'"),
-			this->TeamId, this->SlotIndex, *TargetPS->GetName());
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] CopyProperties: Copying TeamId=%d, SlotIndex=%d, HasTransform=%s to new PlayerState '%s'"),
+			this->TeamId, this->SlotIndex, this->bHasSavedTransform ? TEXT("TRUE") : TEXT("FALSE"), *TargetPS->GetName());
 		TargetPS->SetTeamId(this->TeamId);
 		TargetPS->SetSlotIndex(this->SlotIndex);
+		TargetPS->SavedTransform = this->SavedTransform;
+		TargetPS->bHasSavedTransform = this->bHasSavedTransform;
 	}
+}
+
+void AKCLobbyPlayerState::OverrideWith(APlayerState* PlayerState)
+{
+	Super::OverrideWith(PlayerState);
+
+	if (AKCLobbyPlayerState* InactivePS = Cast<AKCLobbyPlayerState>(PlayerState))
+	{
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] OverrideWith: Restoring Inactive PlayerState '%s' (TeamId=%d, SlotIndex=%d, HasTransform=%s)"),
+			*InactivePS->GetPlayerName(), InactivePS->TeamId, InactivePS->SlotIndex,
+			InactivePS->bHasSavedTransform ? TEXT("TRUE") : TEXT("FALSE"));
+
+		SetTeamId(InactivePS->TeamId);
+		SetSlotIndex(InactivePS->SlotIndex);
+		this->SavedTransform = InactivePS->SavedTransform;
+		this->bHasSavedTransform = InactivePS->bHasSavedTransform;
+	}
+}
+
+void AKCLobbyPlayerState::SavePlayerTransform(const FTransform& InTransform)
+{
+	SavedTransform = InTransform;
+	bHasSavedTransform = true;
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] '%s' SavePlayerTransform: %s"),
+		*GetPlayerName(), *InTransform.ToString());
+}
+
+bool AKCLobbyPlayerState::GetSavedTransform(FTransform& OutTransform) const
+{
+	if (bHasSavedTransform)
+	{
+		OutTransform = SavedTransform;
+		return true;
+	}
+	return false;
+}
+
+void AKCLobbyPlayerState::ClearSavedTransform()
+{
+	SavedTransform = FTransform::Identity;
+	bHasSavedTransform = false;
+	UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] '%s' ClearSavedTransform"), *GetPlayerName());
 }
 
 void AKCLobbyPlayerState::SetSlotIndex(int32 InSlotIndex)
@@ -114,8 +158,8 @@ void AKCLobbyPlayerState::TryRestoreSavedLobbyData()
 {
 	if (HasAuthority())
 	{
-		const FString MyPlayerName = GetPlayerName();
-		if (MyPlayerName.IsEmpty())
+		const FString MyNetIdStr = GetUniquePlayerIdString();
+		if (MyNetIdStr.IsEmpty())
 		{
 			return;
 		}
@@ -126,16 +170,16 @@ void AKCLobbyPlayerState::TryRestoreSavedLobbyData()
 			{
 				int32 SavedTeamId = 0;
 				int32 SavedSlotIndex = INDEX_NONE;
-				if (Subsystem->GetSavedLobbyPlayerData(MyPlayerName, SavedTeamId, SavedSlotIndex))
+				if (Subsystem->GetSavedLobbyPlayerData(MyNetIdStr, SavedTeamId, SavedSlotIndex))
 				{
-					UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: Successfully restored TeamId=%d, SlotIndex=%d for Player '%s'"),
-						SavedTeamId, SavedSlotIndex, *MyPlayerName);
+					UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: Successfully restored TeamId=%d, SlotIndex=%d for Player '%s' (UniqueId='%s')"),
+						SavedTeamId, SavedSlotIndex, *GetPlayerName(), *MyNetIdStr);
 					SetTeamId(SavedTeamId);
 					SetSlotIndex(SavedSlotIndex);
 				}
 				else
 				{
-					UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: No saved lobby data found for Player '%s'"), *MyPlayerName);
+					UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: No saved lobby data found for UniqueId '%s'"), *MyNetIdStr);
 				}
 			}
 		}

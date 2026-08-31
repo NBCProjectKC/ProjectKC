@@ -122,6 +122,9 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 {
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession requested"));
 
+	// 세션 정보 캐싱 (재접속 지원)
+	CacheSessionResult(SessionResult);
+
 	if (!SessionInterface.IsValid())
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: SessionInterface is invalid"));
@@ -319,25 +322,37 @@ void UKCSessionSubsystem::HandleSessionUserInviteAccepted(const bool bWasSuccess
 	}
 }
 
-void UKCSessionSubsystem::SaveLobbyPlayerData(const FString& PlayerName, int32 InTeamId, int32 InSlotIndex)
+void UKCSessionSubsystem::SaveLobbyPlayerData(const FString& UniqueNetId, const FString& PlayerName, int32 InTeamId, int32 InSlotIndex)
 {
-	const FKCLobbySavedPlayerDataStruct Data(PlayerName, InTeamId, InSlotIndex);
-	SavedLobbyPlayers.Add(PlayerName, Data);
+	if (UniqueNetId.IsEmpty())
+	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] SaveLobbyPlayerData Warning: UniqueNetId is empty for '%s'"), *PlayerName);
+		return;
+	}
 
-	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Saved Lobby Player Data: Name='%s', TeamId=%d, SlotIndex=%d"),
-		*PlayerName, InTeamId, InSlotIndex);
+	const FKCLobbySavedPlayerDataStruct Data(UniqueNetId, PlayerName, InTeamId, InSlotIndex);
+	SavedLobbyPlayers.Add(UniqueNetId, Data);
+
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Saved Lobby Player Data: UniqueId='%s', Name='%s', TeamId=%d, SlotIndex=%d"),
+		*UniqueNetId, *PlayerName, InTeamId, InSlotIndex);
 }
 
-bool UKCSessionSubsystem::GetSavedLobbyPlayerData(const FString& PlayerName, int32& OutTeamId, int32& OutSlotIndex) const
+bool UKCSessionSubsystem::GetSavedLobbyPlayerData(const FString& UniqueNetId, int32& OutTeamId, int32& OutSlotIndex) const
 {
-	if (const FKCLobbySavedPlayerDataStruct* FoundData = SavedLobbyPlayers.Find(PlayerName))
+	if (UniqueNetId.IsEmpty())
+	{
+		return false;
+	}
+
+	if (const FKCLobbySavedPlayerDataStruct* FoundData = SavedLobbyPlayers.Find(UniqueNetId))
 	{
 		OutTeamId = FoundData->TeamId;
 		OutSlotIndex = FoundData->SlotIndex;
-		UE_LOG(LogKCSession, Verbose, TEXT("[KCSessionSubsystem] GetSavedLobbyPlayerData: Found data for '%s' (TeamId=%d, SlotIndex=%d)"),
-			*PlayerName, OutTeamId, OutSlotIndex);
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] GetSavedLobbyPlayerData: Found data for UniqueId='%s' (TeamId=%d, SlotIndex=%d)"),
+			*UniqueNetId, OutTeamId, OutSlotIndex);
 		return true;
 	}
+
 	return false;
 }
 
@@ -359,5 +374,33 @@ bool UKCSessionSubsystem::IsLobbyFull() const
 
 	const int32 MaxPlayers = (ExpectedPlayerCount > 0) ? ExpectedPlayerCount : 6;
 	return GS->PlayerArray.Num() >= MaxPlayers;
+}
+
+void UKCSessionSubsystem::CacheSessionResult(const FBlueprintSessionResult& SessionResult)
+{
+	CachedLastSessionResult = SessionResult;
+	bHasCachedSession = SessionResult.OnlineResult.IsValid();
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Cached Last Session Result: Valid=%s, Ping=%d ms"),
+		bHasCachedSession ? TEXT("TRUE") : TEXT("FALSE"), SessionResult.OnlineResult.PingInMs);
+}
+
+void UKCSessionSubsystem::RejoinLastSession()
+{
+	if (!bHasCachedSession || !CachedLastSessionResult.OnlineResult.IsValid())
+	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] RejoinLastSession Failed: No valid cached session found!"));
+		OnJoinSessionComplete.Broadcast(false, FString());
+		return;
+	}
+
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Rejoining cached session directly..."));
+	JoinSession(CachedLastSessionResult);
+}
+
+void UKCSessionSubsystem::ClearCachedSession()
+{
+	CachedLastSessionResult = FBlueprintSessionResult();
+	bHasCachedSession = false;
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Cleared Cached Session"));
 }
 

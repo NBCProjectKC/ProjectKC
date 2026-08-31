@@ -559,7 +559,7 @@ void AKCLobbyGameMode::StartGame()
 				{
 					if (LobbyPS->GetSlotIndex() != INDEX_NONE)
 					{
-						Subsystem->SaveLobbyPlayerData(LobbyPS->GetPlayerName(), LobbyPS->GetTeamId(), LobbyPS->GetSlotIndex());
+						Subsystem->SaveLobbyPlayerData(LobbyPS->GetUniquePlayerIdString(), LobbyPS->GetPlayerName(), LobbyPS->GetTeamId(), LobbyPS->GetSlotIndex());
 						ActiveCount++;
 					}
 				}
