@@ -20,4 +20,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Level")
 	static EKCLevelType GetLevelType(FName LevelName);
+	
+	UFUNCTION(BlueprintPure, Category = "KC|Level")
+	static EKCLevelType GetLevelTypeFromWorld(const UWorld* World);
 };
