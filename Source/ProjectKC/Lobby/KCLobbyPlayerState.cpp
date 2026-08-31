@@ -35,6 +35,20 @@ void AKCLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 	}
 }
 
+void AKCLobbyPlayerState::OverrideWith(APlayerState* PlayerState)
+{
+	Super::OverrideWith(PlayerState);
+
+	if (AKCLobbyPlayerState* InactivePS = Cast<AKCLobbyPlayerState>(PlayerState))
+	{
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] OverrideWith: Restoring Inactive PlayerState '%s' (TeamId=%d, SlotIndex=%d)"),
+			*InactivePS->GetPlayerName(), InactivePS->TeamId, InactivePS->SlotIndex);
+
+		SetTeamId(InactivePS->TeamId);
+		SetSlotIndex(InactivePS->SlotIndex);
+	}
+}
+
 void AKCLobbyPlayerState::SetSlotIndex(int32 InSlotIndex)
 {
 	if (HasAuthority() && SlotIndex != InSlotIndex)
@@ -114,8 +128,8 @@ void AKCLobbyPlayerState::TryRestoreSavedLobbyData()
 {
 	if (HasAuthority())
 	{
-		const FString MyPlayerName = GetPlayerName();
-		if (MyPlayerName.IsEmpty())
+		const FString MyNetIdStr = GetUniquePlayerIdString();
+		if (MyNetIdStr.IsEmpty())
 		{
 			return;
 		}
@@ -126,16 +140,16 @@ void AKCLobbyPlayerState::TryRestoreSavedLobbyData()
 			{
 				int32 SavedTeamId = 0;
 				int32 SavedSlotIndex = INDEX_NONE;
-				if (Subsystem->GetSavedLobbyPlayerData(MyPlayerName, SavedTeamId, SavedSlotIndex))
+				if (Subsystem->GetSavedLobbyPlayerData(MyNetIdStr, SavedTeamId, SavedSlotIndex))
 				{
-					UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: Successfully restored TeamId=%d, SlotIndex=%d for Player '%s'"),
-						SavedTeamId, SavedSlotIndex, *MyPlayerName);
+					UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: Successfully restored TeamId=%d, SlotIndex=%d for Player '%s' (UniqueId='%s')"),
+						SavedTeamId, SavedSlotIndex, *GetPlayerName(), *MyNetIdStr);
 					SetTeamId(SavedTeamId);
 					SetSlotIndex(SavedSlotIndex);
 				}
 				else
 				{
-					UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: No saved lobby data found for Player '%s'"), *MyPlayerName);
+					UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerState] TryRestoreSavedLobbyData: No saved lobby data found for UniqueId '%s'"), *MyNetIdStr);
 				}
 			}
 		}

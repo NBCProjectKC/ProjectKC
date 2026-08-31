@@ -19,20 +19,26 @@ struct PROJECTKC_API FKCLobbySavedPlayerDataStruct
 
 public:
 	FKCLobbySavedPlayerDataStruct()
-		: PlayerName(TEXT(""))
+		: UniqueNetId(TEXT(""))
+		, PlayerName(TEXT(""))
 		, TeamId(0)
 		, SlotIndex(INDEX_NONE)
 	{
 	}
 
-	FKCLobbySavedPlayerDataStruct(const FString& InPlayerName, int32 InTeamId, int32 InSlotIndex)
-		: PlayerName(InPlayerName)
+	FKCLobbySavedPlayerDataStruct(const FString& InUniqueNetId, const FString& InPlayerName, int32 InTeamId, int32 InSlotIndex)
+		: UniqueNetId(InUniqueNetId)
+		, PlayerName(InPlayerName)
 		, TeamId(InTeamId)
 		, SlotIndex(InSlotIndex)
 	{
 	}
 
 public:
+	/** @brief 플레이어 스팀 고유 Net ID */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby")
+	FString UniqueNetId;
+
 	/** @brief 플레이어 표시 닉네임 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby")
 	FString PlayerName;

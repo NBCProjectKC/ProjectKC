@@ -28,7 +28,16 @@ public:
 	//~APlayerState interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void CopyProperties(APlayerState* PlayerState) override;
+	virtual void OverrideWith(APlayerState* PlayerState) override;
 	//~End of APlayerState interface
+
+	/** @brief 튕기기 전 마지막 캐릭터 위치/회전 저장 (재접속 리스폰용) */
+	/** @brief 플레이어의 스팀 고유 ID 문자열 반환 */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Reconnect")
+	FString GetUniquePlayerIdString() const
+	{
+		return GetUniqueId().IsValid() ? GetUniqueId()->ToString() : TEXT("");
+	}
 
 	/** @brief 현재 배정된 슬롯 인덱스를 반환합니다. (0~5) */
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")

@@ -22,10 +22,9 @@ void UKCFriendListWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (!FriendEntryWidgetClass)
+	if (!FriendEntryWidgetClass.Get())
 	{
-		static UClass* LoadedClass = StaticLoadClass(UKCFriendWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
-		FriendEntryWidgetClass = LoadedClass;
+		FriendEntryWidgetClass = LoadClass<UKCFriendWidget>(nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
 	}
 
 	// 1. 즉시 1회 친구 목록 갱신
@@ -56,6 +55,11 @@ void UKCFriendListWidget::NativeDestruct()
 
 void UKCFriendListWidget::RefreshFriendList()
 {
+	if (!IsValid(this))
+	{
+		return;
+	}
+
 	IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
 	if (!OSS)
 	{
@@ -71,15 +75,28 @@ void UKCFriendListWidget::RefreshFriendList()
 	}
 
 	UE_LOG(LogKCSession, Verbose, TEXT("[KCFriendListWidget] Requesting ReadFriendsList..."));
+
+	TWeakObjectPtr<UKCFriendListWidget> WeakThis(this);
 	FriendsInterface->ReadFriendsList(
 		0,
 		EFriendsLists::ToString(EFriendsLists::Default),
-		FOnReadFriendsListComplete::CreateUObject(this, &UKCFriendListWidget::HandleReadFriendsListComplete)
+		FOnReadFriendsListComplete::CreateLambda([WeakThis](int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->HandleReadFriendsListComplete(LocalUserNum, bWasSuccessful, ListName, ErrorStr);
+			}
+		})
 	);
 }
 
 void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
 {
+	if (!IsValid(this) || !FriendList)
+	{
+		return;
+	}
+
 	if (!bWasSuccessful)
 	{
 		UE_LOG(LogKCSession, Warning, TEXT("[KCFriendListWidget] ReadFriendsList failed: %s"), *ErrorStr);
@@ -115,8 +132,16 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 		return bAOnline > bBOnline;
 	});
 
-	if (!FriendList || !FriendEntryWidgetClass)
+	UClass* EntryClass = FriendEntryWidgetClass.Get();
+	if (!EntryClass)
 	{
+		EntryClass = LoadClass<UKCFriendWidget>(nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
+		FriendEntryWidgetClass = EntryClass;
+	}
+
+	if (!EntryClass)
+	{
+		UE_LOG(LogKCSession, Error, TEXT("[KCFriendListWidget] FriendEntryWidgetClass is null!"));
 		return;
 	}
 
@@ -135,7 +160,7 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 		}
 		else
 		{
-			EntryWidget = CreateWidget<UKCFriendWidget>(this, FriendEntryWidgetClass);
+			EntryWidget = CreateWidget<UKCFriendWidget>(this, EntryClass);
 			if (EntryWidget)
 			{
 				FriendList->AddChild(EntryWidget);
