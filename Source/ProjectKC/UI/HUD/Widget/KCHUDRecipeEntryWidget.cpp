@@ -52,25 +52,34 @@ void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars
 		return;
 	}
 
-	const int32 FilledStarCount = FMath::Clamp(DifficultyStars, 0, HB_Stars->GetChildrenCount());
+	int32 StarCount = 0;
 	for (int32 ChildIndex = 0; ChildIndex < HB_Stars->GetChildrenCount(); ++ChildIndex)
 	{
-		if (UWidget* StarWidget = HB_Stars->GetChildAt(ChildIndex))
+		if (Cast<UImage>(HB_Stars->GetChildAt(ChildIndex)))
 		{
-			StarWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-
-			UImage* StarImage = Cast<UImage>(StarWidget);
-			if (!StarImage)
-			{
-				continue;
-			}
-
-			UTexture2D* StarTexture = ChildIndex < FilledStarCount ? FilledStarTexture.Get() : EmptyStarTexture.Get();
-			if (StarTexture)
-			{
-				StarImage->SetBrushFromTexture(StarTexture, false);
-			}
+			++StarCount;
 		}
+	}
+
+	const int32 FilledStarCount = FMath::Clamp(DifficultyStars, 0, StarCount);
+	int32 StarIndex = 0;
+	for (int32 ChildIndex = 0; ChildIndex < HB_Stars->GetChildrenCount(); ++ChildIndex)
+	{
+		UImage* StarImage = Cast<UImage>(HB_Stars->GetChildAt(ChildIndex));
+		if (!StarImage)
+		{
+			continue;
+		}
+
+		StarImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+		UTexture2D* StarTexture = StarIndex < FilledStarCount ? FilledStarTexture.Get() : EmptyStarTexture.Get();
+		if (StarTexture)
+		{
+			StarImage->SetBrushFromTexture(StarTexture, false);
+		}
+
+		++StarIndex;
 	}
 }
 
