@@ -12,7 +12,7 @@ class UAbilitySystemComponent;
 class UCameraComponent;
 class UGameplayAbility;
 class UGameplayEffect;
-class AKCLobbyPlayerState;
+class AKCPlayerState;
 class UKCAbilitySystemComponent;
 class UKCCharacterAttributeSet;
 class UKCEmoteComponent;
@@ -87,7 +87,7 @@ protected:
 	virtual void OnRep_PlayerState() override;
 	virtual void PawnClientRestart() override;
 
-	void BindTeamAppearanceToPlayerState(AKCLobbyPlayerState* InPlayerState);
+	void BindTeamAppearanceToPlayerState(AKCPlayerState* InPlayerState);
 	void ApplyTeamAppearance(int32 TeamId);
 
 #if WITH_EDITOR
@@ -208,5 +208,5 @@ private:
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
 	FDelegateHandle HealthChangedDelegateHandle;
 	FActiveGameplayEffectHandle StaminaRegenEffectHandle;
-	TWeakObjectPtr<AKCLobbyPlayerState> BoundTeamPlayerState;
+	TWeakObjectPtr<AKCPlayerState> BoundTeamPlayerState;
 };

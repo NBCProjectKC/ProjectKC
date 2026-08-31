@@ -5,10 +5,11 @@
 
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
+#include "GameSystem/KCLevelTypeLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
@@ -45,7 +46,7 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 
 	// L_LobbyLevel 레벨에 있을 때만 로비 UI 생성
 	const FString MapName = World->GetMapName();
-	if (!MapName.Contains(TEXT("L_LobbyLevel")))
+	if (UKCLevelTypeLibrary::GetLevelTypeFromWorld(World) != EKCLevelType::LobbyLevel)
 	{
 		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerController] SetupLobbyUI skipped: Not in L_LobbyLevel (Current: %s)"), *MapName);
 		return;

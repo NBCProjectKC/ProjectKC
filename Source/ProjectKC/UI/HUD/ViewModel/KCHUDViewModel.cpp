@@ -6,7 +6,7 @@
 #include "ProjectKC/GameSystem/KCGameState.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeStruct.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeTierType.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCActiveRecipesChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCGamePhaseChangedStruct.h"
@@ -354,15 +354,15 @@ void UKCHUDViewModel::SyncLocalTeamIdFromContext()
 		PlayerController = World->GetFirstPlayerController();
 	}
 
-	AKCLobbyPlayerState* PlayerState = PlayerController
-		? PlayerController->GetPlayerState<AKCLobbyPlayerState>()
+	AKCPlayerState* PlayerState = PlayerController
+		? PlayerController->GetPlayerState<AKCPlayerState>()
 		: nullptr;
 
 	BindLocalTeamPlayerState(PlayerState);
 	SetLocalTeamId(PlayerState ? PlayerState->GetTeamId() : 0);
 }
 
-void UKCHUDViewModel::BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState)
+void UKCHUDViewModel::BindLocalTeamPlayerState(AKCPlayerState* PlayerState)
 {
 	if (BoundLocalTeamPlayerState.Get() == PlayerState)
 	{
@@ -380,7 +380,7 @@ void UKCHUDViewModel::BindLocalTeamPlayerState(AKCLobbyPlayerState* PlayerState)
 
 void UKCHUDViewModel::UnbindLocalTeamPlayerState()
 {
-	if (AKCLobbyPlayerState* PlayerState = BoundLocalTeamPlayerState.Get())
+	if (AKCPlayerState* PlayerState = BoundLocalTeamPlayerState.Get())
 	{
 		PlayerState->OnTeamIdChanged.RemoveDynamic(this, &ThisClass::HandleLocalTeamIdChanged);
 	}

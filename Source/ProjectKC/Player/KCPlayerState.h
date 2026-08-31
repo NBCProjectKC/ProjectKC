@@ -1,29 +1,29 @@
 /**
- * @file KCLobbyPlayerState.h
- * @brief 로비 내 플레이어의 준비(Ready) 상태, 슬롯 인덱스(SlotIndex), 팀 정보(TeamId) 동기화를 담당하는 PlayerState 클래스
+ * @file KCPlayerState.h
+ * @brief 플레이어의 준비(Ready) 상태, 슬롯 인덱스(SlotIndex), 팀 정보(TeamId) 동기화를 담당하는 PlayerState 클래스
  */
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
-#include "KCLobbyPlayerState.generated.h"
+#include "KCPlayerState.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCReadyStatusChangedDelegate, bool, bNewReady);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCTeamIdChangedDelegate, int32, NewTeamId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCSlotIndexChangedDelegate, int32, NewSlotIndex);
 
 /**
- * @class AKCLobbyPlayerState
- * @brief 로비 레벨에서 각 플레이어의 레디 여부, 슬롯 번호(0~5), 팀 ID를 관리하고 변경 시 UI에 브로드캐스트하는 PlayerState
+ * @class AKCPlayerState
+ * @brief 로비 및 인게임에서 각 플레이어의 레디 여부, 슬롯 번호(0~5), 팀 ID를 관리하고 변경 시 UI에 브로드캐스트하는 PlayerState
  */
 UCLASS()
-class PROJECTKC_API AKCLobbyPlayerState : public APlayerState
+class PROJECTKC_API AKCPlayerState : public APlayerState
 {
 	GENERATED_BODY()
 
 public:
-	AKCLobbyPlayerState();
+	AKCPlayerState();
 
 	//~APlayerState interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

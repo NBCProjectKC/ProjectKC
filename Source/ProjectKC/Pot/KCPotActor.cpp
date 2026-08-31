@@ -18,7 +18,7 @@
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCIngredientSubmittedStruct.h"
 #include "ProjectKC/Pot/Component/KCPotProgressBroadcasterComponent.h"
@@ -233,8 +233,8 @@ bool AKCPotActor::TrySubmitHeldIngredient(AActor& Interactor)
 	}
 
 	const APawn* InteractorPawn = Cast<APawn>(&Interactor);
-	const AKCLobbyPlayerState* PlayerState = InteractorPawn
-		? InteractorPawn->GetPlayerState<AKCLobbyPlayerState>()
+	const AKCPlayerState* PlayerState = InteractorPawn
+		? InteractorPawn->GetPlayerState<AKCPlayerState>()
 		: nullptr;
 	if (!PlayerState || PlayerState->GetTeamId() != AssignedTeamId)
 	{

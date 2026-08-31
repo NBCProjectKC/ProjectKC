@@ -10,6 +10,7 @@
 #include "Online/OnlineSessionNames.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameSystem/KCLevelTypeLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
@@ -242,7 +243,7 @@ void UKCSessionSubsystem::HandleCreateSessionComplete(FName SessionName, bool bW
 	{
 		if (UWorld* World = GetWorld())
 		{
-			const FString LobbyURL = TEXT("/Game/KC/SteamLobbySystem/Levels/L_LobbyLevel?listen");
+			const FString LobbyURL = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString() + TEXT("?listen");
 			UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Host ServerTravel to Lobby level: %s"), *LobbyURL);
 			World->ServerTravel(LobbyURL);
 		}
