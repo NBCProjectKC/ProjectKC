@@ -37,6 +37,7 @@ namespace KCGameplayTags
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_PotIngredientsChanged);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Game_PotProgressChanged);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Ingredient_Submitted);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Level_Changed);
 	
 	/* =========================================================================
 	 *  Recipe Completed or Ruind Messages
