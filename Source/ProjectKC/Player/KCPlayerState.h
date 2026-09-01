@@ -98,9 +98,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
 	bool bReady = false;
 
-	/** @brief 플레이어 소속 팀 ID (네트워크 복제, 0: Red, 1: Blue) */
+	/** @brief 플레이어 소속 팀 ID (네트워크 복제, 0: Red, 1: Blue, 기본값: -1) */
 	UPROPERTY(ReplicatedUsing = OnRep_TeamId, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
-	int32 TeamId = 0;
+	int32 TeamId = INDEX_NONE;
 
 	/** @brief 현재 플레이어가 점유 중인 슬롯 인덱스 (네트워크 복제, 0~5) */
 	UPROPERTY(ReplicatedUsing = OnRep_SlotIndex, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby")
