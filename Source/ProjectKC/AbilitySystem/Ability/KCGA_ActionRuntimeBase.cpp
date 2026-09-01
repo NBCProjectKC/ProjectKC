@@ -59,8 +59,9 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	bHasActivationHitResult = false;
 	bFinishingAction = false;
 	bDurabilityConsumedThisActivation = false;
+	bUseConsumptionPendingThisActivation = false;
 	StopActiveDurabilityDrain(false);
-	ActiveDurabilityItem = nullptr;
+	ActiveSourceItem = nullptr;
 	ActiveTraceTask = nullptr;
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
@@ -68,7 +69,7 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	{
 		return;
 	}
-	ActiveDurabilityItem = ResolveSourceItem(Handle, ActorInfo);
+	ActiveSourceItem = ResolveSourceItem(Handle, ActorInfo);
 
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
 	const UKCActionTargeting* Targeting =
@@ -176,12 +177,24 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 {
 	bFinishingAction = true;
 	StopActiveDurabilityDrain(true);
+	AKCWorldItemActor* PendingConsumptionItem =
+		bUseConsumptionPendingThisActivation
+			? ActiveSourceItem.Get()
+			: nullptr;
+	bUseConsumptionPendingThisActivation = false;
 	ActivationTarget = nullptr;
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	// Ability 종료 중에는 GAS가 Task 배열을 순회해 직접 정리한다.
 	ActiveTraceTask = nullptr;
-	ActiveDurabilityItem = nullptr;
+	ActiveSourceItem = nullptr;
+
+	// 실제 제거는 다음 틱이므로 현재 Ability 종료 스택과 몽타주 정리는
+	// 끝까지 진행된다. Super 이후 SourceObject 상태에 의존하지 않게 먼저 예약한다.
+	if (IsValid(PendingConsumptionItem))
+	{
+		PendingConsumptionItem->FinalizePendingUseConsumption();
+	}
 
 	Super::EndAbility(
 		Handle,
@@ -217,10 +230,11 @@ FKCActionTargetingContext UKCGA_ActionRuntimeBase::BuildTargetingContext() const
 	return Context;
 }
 
-void UKCGA_ActionRuntimeBase::ExecuteTargets(
+bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 	const TArray<FKCActionTarget>& Targets)
 {
 	bool bConfirmedHit = false;
+	bool bAnyExecutionSucceeded = false;
 	for (const FKCActionTarget& Target : Targets)
 	{
 		if (!IsValid(Target.Actor))
@@ -231,7 +245,7 @@ void UKCGA_ActionRuntimeBase::ExecuteTargets(
 
 		UAbilitySystemComponent* TargetAbilitySystem =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target.Actor);
-		ExecuteActionHook(
+		bAnyExecutionSucceeded |= ExecuteActionHook(
 			TAG_KC_ActionHook_OnExecute,
 			TargetAbilitySystem,
 			Target.Actor,
@@ -244,6 +258,15 @@ void UKCGA_ActionRuntimeBase::ExecuteTargets(
 	{
 		bDurabilityConsumedThisActivation = true;
 	}
+
+	if (bAnyExecutionSucceeded &&
+		!bUseConsumptionPendingThisActivation &&
+		TryBeginActiveItemUseConsumption())
+	{
+		bUseConsumptionPendingThisActivation = true;
+	}
+
+	return bAnyExecutionSucceeded;
 }
 
 AKCWorldItemActor* UKCGA_ActionRuntimeBase::ResolveSourceItem(
@@ -269,13 +292,19 @@ bool UKCGA_ActionRuntimeBase::TryConsumeActiveItemDurability(
 	EKCItemDurabilityConsumeMode ConsumeMode,
 	float ConsumptionScale)
 {
-	AKCWorldItemActor* Item = ActiveDurabilityItem.Get();
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
 	return Item && Item->TryConsumeDurability(ConsumeMode, ConsumptionScale);
+}
+
+bool UKCGA_ActionRuntimeBase::TryBeginActiveItemUseConsumption()
+{
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
+	return Item && Item->TryBeginUseConsumption();
 }
 
 void UKCGA_ActionRuntimeBase::StartActiveDurabilityDrain()
 {
-	AKCWorldItemActor* Item = ActiveDurabilityItem.Get();
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
 	const UKCItemDefinition* ItemDefinition = Item
 		? Item->GetItemDefinition()
 		: nullptr;
@@ -333,7 +362,7 @@ void UKCGA_ActionRuntimeBase::TickActiveDurabilityDrain()
 	}
 
 	UWorld* World = GetWorld();
-	AKCWorldItemActor* Item = ActiveDurabilityItem.Get();
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
 	if (!World || !Item)
 	{
 		StopActiveDurabilityDrain(false);

@@ -180,6 +180,40 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Channel Action은 KCGA_ChannelAction에 고정된다."),
 		ChannelDefinition->GetAbilityClass() ==
 			UKCGA_ChannelAction::StaticClass());
+	TestTrue(
+		TEXT("기존 Channel Action의 기본 실행 방식은 Montage Event다."),
+		ChannelDefinition->ExecutionMode ==
+			EKCChannelExecutionMode::MontageEvent);
+
+	UKCChannelActionDefinition* FixedIntervalChannel =
+		MakeChannelDefinition(UKCSweepTargeting::StaticClass());
+	AddMontage(FixedIntervalChannel);
+	FixedIntervalChannel->ExecutionMode =
+		EKCChannelExecutionMode::FixedInterval;
+	FixedIntervalChannel->PulseInterval = 0.1f;
+	FixedIntervalChannel->bExecuteImmediately = true;
+	TestTrue(
+		TEXT("Instant Targeting Channel은 고정 주기 Pulse를 사용할 수 있다."),
+		FixedIntervalChannel->ValidateWithActionContract(Error));
+
+	UKCChannelActionDefinition* TooFastFixedInterval =
+		MakeChannelDefinition(UKCSweepTargeting::StaticClass());
+	AddMontage(TooFastFixedInterval);
+	TooFastFixedInterval->ExecutionMode =
+		EKCChannelExecutionMode::FixedInterval;
+	TooFastFixedInterval->PulseInterval = 0.0f;
+	TestFalse(
+		TEXT("고정 주기 Pulse는 최소 실행 간격보다 짧을 수 없다."),
+		TooFastFixedInterval->ValidateWithActionContract(Error));
+
+	UKCChannelActionDefinition* TraceWindowFixedInterval =
+		MakeChannelDefinition(UKCItemSocketTrailTargeting::StaticClass());
+	AddMontage(TraceWindowFixedInterval);
+	TraceWindowFixedInterval->ExecutionMode =
+		EKCChannelExecutionMode::FixedInterval;
+	TestFalse(
+		TEXT("FixedInterval은 Trace Window가 아닌 Instant Targeting만 허용한다."),
+		TraceWindowFixedInterval->ValidateWithActionContract(Error));
 
 	UKCAbilityDefinition* ZeroPlayRate =
 		MakeDefinition(UKCSweepTargeting::StaticClass());

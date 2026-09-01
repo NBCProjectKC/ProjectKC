@@ -92,7 +92,8 @@ void AKCWorldItemActor::BeginPlay()
 bool AKCWorldItemActor::InitializeItem(UKCItemDefinition* NewDefinition)
 {
 	if (!HasAuthority() || RuntimeState.State != EKCWorldItemState::World ||
-		!IsValid(NewDefinition))
+		!IsValid(NewDefinition) || bUseConsumptionPending ||
+		bUseConsumptionDestructionScheduled)
 	{
 		return false;
 	}
@@ -108,6 +109,8 @@ bool AKCWorldItemActor::InitializeItem(UKCItemDefinition* NewDefinition)
 	}
 
 	ResetDurability();
+	bUseConsumptionPending = false;
+	bUseConsumptionDestructionScheduled = false;
 	ApplyStatePresentation();
 	ForceNetUpdate();
 	return true;
@@ -236,12 +239,13 @@ bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
 bool AKCWorldItemActor::CanBePickedUp() const
 {
 	return RuntimeState.State == EKCWorldItemState::World &&
-		bDefinitionValid;
+		bDefinitionValid && !bUseConsumptionPending;
 }
 
 bool AKCWorldItemActor::IsUsable() const
 {
-	return bDefinitionValid && ItemDefinition->IsUsable() && !IsBroken();
+	return bDefinitionValid && ItemDefinition->IsUsable() &&
+		!IsBroken() && !bUseConsumptionPending;
 }
 
 bool AKCWorldItemActor::UsesDurability() const
@@ -271,6 +275,42 @@ float AKCWorldItemActor::GetDurabilityNormalized() const
 		CurrentDurability / FKCItemDurabilityStruct::MaximumDurability,
 		0.0f,
 		1.0f);
+}
+
+bool AKCWorldItemActor::IsUseConsumptionPending() const
+{
+	return bUseConsumptionPending;
+}
+
+bool AKCWorldItemActor::TryBeginUseConsumption()
+{
+	if (!HasAuthority() || !bDefinitionValid || !ItemDefinition ||
+		ItemDefinition->UseLifecycle !=
+			EKCItemUseLifecycle::ConsumeOnSuccessfulExecute ||
+		bUseConsumptionPending || bUseConsumptionDestructionScheduled)
+	{
+		return false;
+	}
+
+	bUseConsumptionPending = true;
+	ApplyStatePresentation();
+	ForceNetUpdate();
+	return true;
+}
+
+bool AKCWorldItemActor::FinalizePendingUseConsumption()
+{
+	if (!HasAuthority() || !bUseConsumptionPending ||
+		bUseConsumptionDestructionScheduled)
+	{
+		return false;
+	}
+
+	bUseConsumptionDestructionScheduled = true;
+	GetWorldTimerManager().SetTimerForNextTick(
+		this,
+		&AKCWorldItemActor::DestroyConsumedItem);
+	return true;
 }
 
 bool AKCWorldItemActor::TryConsumeDurability(
@@ -323,6 +363,7 @@ void AKCWorldItemActor::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(AKCWorldItemActor, RuntimeState);
 	DOREPLIFETIME(AKCWorldItemActor, ItemDefinition);
 	DOREPLIFETIME(AKCWorldItemActor, CurrentDurability);
+	DOREPLIFETIME(AKCWorldItemActor, bUseConsumptionPending);
 }
 
 void AKCWorldItemActor::OnRep_RuntimeState()
@@ -342,6 +383,11 @@ void AKCWorldItemActor::OnRep_ItemDefinition()
 void AKCWorldItemActor::OnRep_CurrentDurability(float PreviousDurability)
 {
 	BroadcastDurabilityChanged(PreviousDurability);
+}
+
+void AKCWorldItemActor::OnRep_UseConsumptionPending()
+{
+	ApplyStatePresentation();
 }
 
 void AKCWorldItemActor::MulticastPlayBreakEffects_Implementation(
@@ -501,7 +547,9 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 
 void AKCWorldItemActor::ApplyStatePresentation()
 {
-	if (!bDefinitionValid)
+	ItemMesh->SetVisibility(!bUseConsumptionPending, true);
+
+	if (!bDefinitionValid || bUseConsumptionPending)
 	{
 		ItemMesh->SetSimulatePhysics(false);
 		ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -582,6 +630,27 @@ void AKCWorldItemActor::DestroyBrokenItem()
 {
 	bBreakDestructionScheduled = false;
 	if (!HasAuthority() || !IsBroken() || !ShouldDestroyWhenBroken())
+	{
+		return;
+	}
+
+	DestroyItemActor();
+}
+
+void AKCWorldItemActor::DestroyConsumedItem()
+{
+	bUseConsumptionDestructionScheduled = false;
+	if (!HasAuthority() || !bUseConsumptionPending)
+	{
+		return;
+	}
+
+	DestroyItemActor();
+}
+
+void AKCWorldItemActor::DestroyItemActor()
+{
+	if (!HasAuthority())
 	{
 		return;
 	}

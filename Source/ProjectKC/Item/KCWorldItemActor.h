@@ -96,6 +96,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Item|Durability")
 	float GetDurabilityNormalized() const;
 
+	/** 성공 실행 뒤 소비가 확정되어 추가 사용을 막고 있는지 반환한다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Use")
+	bool IsUseConsumptionPending() const;
+
+	/** Action 런타임이 성공한 Execute를 정산할 때 호출하는 서버 전용 진입점이다. */
+	bool TryBeginUseConsumption();
+
+	/** 활성 Action 정리가 끝난 뒤 예약된 소비 파괴를 다음 틱에 확정한다. */
+	bool FinalizePendingUseConsumption();
+
 	/** 서버의 실제 사용 수명주기가 정확한 소모 시점에 호출한다. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item|Durability")
 	bool TryConsumeDurability(
@@ -136,6 +146,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_CurrentDurability(float PreviousDurability);
+
+	UFUNCTION()
+	void OnRep_UseConsumptionPending();
 
 	/** 서버가 파괴 직전에 호출하며 현재 관련 클라이언트에서 연출을 재생한다. */
 	UFUNCTION(NetMulticast, Reliable)
@@ -178,6 +191,8 @@ private:
 	void BroadcastDurabilityChanged(float PreviousDurability);
 	void HandleBroken();
 	void DestroyBrokenItem();
+	void DestroyConsumedItem();
+	void DestroyItemActor();
 	bool ShouldDestroyWhenBroken() const;
 
 	UPROPERTY(ReplicatedUsing = OnRep_RuntimeState)
@@ -186,6 +201,10 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentDurability)
 	float CurrentDurability = FKCItemDurabilityStruct::MaximumDurability;
 
+	UPROPERTY(ReplicatedUsing = OnRep_UseConsumptionPending)
+	bool bUseConsumptionPending = false;
+
 	bool bDefinitionValid = false;
 	bool bBreakDestructionScheduled = false;
+	bool bUseConsumptionDestructionScheduled = false;
 };

@@ -63,10 +63,11 @@ private:
 	friend class UKCAbilityTask_ActionTraceWindow;
 
 	FKCActionTargetingContext BuildTargetingContext() const;
-	void ExecuteTargets(const TArray<FKCActionTarget>& Targets);
+	bool ExecuteTargets(const TArray<FKCActionTarget>& Targets);
 	AKCWorldItemActor* ResolveSourceItem(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo) const;
+	bool TryBeginActiveItemUseConsumption();
 	bool TryConsumeActiveItemDurability(
 		EKCItemDurabilityConsumeMode ConsumeMode,
 		float ConsumptionScale = 1.0f);
@@ -79,10 +80,11 @@ private:
 	bool bHasActivationHitResult = false;
 	bool bFinishingAction = false;
 	bool bDurabilityConsumedThisActivation = false;
+	bool bUseConsumptionPendingThisActivation = false;
 	bool bDurabilityDrainActive = false;
 	double LastDurabilityDrainTimeSeconds = 0.0;
 	FTimerHandle DurabilityDrainTimerHandle;
-	TWeakObjectPtr<AKCWorldItemActor> ActiveDurabilityItem;
+	TWeakObjectPtr<AKCWorldItemActor> ActiveSourceItem;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UKCAbilityTask_ActionTraceWindow> ActiveTraceTask;

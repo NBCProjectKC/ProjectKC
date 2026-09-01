@@ -124,6 +124,66 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("사용 Action은 별도 Data Asset이 아니라 Item Definition에 포함된다."),
 		UsableItem->UseAction->GetOuter() == UsableItem);
+	TestTrue(
+		TEXT("기존 아이템의 기본 사용 수명주기는 Persistent다."),
+		UsableItem->UseLifecycle == EKCItemUseLifecycle::Persistent);
+
+	UKCItemDefinition* ConsumableWithoutUse =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableWithoutUse->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestFalse(
+		TEXT("성공 후 소비 아이템에는 UseAction이 필요하다."),
+		ConsumableWithoutUse->Validate(Error));
+
+	UKCItemDefinition* ConsumableWithoutRequiredFragment =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableWithoutRequiredFragment->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(
+			ConsumableWithoutRequiredFragment);
+	ConsumableWithoutRequiredFragment->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestFalse(
+		TEXT("성공 후 소비에는 성공을 확정할 필수 Fragment가 필요하다."),
+		ConsumableWithoutRequiredFragment->Validate(Error));
+
+	UKCItemDefinition* ConsumableItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(ConsumableItem);
+	ConsumableItem->UseAction->ActionHooks[0].Fragments[0]->bRequired = true;
+	ConsumableItem->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestTrue(
+		TEXT("필수 실행 결과가 있는 Single Action은 성공 후 소비할 수 있다."),
+		ConsumableItem->Validate(Error));
+
+	UKCItemDefinition* ConsumableChannelItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableChannelItem->UseAction =
+		KCItemDefinitionTests::MakeValidChannelUseAbility(
+			ConsumableChannelItem);
+	ConsumableChannelItem->UseAction->ActionHooks[0].Fragments[0]->bRequired = true;
+	ConsumableChannelItem->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestFalse(
+		TEXT("성공 후 소비는 반복 실행되는 Channel Action에 설정할 수 없다."),
+		ConsumableChannelItem->Validate(Error));
+
+	UKCItemDefinition* ConsumableDurabilityItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableDurabilityItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(
+			ConsumableDurabilityItem);
+	ConsumableDurabilityItem->UseAction->ActionHooks[0].Fragments[0]->bRequired = true;
+	ConsumableDurabilityItem->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	ConsumableDurabilityItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnUse;
+	ConsumableDurabilityItem->Durability.ConsumeAmount = 100.0f;
+	TestFalse(
+		TEXT("일회용 소비와 내구도 소모를 동시에 설정할 수 없다."),
+		ConsumableDurabilityItem->Validate(Error));
 
 	UKCItemDefinition* DurabilityWithoutUse =
 		KCItemDefinitionTests::MakeCarryOnlyItem();

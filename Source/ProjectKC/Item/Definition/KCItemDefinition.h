@@ -10,6 +10,17 @@
 class UKCAbilityDefinition;
 class UTexture2D;
 
+/** 성공한 사용 뒤에도 원본 아이템 인스턴스를 유지할지 정한다. */
+UENUM(BlueprintType)
+enum class EKCItemUseLifecycle : uint8
+{
+	/** 도구·발사기처럼 사용 뒤에도 손에 남는다. */
+	Persistent UMETA(DisplayName = "Persistent"),
+
+	/** 일회용 투척물·소모품처럼 첫 성공 실행 뒤 원본이 제거된다. */
+	ConsumeOnSuccessfulExecute UMETA(DisplayName = "Consume On Successful Execute")
+};
+
 /** 인벤토리와 무관한 단일 월드 아이템의 불변 구성 데이터다. */
 UCLASS(BlueprintType)
 class PROJECTKC_API UKCItemDefinition : public UPrimaryDataAsset
@@ -52,6 +63,13 @@ public:
 		BlueprintReadOnly,
 		Category = "Item")
 	TObjectPtr<UKCAbilityDefinition> UseAction;
+
+	/** UseAction이 성공적으로 결과를 실행한 뒤 원본 아이템을 처리하는 방식이다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Item|Use")
+	EKCItemUseLifecycle UseLifecycle = EKCItemUseLifecycle::Persistent;
 
 	UPROPERTY(
 		EditDefaultsOnly,

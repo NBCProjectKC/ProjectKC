@@ -3,6 +3,9 @@
 #include "Misc/DataValidation.h"
 #include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 
 #if WITH_EDITOR
@@ -77,6 +80,45 @@ bool UKCItemDefinition::Validate(FString& OutError) const
 	{
 		OutError = TEXT("내구도를 사용하는 아이템에는 UseAction이 필요합니다.");
 		return false;
+	}
+
+	if (UseLifecycle == EKCItemUseLifecycle::ConsumeOnSuccessfulExecute)
+	{
+		if (!UseAction)
+		{
+			OutError = TEXT(
+				"ConsumeOnSuccessfulExecute 아이템에는 UseAction이 필요합니다.");
+			return false;
+		}
+
+		if (!UseAction->IsA<UKCSingleActionDefinition>())
+		{
+			OutError = TEXT(
+				"ConsumeOnSuccessfulExecute는 Single Action에만 사용할 수 있습니다.");
+			return false;
+		}
+
+		if (Durability.IsEnabled())
+		{
+			OutError = TEXT(
+				"일회용 아이템 소비와 내구도 소모를 동시에 설정할 수 없습니다.");
+			return false;
+		}
+
+		const FKCActionHookStruct* ExecuteHook =
+			UseAction->FindActionHook(TAG_KC_ActionHook_OnExecute);
+		const bool bHasRequiredExecutionFragment = ExecuteHook &&
+			ExecuteHook->Fragments.ContainsByPredicate(
+				[](const UKCActionFragment* Fragment)
+				{
+					return IsValid(Fragment) && Fragment->bRequired;
+				});
+		if (!bHasRequiredExecutionFragment)
+		{
+			OutError = TEXT(
+				"ConsumeOnSuccessfulExecute에는 성공을 확정할 OnExecute 필수 Fragment가 필요합니다.");
+			return false;
+		}
 	}
 
 	if (Durability.ConsumeMode ==
