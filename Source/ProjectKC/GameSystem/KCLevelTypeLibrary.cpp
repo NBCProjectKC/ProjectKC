@@ -5,7 +5,7 @@ FName UKCLevelTypeLibrary::GetLevelName(EKCLevelType LevelType)
 	switch (LevelType)
 	{
 	case EKCLevelType::SplashScreen:	return TEXT("L_SplashScreen");
-	case EKCLevelType::MainMenu:		return TEXT("L_MainMenu");
+	case EKCLevelType::MainMenu:		return TEXT("L_MainMeun");
 	case EKCLevelType::LoadInLevel:		return TEXT("L_LoadInLevel");
 	case EKCLevelType::LobbyLevel:		return TEXT("L_LobbyLevel");
 	case EKCLevelType::Loading:			return TEXT("L_Loading");
@@ -17,7 +17,7 @@ FName UKCLevelTypeLibrary::GetLevelName(EKCLevelType LevelType)
 EKCLevelType UKCLevelTypeLibrary::GetLevelType(FName LevelName)
 {
 	if (LevelName == TEXT("L_SplashScreen")) return EKCLevelType::SplashScreen;
-	if (LevelName == TEXT("L_MainMenu"))     return EKCLevelType::MainMenu;
+	if (LevelName == TEXT("L_MainMeun"))     return EKCLevelType::MainMenu;
 	if (LevelName == TEXT("L_LoadInLevel"))  return EKCLevelType::LoadInLevel;
 	if (LevelName == TEXT("L_LobbyLevel"))   return EKCLevelType::LobbyLevel;
 	if (LevelName == TEXT("L_Loading"))      return EKCLevelType::Loading;
