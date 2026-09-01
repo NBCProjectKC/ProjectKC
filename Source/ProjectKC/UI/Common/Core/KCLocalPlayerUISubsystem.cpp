@@ -5,14 +5,14 @@
 #include "GameFramework/PlayerController.h"
 #include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 
-UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass)
+UKCUserWidget* UKCLocalPlayerUISubsystem::SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass)
 {
-	ClearHUDWidget();
+	ClearScreenWidget();
 
 	ULocalPlayer* OwnerLocalPlayer = GetLocalPlayer();
 	if (!OwnerLocalPlayer || !WidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set HUD: LocalPlayer=%s, WidgetClass=%s."),
+		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set screen: LocalPlayer=%s, WidgetClass=%s."),
 			OwnerLocalPlayer ? TEXT("Valid") : TEXT("Null"),
 			*GetNameSafe(WidgetClass));
 		return nullptr;
@@ -21,36 +21,46 @@ UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget
 	APlayerController* OwnerPlayerController = GetOwningPlayerController();
 	if (!OwnerPlayerController)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set HUD: OwnerPlayerController is null."));
+		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set screen: OwnerPlayerController is null."));
 		return nullptr;
 	}
 
-	ActiveHUDWidget = CreateWidget<UKCUserWidget>(OwnerPlayerController, WidgetClass);
-	if (ActiveHUDWidget)
+	ActiveScreenWidget = CreateWidget<UKCUserWidget>(OwnerPlayerController, WidgetClass);
+	if (ActiveScreenWidget)
 	{
-		const bool bAddedToScreen = ActiveHUDWidget->AddToPlayerScreen();
+		const bool bAddedToScreen = ActiveScreenWidget->AddToPlayerScreen();
 
-		UE_LOG(LogTemp, Log, TEXT("KC UI set HUD: Widget=%s, Class=%s, AddedToScreen=%s."),
-			*GetNameSafe(ActiveHUDWidget),
+		UE_LOG(LogTemp, Log, TEXT("KC UI set screen: Widget=%s, Class=%s, AddedToScreen=%s."),
+			*GetNameSafe(ActiveScreenWidget),
 			*GetNameSafe(WidgetClass),
 			bAddedToScreen ? TEXT("true") : TEXT("false"));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set HUD: CreateWidget failed for %s."),
+		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set screen: CreateWidget failed for %s."),
 			*GetNameSafe(WidgetClass));
 	}
 
-	return ActiveHUDWidget;
+	return ActiveScreenWidget;
+}
+
+void UKCLocalPlayerUISubsystem::ClearScreenWidget()
+{
+	if (ActiveScreenWidget)
+	{
+		ActiveScreenWidget->RemoveFromParent();
+		ActiveScreenWidget = nullptr;
+	}
+}
+
+UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass)
+{
+	return SetScreenWidget(WidgetClass);
 }
 
 void UKCLocalPlayerUISubsystem::ClearHUDWidget()
 {
-	if (ActiveHUDWidget)
-	{
-		ActiveHUDWidget->RemoveFromParent();
-		ActiveHUDWidget = nullptr;
-	}
+	ClearScreenWidget();
 }
 
 void UKCLocalPlayerUISubsystem::QueueToast(const FText& Message)
@@ -60,7 +70,7 @@ void UKCLocalPlayerUISubsystem::QueueToast(const FText& Message)
 
 void UKCLocalPlayerUISubsystem::Deinitialize()
 {
-	ClearHUDWidget();
+	ClearScreenWidget();
 	PendingToastMessages.Reset();
 
 	Super::Deinitialize();

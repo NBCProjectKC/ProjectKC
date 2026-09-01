@@ -14,6 +14,12 @@ class PROJECTKC_API UKCLocalPlayerUISubsystem : public ULocalPlayerSubsystem
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	UKCUserWidget* SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void ClearScreenWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
@@ -29,7 +35,7 @@ private:
 	APlayerController* GetOwningPlayerController() const;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UKCUserWidget> ActiveHUDWidget;
+	TObjectPtr<UKCUserWidget> ActiveScreenWidget;
 
 	UPROPERTY(Transient)
 	TArray<FText> PendingToastMessages;
