@@ -338,7 +338,11 @@ void UKCSessionSubsystem::SaveLobbyPlayerData(const FString& UniqueNetId, const 
 		*UniqueNetId, *PlayerName, InTeamId, InSlotIndex);
 }
 
-bool UKCSessionSubsystem::GetSavedLobbyPlayerData(const FString& UniqueNetId, int32& OutTeamId, int32& OutSlotIndex) const
+bool UKCSessionSubsystem::GetSavedLobbyPlayerData(
+	const FString& UniqueNetId,
+	FString& OutPlayerName,
+	int32& OutTeamId,
+	int32& OutSlotIndex) const
 {
 	if (UniqueNetId.IsEmpty())
 	{
@@ -347,10 +351,11 @@ bool UKCSessionSubsystem::GetSavedLobbyPlayerData(const FString& UniqueNetId, in
 
 	if (const FKCLobbySavedPlayerDataStruct* FoundData = SavedLobbyPlayers.Find(UniqueNetId))
 	{
+		OutPlayerName = FoundData->PlayerName;
 		OutTeamId = FoundData->TeamId;
 		OutSlotIndex = FoundData->SlotIndex;
-		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] GetSavedLobbyPlayerData: Found data for UniqueId='%s' (TeamId=%d, SlotIndex=%d)"),
-			*UniqueNetId, OutTeamId, OutSlotIndex);
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] GetSavedLobbyPlayerData: Found data for UniqueId='%s' (Name='%s', TeamId=%d, SlotIndex=%d)"),
+			*UniqueNetId, *OutPlayerName, OutTeamId, OutSlotIndex);
 		return true;
 	}
 

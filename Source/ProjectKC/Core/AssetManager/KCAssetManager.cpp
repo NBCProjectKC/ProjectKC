@@ -1,5 +1,7 @@
 ﻿#include "KCAssetManager.h"
 
+#include "Item/Definition/KCItemDefinition.h"
+
 UKCAssetManager& UKCAssetManager::Get()
 {
 	UKCAssetManager* This = Cast<UKCAssetManager>(GEngine->AssetManager);
@@ -10,14 +12,11 @@ UKCAssetManager& UKCAssetManager::Get()
 void UKCAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
-
-	TArray<FPrimaryAssetId> ItemIds;
-	GetPrimaryAssetIdList(FPrimaryAssetType("Item"), ItemIds);
-	UE_LOG(LogTemp, Warning, TEXT("[AssetManager] Item 타입 %d개 발견"), ItemIds.Num());
 }
 
 void UKCAssetManager::PreloadAssetsByType(FPrimaryAssetType AssetType, TFunction<void()> OnComplete)
 {
+	// PrimaryAssetId 저장
 	TArray<FPrimaryAssetId> AssetIds;
 	GetPrimaryAssetIdList(AssetType, AssetIds);
 
@@ -27,7 +26,7 @@ void UKCAssetManager::PreloadAssetsByType(FPrimaryAssetType AssetType, TFunction
 		OnComplete();
 		return;
 	}
-
+	// 비동기 일괄 스트리밍 로드
 	LoadPrimaryAssets(AssetIds, TArray<FName>(), FStreamableDelegate::CreateLambda([OnComplete]()
 	{
 		OnComplete();

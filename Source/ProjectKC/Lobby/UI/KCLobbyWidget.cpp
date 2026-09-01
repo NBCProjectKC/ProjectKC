@@ -6,7 +6,7 @@
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
 #include "ProjectKC/Lobby/UI/KCFriendListWidget.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Components/Button.h"
@@ -53,7 +53,7 @@ void UKCLobbyWidget::NativeConstruct()
 				[this]()
 				{
 					BindRetryCount++;
-					if (TryBindPlayerState() || BindRetryCount >= 20)
+					if (TryBindPlayerState() || BindRetryCount >= 200)
 					{
 						if (UWorld* CurrentWorld = GetWorld())
 						{
@@ -87,14 +87,20 @@ bool UKCLobbyWidget::TryBindPlayerState()
 
 	if (APlayerController* PC = GetOwningPlayer())
 	{
-		if (AKCLobbyPlayerState* PS = PC->GetPlayerState<AKCLobbyPlayerState>())
+		if (AKCPlayerState* PS = PC->GetPlayerState<AKCPlayerState>())
 		{
 			PS->OnReadyStatusChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnReadyStatusUpdated);
 			PS->OnTeamIdChanged.AddUniqueDynamic(this, &UKCLobbyWidget::OnTeamIdUpdated);
 			OnReadyStatusUpdated(PS->IsReady());
-			OnTeamIdUpdated(PS->GetTeamId());
+
+			if (PS->GetTeamId() != INDEX_NONE)
+			{
+				OnTeamIdUpdated(PS->GetTeamId());
+			}
+
 			bPlayerStateBound = true;
-			UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] Successfully bound to PlayerState '%s'"), *PS->GetPlayerName());
+			UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] Successfully bound to PlayerState '%s' (TeamId: %d)"),
+				*PS->GetPlayerName(), PS->GetTeamId());
 			return true;
 		}
 	}
@@ -104,11 +110,11 @@ bool UKCLobbyWidget::TryBindPlayerState()
 
 void UKCLobbyWidget::PlayMatchStartAnim()
 {
-	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] Playing MatchStartAnim"));
 	if (MatchStartAnim)
 	{
-		PlayAnimationForward(MatchStartAnim);
+		PlayAnimation(MatchStartAnim);
 	}
+
 	SetIsEnabled(false);
 }
 
@@ -117,7 +123,7 @@ void UKCLobbyWidget::SetStartGameButtonEnabled(bool bEnabled)
 	if (Button_StartGame)
 	{
 		Button_StartGame->SetIsEnabled(bEnabled);
-		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyWidget] SetStartGameButtonEnabled: %s"), bEnabled ? TEXT("TRUE") : TEXT("FALSE"));
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] SetStartGameButtonEnabled: %s"), bEnabled ? TEXT("TRUE") : TEXT("FALSE"));
 	}
 }
 
@@ -125,15 +131,19 @@ void UKCLobbyWidget::OnSocialsClicked()
 {
 	if (WBP_FriendList)
 	{
-		const ESlateVisibility CurrentVis = WBP_FriendList->GetVisibility();
-		WBP_FriendList->SetVisibility(CurrentVis == ESlateVisibility::Visible ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
-		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyWidget] OnSocialsClicked -> FriendList visibility toggled"));
+		const ESlateVisibility CurrentVisibility = WBP_FriendList->GetVisibility();
+		const ESlateVisibility NewVisibility = (CurrentVisibility == ESlateVisibility::Visible)
+			? ESlateVisibility::Collapsed
+			: ESlateVisibility::Visible;
+
+		WBP_FriendList->SetVisibility(NewVisibility);
+		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyWidget] OnSocialsClicked: Toggled FriendList visibility to %s"),
+			NewVisibility == ESlateVisibility::Visible ? TEXT("Visible") : TEXT("Collapsed"));
 	}
 }
 
 void UKCLobbyWidget::OnReadyClicked()
 {
-	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] OnReadyClicked -> Requesting ROS_ToggleReadyStatus"));
 	if (AKCLobbyPlayerController* PC = Cast<AKCLobbyPlayerController>(GetOwningPlayer()))
 	{
 		PC->ROS_ToggleReadyStatus();
@@ -167,11 +177,20 @@ void UKCLobbyWidget::OnTeamIdUpdated(int32 NewTeamId)
 {
 	if (Text_TeamName)
 	{
-		const FText TeamText = (NewTeamId == 0) ? LOCTEXT("TeamRed", "TEAM RED") : LOCTEXT("TeamBlue", "TEAM BLUE");
-		Text_TeamName->SetText(TeamText);
-		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyWidget] OnTeamIdUpdated UI Text set to: Team %d"), NewTeamId);
+		if (NewTeamId == 0)
+		{
+			Text_TeamName->SetText(LOCTEXT("TeamRed", "TEAM RED"));
+		}
+		else if (NewTeamId == 1)
+		{
+			Text_TeamName->SetText(LOCTEXT("TeamBlue", "TEAM BLUE"));
+		}
+		else
+		{
+			Text_TeamName->SetText(LOCTEXT("TeamAssigning", "ASSIGNING..."));
+		}
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] OnTeamIdUpdated UI Text set to: Team %d"), NewTeamId);
 	}
 }
 
 #undef LOCTEXT_NAMESPACE
-

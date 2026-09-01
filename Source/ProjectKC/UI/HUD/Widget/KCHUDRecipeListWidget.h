@@ -9,14 +9,21 @@ class UListView;
 class UVerticalBox;
 class UKCHUDRecipeEntryWidget;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FKCRecipeListItemChangedNativeDelegate, const FKCRecipeViewData&);
+
 UCLASS(BlueprintType)
 class PROJECTKC_API UKCHUDRecipeListItem : public UObject
 {
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetRecipe(const FKCRecipeViewData& NewRecipe);
+
 	UPROPERTY(BlueprintReadOnly, Category = "KC|UI")
 	FKCRecipeViewData Recipe;
+
+	FKCRecipeListItemChangedNativeDelegate OnRecipeChangedNative;
 };
 
 UCLASS(Abstract, Blueprintable)
@@ -47,6 +54,8 @@ protected:
 	TObjectPtr<UVerticalBox> VerticalBox;
 
 private:
+	bool CanReuseRecipeItems(const TArray<FKCRecipeViewData>& Recipes) const;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCHUDRecipeListItem>> RecipeItems;
 };

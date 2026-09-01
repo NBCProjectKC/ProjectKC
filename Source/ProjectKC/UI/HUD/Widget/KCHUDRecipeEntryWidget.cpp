@@ -3,12 +3,14 @@
 #include "Components/CheckBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
+#include "Components/ListView.h"
 #include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/VerticalBox.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
+#include "ProjectKC/UI/HUD/Widget/KCRecipeEntryIngredient.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeListWidget.h"
 
 void UKCHUDRecipeEntryWidget::NativePreConstruct()
@@ -19,19 +21,30 @@ void UKCHUDRecipeEntryWidget::NativePreConstruct()
 
 void UKCHUDRecipeEntryWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
-	if (const UKCHUDRecipeListItem* RecipeItem = Cast<UKCHUDRecipeListItem>(ListItemObject))
+	if (UKCHUDRecipeListItem* RecipeItem = Cast<UKCHUDRecipeListItem>(ListItemObject))
 	{
+		BindRecipeListItem(RecipeItem);
 		SetRecipe(RecipeItem->Recipe);
 	}
+}
+
+void UKCHUDRecipeEntryWidget::NativeOnEntryReleased()
+{
+	UnbindRecipeListItem();
 }
 
 void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 {
 	BP_OnRecipeSet(Recipe);
 
-	if (HB_Ingredients)
+	if (LV_Ingredients)
 	{
-		HB_Ingredients->SetVisibility(ESlateVisibility::Collapsed);
+		LV_Ingredients->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+
+	if (VB_TestIngredients)
+	{
+		VB_TestIngredients->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
 	if (FoodNameText)
@@ -40,9 +53,43 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 	}
 
 	RefreshDifficultyStars(Recipe.DifficultyStars);
+	RefreshCookingIndicators(Recipe);
 	RefreshTeamProgressBars(Recipe);
+	RefreshIngredientList(Recipe.Ingredients);
+}
 
-	RefreshTestIngredientWidgets(Recipe.Ingredients);
+void UKCHUDRecipeEntryWidget::BindRecipeListItem(UKCHUDRecipeListItem* RecipeItem)
+{
+	if (BoundRecipeItem.Get() == RecipeItem)
+	{
+		return;
+	}
+
+	UnbindRecipeListItem();
+	BoundRecipeItem = RecipeItem;
+
+	if (RecipeItem)
+	{
+		RecipeChangedHandle = RecipeItem->OnRecipeChangedNative.AddUObject(
+			this,
+			&ThisClass::HandleRecipeListItemChanged);
+	}
+}
+
+void UKCHUDRecipeEntryWidget::UnbindRecipeListItem()
+{
+	if (UKCHUDRecipeListItem* RecipeItem = BoundRecipeItem.Get())
+	{
+		RecipeItem->OnRecipeChangedNative.Remove(RecipeChangedHandle);
+	}
+
+	BoundRecipeItem.Reset();
+	RecipeChangedHandle.Reset();
+}
+
+void UKCHUDRecipeEntryWidget::HandleRecipeListItemChanged(const FKCRecipeViewData& Recipe)
+{
+	SetRecipe(Recipe);
 }
 
 void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars)
@@ -52,26 +99,126 @@ void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars
 		return;
 	}
 
-	const int32 FilledStarCount = FMath::Clamp(DifficultyStars, 0, HB_Stars->GetChildrenCount());
+	int32 StarCount = 0;
 	for (int32 ChildIndex = 0; ChildIndex < HB_Stars->GetChildrenCount(); ++ChildIndex)
 	{
-		if (UWidget* StarWidget = HB_Stars->GetChildAt(ChildIndex))
+		if (Cast<UImage>(HB_Stars->GetChildAt(ChildIndex)))
 		{
-			StarWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-
-			UImage* StarImage = Cast<UImage>(StarWidget);
-			if (!StarImage)
-			{
-				continue;
-			}
-
-			UTexture2D* StarTexture = ChildIndex < FilledStarCount ? FilledStarTexture.Get() : EmptyStarTexture.Get();
-			if (StarTexture)
-			{
-				StarImage->SetBrushFromTexture(StarTexture, false);
-			}
+			++StarCount;
 		}
 	}
+
+	const int32 FilledStarCount = FMath::Clamp(DifficultyStars, 0, StarCount);
+	int32 StarIndex = 0;
+	for (int32 ChildIndex = 0; ChildIndex < HB_Stars->GetChildrenCount(); ++ChildIndex)
+	{
+		UImage* StarImage = Cast<UImage>(HB_Stars->GetChildAt(ChildIndex));
+		if (!StarImage)
+		{
+			continue;
+		}
+
+		StarImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+		UTexture2D* StarTexture = StarIndex < FilledStarCount ? FilledStarTexture.Get() : EmptyStarTexture.Get();
+		if (StarTexture)
+		{
+			StarImage->SetBrushFromTexture(StarTexture, false);
+		}
+
+		++StarIndex;
+	}
+}
+
+void UKCHUDRecipeEntryWidget::RefreshCookingIndicators(const FKCRecipeViewData& Recipe)
+{
+	ApplyCookingIndicator(Team1CookingImage.Get(), Team1Cooking.Get(), Recipe.bTeam0Cooking);
+	ApplyCookingIndicator(Team2CookingImage.Get(), Team2Cooking.Get(), Recipe.bTeam1Cooking);
+}
+
+void UKCHUDRecipeEntryWidget::ApplyCookingIndicator(UImage* CookingImage, UWidgetAnimation* CookingAnimation, const bool bCooking)
+{
+	if (CookingImage)
+	{
+		CookingImage->SetVisibility(bCooking
+			? ESlateVisibility::SelfHitTestInvisible
+			: ESlateVisibility::Hidden);
+	}
+
+	if (!CookingAnimation)
+	{
+		return;
+	}
+
+	if (bCooking)
+	{
+		if (!IsAnimationPlaying(CookingAnimation))
+		{
+			PlayAnimation(CookingAnimation, 0.0f, 0);
+		}
+	}
+	else if (IsAnimationPlaying(CookingAnimation))
+	{
+		StopAnimation(CookingAnimation);
+	}
+}
+
+void UKCHUDRecipeEntryWidget::RefreshIngredientList(const TArray<FKCRecipeIngredientViewData>& Ingredients)
+{
+	if (!LV_Ingredients)
+	{
+		return;
+	}
+
+	if (CanReuseIngredientItems(Ingredients))
+	{
+		for (int32 IngredientIndex = 0; IngredientIndex < Ingredients.Num(); ++IngredientIndex)
+		{
+			IngredientItems[IngredientIndex]->SetIngredient(Ingredients[IngredientIndex]);
+		}
+
+		return;
+	}
+
+	IngredientItems.Reset();
+	IngredientItems.Reserve(Ingredients.Num());
+
+	TArray<UObject*> ListItems;
+	ListItems.Reserve(Ingredients.Num());
+
+	for (const FKCRecipeIngredientViewData& Ingredient : Ingredients)
+	{
+		UKCRecipeIngredientListItem* IngredientItem = NewObject<UKCRecipeIngredientListItem>(this);
+		if (!IngredientItem)
+		{
+			continue;
+		}
+
+		IngredientItem->SetIngredient(Ingredient);
+		IngredientItems.Add(IngredientItem);
+		ListItems.Add(IngredientItem);
+	}
+
+	LV_Ingredients->SetListItems(ListItems);
+}
+
+bool UKCHUDRecipeEntryWidget::CanReuseIngredientItems(const TArray<FKCRecipeIngredientViewData>& Ingredients) const
+{
+	if (IngredientItems.Num() != Ingredients.Num())
+	{
+		return false;
+	}
+
+	for (int32 IngredientIndex = 0; IngredientIndex < Ingredients.Num(); ++IngredientIndex)
+	{
+		const UKCRecipeIngredientListItem* IngredientItem = IngredientItems[IngredientIndex];
+		if (!IngredientItem || IngredientItem->Ingredient.IngredientId != Ingredients[IngredientIndex].IngredientId)
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 void UKCHUDRecipeEntryWidget::RefreshTestIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients)
@@ -151,7 +298,17 @@ void UKCHUDRecipeEntryWidget::NativeApplyColorStyle(const UKCColorStyle* InColor
 
 	if (FoodNameText)
 	{
-		FoodNameText->SetColorAndOpacity(FSlateColor(InColorStyle->RecipeText));
+		// FoodNameText->SetColorAndOpacity(FSlateColor(InColorStyle->RecipeText));
+	}
+
+	if (Team1CookingImage && InColorStyle->TeamColors.IsValidIndex(0))
+	{
+		Team1CookingImage->SetColorAndOpacity(InColorStyle->TeamColors[0]);
+	}
+
+	if (Team2CookingImage && InColorStyle->TeamColors.IsValidIndex(1))
+	{
+		Team2CookingImage->SetColorAndOpacity(InColorStyle->TeamColors[1]);
 	}
 
 	if (Team1ProgressBar && InColorStyle->TeamColors.IsValidIndex(0))
