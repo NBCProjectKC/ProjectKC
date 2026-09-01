@@ -283,6 +283,37 @@ FTransform UKCHeldItemComponent::MakeHeldItemDropTransform() const
 	return FTransform(Holder->GetActorRotation(), DropLocation);
 }
 
+bool UKCHeldItemComponent::ClearHeldItemForDestruction(
+	AKCWorldItemActor* Item)
+{
+	AActor* Holder = GetOwner();
+	if (!Holder || !Holder->HasAuthority() || !IsValid(Item) ||
+		HeldItem != Item)
+	{
+		return false;
+	}
+
+	if (InputPressedItem.Get() == Item)
+	{
+		InputPressedItem = nullptr;
+		InputPressedAbilityHandle = FGameplayAbilitySpecHandle();
+	}
+
+	if (!Item->ExitHeldState(Item->GetActorTransform(), FVector::ZeroVector))
+	{
+		UE_LOG(
+			LogKCHeldItemComponent,
+			Warning,
+			TEXT("파괴되는 Item '%s'의 Held 상태 정리에 실패했지만 Holder 참조는 제거합니다."),
+			*GetNameSafe(Item));
+	}
+
+	HeldItem = nullptr;
+	Holder->ForceNetUpdate();
+	BroadcastHeldItemChanged();
+	return true;
+}
+
 void UKCHeldItemComponent::BroadcastHeldItemChanged()
 {
 	OnHeldItemChanged.Broadcast(HeldItem);

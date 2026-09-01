@@ -1,0 +1,46 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
+#include "ProjectKC/AbilitySystem/Struct/KCProjectileConfigStruct.h"
+#include "KCThrowProjectileFragment.generated.h"
+
+/** OnExecute에서 투사체를 서버 권위로 생성하는 일회성 결과 Fragment다. */
+UCLASS(EditInlineNew, DefaultToInstanced, meta = (DisplayName = "Throw Projectile"))
+class PROJECTKC_API UKCThrowProjectileFragment : public UKCActionFragment
+{
+	GENERATED_BODY()
+
+public:
+	UKCThrowProjectileFragment();
+
+	virtual bool Validate(FString& OutError) const override;
+	virtual bool DeclaresSetByCallerTag(FGameplayTag DataTag) const override;
+	virtual void AppendDeclaredSetByCallerTags(
+		FGameplayTagContainer& OutTags) const override;
+	virtual bool CanExecute(
+		const FKCActionExecutionContext& Context,
+		FString& OutError) const override;
+	virtual bool Execute(const FKCActionExecutionContext& Context) const override;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Projectile",
+		meta = (ShowOnlyInnerProperties))
+	FKCProjectileLaunchConfigStruct LaunchConfig;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Projectile",
+		meta = (ShowOnlyInnerProperties))
+	FKCProjectileExplosionConfigStruct ExplosionConfig;
+
+private:
+	AActor* ResolveLaunchOrigin(const FKCActionExecutionContext& Context) const;
+	UObject* ResolveEffectSourceObject(
+		const FKCActionExecutionContext& Context,
+		AActor* LaunchOrigin) const;
+};
+
