@@ -32,6 +32,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
 	void SetStartGameButtonEnabled(bool bEnabled);
 
+	/** @brief PlayerState에 안전하게 바인딩을 시도합니다. 바인딩 성공 시 true 반환 */
+	bool TryBindPlayerState();
+
 protected:
 	//~UUserWidget interface
 	virtual void NativeConstruct() override;
@@ -87,9 +90,6 @@ protected:
 	virtual void OnTeamIdUpdated(int32 NewTeamId);
 
 private:
-	/** @brief PlayerState에 안전하게 바인딩을 시도합니다. 바인딩 성공 시 true 반환 */
-	bool TryBindPlayerState();
-
 	/** @brief PlayerState와의 바인딩 및 초기화 완료 여부 */
 	bool bPlayerStateBound = false;
 
