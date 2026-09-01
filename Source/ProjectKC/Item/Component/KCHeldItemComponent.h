@@ -120,6 +120,7 @@ private:
 
 	USceneComponent* ResolveAttachmentComponent() const;
 	FTransform MakeHeldItemDropTransform() const;
+	bool ClearHeldItemForDestruction(AKCWorldItemActor* Item);
 	void BroadcastHeldItemChanged();
 
 	UPROPERTY(ReplicatedUsing = OnRep_HeldItem)
