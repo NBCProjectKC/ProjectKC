@@ -20,8 +20,10 @@
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
-#include "ProjectKC/Lobby/KCLobbyPlayerState.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
+#include "ProjectKC/UI/World/Player/Component/KCPlayerOverHeadComponent.h"
+#include "ProjectKC/UI/World/Player/Struct/KCPlayerDisplayInfoStruct.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -175,6 +177,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	InteractionComponent = CreateDefaultSubobject<UKCPlayerInteractionComponent>(
 		TEXT("InteractionComponent"));
 	InteractionComponent->SetupAttachment(RootComponent);
+	PlayerOverHeadComponent = CreateDefaultSubobject<UKCPlayerOverHeadComponent>(
+		TEXT("PlayerOverHead"));
 
 #if WITH_EDITORONLY_DATA
 	HeldItemPreviewMesh =
@@ -411,8 +415,8 @@ void AKCPlayerCharacter::PawnClientRestart()
 
 void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
 {
-	AKCLobbyPlayerState* TeamPlayerState =
-		GetPlayerState<AKCLobbyPlayerState>();
+	AKCPlayerState* TeamPlayerState =
+		GetPlayerState<AKCPlayerState>();
 	BindTeamAppearanceToPlayerState(TeamPlayerState);
 
 	if (!TeamPlayerState)
@@ -426,7 +430,7 @@ void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
 }
 
 void AKCPlayerCharacter::BindTeamAppearanceToPlayerState(
-	AKCLobbyPlayerState* InPlayerState)
+	AKCPlayerState* InPlayerState)
 {
 	if (BoundTeamPlayerState.Get() != InPlayerState)
 	{
@@ -438,6 +442,9 @@ void AKCPlayerCharacter::BindTeamAppearanceToPlayerState(
 			InPlayerState->OnTeamIdChanged.AddUniqueDynamic(
 				this,
 				&AKCPlayerCharacter::HandleTeamIdChanged);
+			InPlayerState->OnGamePlayerNameChanged.AddUniqueDynamic(
+				this,
+				&AKCPlayerCharacter::HandleGamePlayerNameChanged);
 		}
 	}
 
@@ -445,15 +452,20 @@ void AKCPlayerCharacter::BindTeamAppearanceToPlayerState(
 	{
 		ApplyTeamAppearance(InPlayerState->GetTeamId());
 	}
+
+	RefreshPlayerOverHead();
 }
 
 void AKCPlayerCharacter::UnbindTeamAppearanceFromPlayerState()
 {
-	if (AKCLobbyPlayerState* TeamPlayerState = BoundTeamPlayerState.Get())
+	if (AKCPlayerState* TeamPlayerState = BoundTeamPlayerState.Get())
 	{
 		TeamPlayerState->OnTeamIdChanged.RemoveDynamic(
 			this,
 			&AKCPlayerCharacter::HandleTeamIdChanged);
+		TeamPlayerState->OnGamePlayerNameChanged.RemoveDynamic(
+			this,
+			&AKCPlayerCharacter::HandleGamePlayerNameChanged);
 	}
 
 	BoundTeamPlayerState.Reset();
@@ -462,6 +474,33 @@ void AKCPlayerCharacter::UnbindTeamAppearanceFromPlayerState()
 void AKCPlayerCharacter::HandleTeamIdChanged(const int32 NewTeamId)
 {
 	ApplyTeamAppearance(NewTeamId);
+	RefreshPlayerOverHead();
+}
+
+void AKCPlayerCharacter::HandleGamePlayerNameChanged(const FString& NewPlayerName)
+{
+	RefreshPlayerOverHead();
+}
+
+void AKCPlayerCharacter::RefreshPlayerOverHead()
+{
+	if (!PlayerOverHeadComponent)
+	{
+		return;
+	}
+
+	const AKCPlayerState* KCPlayerState = GetPlayerState<AKCPlayerState>();
+	if (!KCPlayerState)
+	{
+		PlayerOverHeadComponent->ClearPlayerDisplayInfo();
+		return;
+	}
+
+	PlayerOverHeadComponent->SetPlayerDisplayInfo(FKCPlayerDisplayInfoStruct(
+		FText::FromString(KCPlayerState->GetGamePlayerName()),
+		KCPlayerState->GetTeamId(),
+		KCPlayerState->GetUniquePlayerIdString(),
+		true));
 }
 
 void AKCPlayerCharacter::ApplyTeamAppearance(const int32 TeamId)

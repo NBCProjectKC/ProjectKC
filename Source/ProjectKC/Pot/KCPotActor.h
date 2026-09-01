@@ -38,6 +38,7 @@ public:
 	EKCPotStateType GetPotState() const { return PotState; }
 
 	int32 GetAssignedTeamId() const { return AssignedTeamId; }
+	FName GetActiveRecipeRowName() const { return ActiveRecipeRowName; }
 	const UKCCookingProgressAttributeSet* GetCookingProgressAttributes() const { return CookingProgressAttributes; }
 	float GetActiveProgressSpeedPerSecond() const { return ActiveProgressSpeedPerSecond; }
 

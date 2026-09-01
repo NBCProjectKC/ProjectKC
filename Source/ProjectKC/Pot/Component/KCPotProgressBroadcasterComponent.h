@@ -27,19 +27,20 @@ public:
 
 private:
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPotProgressStarted(int32 TeamId, int32 RemainingSeconds);
+	void MulticastPotProgressStarted(int32 TeamId, FName RecipeRowName, int32 RemainingSeconds);
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastPotProgressUpdated(int32 TeamId, float ProgressPercent, int32 RemainingSeconds);
+	void MulticastPotProgressUpdated(int32 TeamId, FName RecipeRowName, float ProgressPercent, int32 RemainingSeconds);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPotProgressCompleted(int32 TeamId);
+	void MulticastPotProgressCompleted(int32 TeamId, FName RecipeRowName);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPotProgressHidden(int32 TeamId);
 
 	void BroadcastPotProgress(
 		int32 TeamId,
+		FName RecipeRowName,
 		float ProgressPercent,
 		int32 RemainingSeconds,
 		bool bVisible,

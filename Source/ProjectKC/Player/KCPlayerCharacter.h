@@ -12,13 +12,14 @@ class UAbilitySystemComponent;
 class UCameraComponent;
 class UGameplayAbility;
 class UGameplayEffect;
-class AKCLobbyPlayerState;
+class AKCPlayerState;
 class UKCAbilitySystemComponent;
 class UKCCharacterAttributeSet;
 class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
+class UKCPlayerOverHeadComponent;
 class UKCPlayerInteractionComponent;
 class USceneComponent;
 class USpringArmComponent;
@@ -87,7 +88,7 @@ protected:
 	virtual void OnRep_PlayerState() override;
 	virtual void PawnClientRestart() override;
 
-	void BindTeamAppearanceToPlayerState(AKCLobbyPlayerState* InPlayerState);
+	void BindTeamAppearanceToPlayerState(AKCPlayerState* InPlayerState);
 	void ApplyTeamAppearance(int32 TeamId);
 
 #if WITH_EDITOR
@@ -99,9 +100,13 @@ private:
 	void ConfigureDriverMesh();
 	void RefreshTeamAppearanceBinding();
 	void UnbindTeamAppearanceFromPlayerState();
+	void RefreshPlayerOverHead();
 
 	UFUNCTION()
 	void HandleTeamIdChanged(int32 NewTeamId);
+
+	UFUNCTION()
+	void HandleGamePlayerNameChanged(const FString& NewPlayerName);
 
 	void InitializeAbilityActorInfo();
 	void GrantDefaultAbilities();
@@ -156,6 +161,10 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerInteractionComponent> InteractionComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|UI",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerOverHeadComponent> PlayerOverHeadComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> AvatarBody;
@@ -208,5 +217,5 @@ private:
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
 	FDelegateHandle HealthChangedDelegateHandle;
 	FActiveGameplayEffectHandle StaminaRegenEffectHandle;
-	TWeakObjectPtr<AKCLobbyPlayerState> BoundTeamPlayerState;
+	TWeakObjectPtr<AKCPlayerState> BoundTeamPlayerState;
 };
