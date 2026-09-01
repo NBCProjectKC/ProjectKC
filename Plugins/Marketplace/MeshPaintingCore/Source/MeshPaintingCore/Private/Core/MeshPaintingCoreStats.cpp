@@ -1,0 +1,21 @@
+// Copyright Shared Orbit 2026. All Rights Reserved.
+
+#include "MeshPaintingCoreStats.h"
+
+DEFINE_STAT(STAT_MeshPaintingCore_ApplyPaint);
+DEFINE_STAT(STAT_MeshPaintingCore_UpdateBrushPreview);
+DEFINE_STAT(STAT_MeshPaintingCore_TracePaintUnderCursor);
+DEFINE_STAT(STAT_MeshPaintingCore_PaintAtHitWithSettings);
+DEFINE_STAT(STAT_MeshPaintingCore_ResolvePaintHit);
+DEFINE_STAT(STAT_MeshPaintingCore_FindPaintHitUV);
+DEFINE_STAT(STAT_MeshPaintingCore_FindSkeletalMeshFaceUV);
+DEFINE_STAT(STAT_MeshPaintingCore_CollectStaticMeshUVTriangles);
+DEFINE_STAT(STAT_MeshPaintingCore_CollectSkeletalMeshUVTriangles);
+DEFINE_STAT(STAT_MeshPaintingCore_DrawBrushToRenderTarget);
+
+DEFINE_STAT(STAT_MeshPaintingCore_PaintCalls);
+DEFINE_STAT(STAT_MeshPaintingCore_SuccessfulPaintCalls);
+DEFINE_STAT(STAT_MeshPaintingCore_RenderTargetDraws);
+DEFINE_STAT(STAT_MeshPaintingCore_UVIslandTrianglesScanned);
+DEFINE_STAT(STAT_MeshPaintingCore_GPUBrushTrianglesDrawn);
+DEFINE_STAT(STAT_MeshPaintingCore_SkeletalUVFallbackTrianglesScanned);
