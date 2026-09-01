@@ -31,6 +31,16 @@ void AKCLobbyPlayerController::PostSeamlessTravel()
 	SetupLobbyUI();
 }
 
+void AKCLobbyPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	if (IsLocalPlayerController() && LobbyWidgetInstance)
+	{
+		LobbyWidgetInstance->TryBindPlayerState();
+	}
+}
+
 void AKCLobbyPlayerController::SetupLobbyUI()
 {
 	if (!IsLocalPlayerController())

@@ -47,6 +47,7 @@ protected:
 	//~APlayerController interface
 	virtual void BeginPlay() override;
 	virtual void PostSeamlessTravel() override;
+	virtual void OnRep_PlayerState() override;
 	//~End of APlayerController interface
 
 	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
