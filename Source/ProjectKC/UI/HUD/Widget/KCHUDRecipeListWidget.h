@@ -2,29 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
-#include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeTypes.h"
 #include "KCHUDRecipeListWidget.generated.h"
 
 class UListView;
 class UVerticalBox;
+class UWidgetAnimation;
 class UKCHUDRecipeEntryWidget;
-
-DECLARE_MULTICAST_DELEGATE_OneParam(FKCRecipeListItemChangedNativeDelegate, const FKCRecipeViewData&);
-
-UCLASS(BlueprintType)
-class PROJECTKC_API UKCHUDRecipeListItem : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	UFUNCTION(BlueprintCallable, Category = "KC|UI")
-	void SetRecipe(const FKCRecipeViewData& NewRecipe);
-
-	UPROPERTY(BlueprintReadOnly, Category = "KC|UI")
-	FKCRecipeViewData Recipe;
-
-	FKCRecipeListItemChangedNativeDelegate OnRecipeChangedNative;
-};
+class UKCHUDRecipeViewModel;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTKC_API UKCHUDRecipeListWidget : public UKCUserWidget
@@ -36,6 +21,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetRecipes(const TArray<FKCRecipeViewData>& Recipes);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void PlayListShake();
+
+	void SetRecipeViewModels(const TArray<TObjectPtr<UKCHUDRecipeViewModel>>& RecipeViewModels);
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "KC|UI", meta = (DisplayName = "On Recipes Set"))
@@ -53,9 +43,12 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UVerticalBox> VerticalBox;
 
+	UPROPERTY(Transient, meta = (BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> ListShake;
+
 private:
 	bool CanReuseRecipeItems(const TArray<FKCRecipeViewData>& Recipes) const;
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UKCHUDRecipeListItem>> RecipeItems;
+	TArray<TObjectPtr<UKCHUDRecipeViewModel>> PreviewRecipeViewModels;
 };
