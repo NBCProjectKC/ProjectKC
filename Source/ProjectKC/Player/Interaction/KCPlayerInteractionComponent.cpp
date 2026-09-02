@@ -3,6 +3,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "Interaction/Interface/KCInteractableInterface.h"
 
 UKCPlayerInteractionComponent::UKCPlayerInteractionComponent()
@@ -16,11 +17,34 @@ UKCPlayerInteractionComponent::UKCPlayerInteractionComponent()
 	SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Overlap);
 	SetGenerateOverlapEvents(true);
 	SetCanEverAffectNavigation(false);
+	PrimaryComponentTick.bCanEverTick = true;
+}
+
+void UKCPlayerInteractionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	RefreshBestInteractable();
+}
+
+void UKCPlayerInteractionComponent::TickComponent(
+	const float DeltaTime,
+	const ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (OwnerPawn && OwnerPawn->IsLocallyControlled())
+	{
+		RefreshBestInteractable();
+	}
 }
 
 void UKCPlayerInteractionComponent::TryInteract()
 {
-	AActor* TargetActor = GetBestInteractable();
+	RefreshBestInteractable();
+
+	AActor* TargetActor = GetCurrentBestInteractable();
 	if (!TargetActor)
 	{
 		return;
@@ -64,6 +88,23 @@ AActor* UKCPlayerInteractionComponent::GetBestInteractable() const
 	}
 
 	return BestTargetActor;
+}
+
+AActor* UKCPlayerInteractionComponent::GetCurrentBestInteractable() const
+{
+	return CurrentBestInteractable.Get();
+}
+
+void UKCPlayerInteractionComponent::RefreshBestInteractable()
+{
+	AActor* NewBestInteractable = GetBestInteractable();
+	if (CurrentBestInteractable.Get() == NewBestInteractable)
+	{
+		return;
+	}
+
+	CurrentBestInteractable = NewBestInteractable;
+	OnBestInteractableChanged.Broadcast(NewBestInteractable);
 }
 
 void UKCPlayerInteractionComponent::ServerTryInteract_Implementation(AActor* TargetActor)

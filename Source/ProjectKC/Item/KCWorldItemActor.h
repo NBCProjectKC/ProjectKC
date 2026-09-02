@@ -66,6 +66,10 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
+	virtual FGameplayTag GetInteractionPromptTag_Implementation(
+		AActor* Interactor) const override;
+	virtual FVector GetInteractionPromptWorldLocation_Implementation(
+		AActor* Interactor) const override;
 
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(
