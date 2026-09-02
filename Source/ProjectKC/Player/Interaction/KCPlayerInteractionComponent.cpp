@@ -5,6 +5,8 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Interaction/Interface/KCInteractableInterface.h"
+#include "ProjectKC/Item/Component/KCHeldItemComponent.h"
+#include "ProjectKC/Item/KCWorldItemActor.h"
 
 UKCPlayerInteractionComponent::UKCPlayerInteractionComponent()
 {
@@ -175,7 +177,20 @@ bool UKCPlayerInteractionComponent::IsValidInteractionComponent(
 		return false;
 	}
 
-	const FVector ToTarget = (ClosestInteractionPoint - OwnerLocation).GetSafeNormal2D();
+	if (const AKCWorldItemActor* WorldItem = Cast<AKCWorldItemActor>(TargetActor))
+	{
+		const UKCHeldItemComponent* HeldItemComponent =
+			OwnerActor->FindComponentByClass<UKCHeldItemComponent>();
+		if (!HeldItemComponent || !HeldItemComponent->CanPickUpItem(WorldItem))
+		{
+			return false;
+		}
+
+		ClosestInteractionPoint = WorldItem->GetActorLocation();
+	}
+
+	const FVector ToTarget =
+		(ClosestInteractionPoint - OwnerLocation).GetSafeNormal2D();
 	if (!ToTarget.IsNearlyZero())
 	{
 		if (FVector::DistSquared2D(OwnerLocation, ClosestInteractionPoint)
