@@ -57,6 +57,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UKCLoadingViewModel> LoadingViewModel;
 	
+	// 프로그레스바 최소 노출시간
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	float MinDisplayDurationSeconds = 1.5f;
+
+	double PreloadStartTimeSeconds = 0.0;
+	
+	FTSTicker::FDelegateHandle ProgressAnimTickerHandle;
+	bool TickProgressAnimation(float DeltaTime);
+	
 	// GMS 핸들
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;
 };

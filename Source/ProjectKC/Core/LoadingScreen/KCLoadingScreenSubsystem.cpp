@@ -60,6 +60,10 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	}
 	LoadingViewModel->SetProgress(0.0f);
 	LoadingViewModel->PickRandomTip(TipsAsset);
+	
+	PreloadStartTimeSeconds = FPlatformTime::Seconds();
+	ProgressAnimTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+		FTickerDelegate::CreateUObject(this, &UKCLoadingScreenSubsystem::TickProgressAnimation), 0.05f);
 		
 	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] 뷰모델 준비 완료, 위젯 표시 단계 진입 직전"));
 
@@ -107,6 +111,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 				if (StrongThis->LoadingViewModel)
 				{
 					const float CappedProgress = FMath::Min(NewProgress * 0.99f, 0.99f);
+					UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] SetProgress 호출: NewProgress=%.3f, CappedProgress=%.3f"), NewProgress, CappedProgress);
 					StrongThis->LoadingViewModel->SetProgress(CappedProgress);
 				}
 			}
@@ -142,21 +147,17 @@ void UKCLoadingScreenSubsystem::OnLevelChangedMessage(FGameplayTag Channel, cons
 
 void UKCLoadingScreenSubsystem::TryHide()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] TryHide 진입. bAssetsReady=%s, bLevelReady=%s"),
-		bAssetsReady ? TEXT("true") : TEXT("false"), bLevelReady ? TEXT("true") : TEXT("false"));
-
 	if (!bAssetsReady || !bLevelReady)
 	{
 		return;
 	}
 
-	// 이때 progressbar 100% 채움
+	FTSTicker::GetCoreTicker().RemoveTicker(ProgressAnimTickerHandle);
+
 	if (LoadingViewModel)
 	{
 		LoadingViewModel->SetProgress(1.0f);
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] 두 조건 다 충족, 위젯 내리는 중"));
 
 	const ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr;
 	if (UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer ? LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>() : nullptr)
@@ -165,6 +166,18 @@ void UKCLoadingScreenSubsystem::TryHide()
 	}
 
 	WaitingForLevel = EKCLevelType::None;
+}
 
-	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] TryHide 완료"));
+bool UKCLoadingScreenSubsystem::TickProgressAnimation(float DeltaTime)
+{
+	if (!LoadingViewModel)
+	{
+		return true;
+	}
+
+	const double Elapsed = FPlatformTime::Seconds() - PreloadStartTimeSeconds;
+	const float FakeProgress = FMath::Min(static_cast<float>(Elapsed / MinDisplayDurationSeconds) * 0.99f, 0.99f);
+	LoadingViewModel->SetProgress(FakeProgress);
+
+	return true;
 }
