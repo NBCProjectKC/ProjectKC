@@ -20,6 +20,7 @@ class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
 class UKCPlayerOverHeadComponent;
+class UKCPlayerInteractionPromptComponent;
 class UKCPlayerInteractionComponent;
 class USceneComponent;
 class USpringArmComponent;
@@ -74,6 +75,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UKCPlayerInteractionComponent* GetInteractionComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	UKCPlayerInteractionPromptComponent* GetInteractionPromptComponent() const;
 
 	/** 선택한 Item Definition을 실제 HandItem/Grip 계산으로 에디터에 표시한다. */
 	UFUNCTION(CallInEditor, Category = "KC|Item|Preview")
@@ -164,6 +168,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|UI",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerOverHeadComponent> PlayerOverHeadComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|UI",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerInteractionPromptComponent> InteractionPromptComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
 		meta = (AllowPrivateAccess = "true"))

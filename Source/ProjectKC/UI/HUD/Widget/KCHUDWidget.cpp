@@ -26,6 +26,7 @@ void UKCHUDWidget::NativeConstruct()
 	HUDViewModel->OnMatchTimerChangedNative.AddUObject(this, &ThisClass::HandleMatchTimerChanged);
 	HUDViewModel->OnRecipesChangedNative.AddUObject(this, &ThisClass::HandleRecipesChanged);
 	HUDViewModel->OnPotProgressChangedNative.AddUObject(this, &ThisClass::HandlePotProgressChanged);
+	HUDViewModel->OnLocalDishRuinedNative.AddUObject(this, &ThisClass::HandleLocalDishRuined);
 	RefreshHUD();
 }
 
@@ -37,6 +38,7 @@ void UKCHUDWidget::NativeDestruct()
 		HUDViewModel->OnMatchTimerChangedNative.RemoveAll(this);
 		HUDViewModel->OnRecipesChangedNative.RemoveAll(this);
 		HUDViewModel->OnPotProgressChangedNative.RemoveAll(this);
+		HUDViewModel->OnLocalDishRuinedNative.RemoveAll(this);
 		HUDViewModel->StopListening();
 	}
 
@@ -58,6 +60,14 @@ void UKCHUDWidget::HandlePotProgressChanged(int32 TeamId, const FKCPotProgressVi
 	RefreshPotProgress(TeamId);
 }
 
+void UKCHUDWidget::HandleLocalDishRuined()
+{
+	if (WBP_HUDRecipeList)
+	{
+		WBP_HUDRecipeList->PlayListShake();
+	}
+}
+
 void UKCHUDWidget::RefreshHUD()
 {
 	RefreshScore();
@@ -73,14 +83,11 @@ void UKCHUDWidget::RefreshScore()
 		return;
 	}
 
-	const int32 LeftScore = HUDViewModel->GetTeamScore(0);
-	const int32 RightScore = HUDViewModel->GetTeamScore(1);
-	
 	if (!Team1ScoreText || !Team2ScoreText)
 		return;
 	
-	Team1ScoreText->SetText(FText::AsNumber(LeftScore));
-	Team2ScoreText->SetText(FText::AsNumber(RightScore));
+	Team1ScoreText->SetText(HUDViewModel->GetTeamScoreText(0));
+	Team2ScoreText->SetText(HUDViewModel->GetTeamScoreText(1));
 	
 }
 
@@ -97,11 +104,10 @@ void UKCHUDWidget::ApplyMatchTimerText(int32 RemainingSeconds)
 		return;
 	}
 
-	const int32 ClampedSeconds = FMath::Max(0, RemainingSeconds);
-	TimerTextBlock->SetText(FText::FromString(FString::Printf(
-		TEXT("%02d:%02d"),
-		ClampedSeconds / 60,
-		ClampedSeconds % 60)));
+	(void)RemainingSeconds;
+	TimerTextBlock->SetText(HUDViewModel
+		? HUDViewModel->GetRemainingMatchTimeText()
+		: FText::GetEmpty());
 }
 
 UTextBlock* UKCHUDWidget::ResolveTimerTextBlock()
@@ -126,10 +132,9 @@ void UKCHUDWidget::RefreshRecipes()
 		return;
 	}
 
-	const TArray<FKCRecipeViewData>& Recipes = HUDViewModel->GetRecipes();
 	if (WBP_HUDRecipeList)
 	{
-		WBP_HUDRecipeList->SetRecipes(Recipes);
+		WBP_HUDRecipeList->SetRecipeViewModels(HUDViewModel->GetRecipeViewModels());
 	}
 }
 

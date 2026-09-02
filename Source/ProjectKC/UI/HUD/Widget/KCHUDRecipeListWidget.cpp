@@ -1,14 +1,10 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeListWidget.h"
 
+#include "Animation/WidgetAnimation.h"
 #include "Components/ListView.h"
 #include "Components/VerticalBox.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeViewModel.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeEntryWidget.h"
-
-void UKCHUDRecipeListItem::SetRecipe(const FKCRecipeViewData& NewRecipe)
-{
-	Recipe = NewRecipe;
-	OnRecipeChangedNative.Broadcast(Recipe);
-}
 
 void UKCHUDRecipeListWidget::NativePreConstruct()
 {
@@ -19,28 +15,54 @@ void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes
 {
 	BP_OnRecipesSet(Recipes);
 
-	if (RecipeListView && CanReuseRecipeItems(Recipes))
+	if (CanReuseRecipeItems(Recipes))
 	{
 		for (int32 RecipeIndex = 0; RecipeIndex < Recipes.Num(); ++RecipeIndex)
 		{
-			RecipeItems[RecipeIndex]->SetRecipe(Recipes[RecipeIndex]);
+			PreviewRecipeViewModels[RecipeIndex]->SetRecipe(Recipes[RecipeIndex]);
 		}
 
+		SetRecipeViewModels(PreviewRecipeViewModels);
 		return;
 	}
 
-	RecipeItems.Reset();
-	RecipeItems.Reserve(Recipes.Num());
-
-	TArray<UObject*> ListItems;
-	ListItems.Reserve(Recipes.Num());
+	PreviewRecipeViewModels.Reset();
+	PreviewRecipeViewModels.Reserve(Recipes.Num());
 
 	for (const FKCRecipeViewData& Recipe : Recipes)
 	{
-		UKCHUDRecipeListItem* Item = NewObject<UKCHUDRecipeListItem>(this);
-		Item->SetRecipe(Recipe);
-		RecipeItems.Add(Item);
-		ListItems.Add(Item);
+		UKCHUDRecipeViewModel* RecipeViewModel = NewObject<UKCHUDRecipeViewModel>(this);
+		if (!RecipeViewModel)
+		{
+			continue;
+		}
+
+		RecipeViewModel->SetRecipe(Recipe);
+		PreviewRecipeViewModels.Add(RecipeViewModel);
+	}
+
+	SetRecipeViewModels(PreviewRecipeViewModels);
+}
+
+void UKCHUDRecipeListWidget::PlayListShake()
+{
+	if (ListShake)
+	{
+		PlayAnimation(ListShake, 0.0f, 2);
+	}
+}
+
+void UKCHUDRecipeListWidget::SetRecipeViewModels(const TArray<TObjectPtr<UKCHUDRecipeViewModel>>& RecipeViewModels)
+{
+	TArray<UObject*> ListItems;
+	ListItems.Reserve(RecipeViewModels.Num());
+
+	for (UKCHUDRecipeViewModel* RecipeViewModel : RecipeViewModels)
+	{
+		if (RecipeViewModel)
+		{
+			ListItems.Add(RecipeViewModel);
+		}
 	}
 
 	if (RecipeListView)
@@ -56,36 +78,36 @@ void UKCHUDRecipeListWidget::SetRecipes(const TArray<FKCRecipeViewData>& Recipes
 	}
 
 	EntryContainer->ClearChildren();
-	
+
 	if (!EntryWidgetClass)
 	{
 		return;
 	}
 
-	for (const FKCRecipeViewData& Recipe : Recipes)
+	for (UKCHUDRecipeViewModel* RecipeViewModel : RecipeViewModels)
 	{
 		UKCHUDRecipeEntryWidget* EntryWidget = CreateWidget<UKCHUDRecipeEntryWidget>(this, EntryWidgetClass);
-		if (!EntryWidget)
+		if (!EntryWidget || !RecipeViewModel)
 		{
 			continue;
 		}
 
-		EntryWidget->SetRecipe(Recipe);
+		EntryWidget->SetRecipeViewModel(RecipeViewModel);
 		EntryContainer->AddChildToVerticalBox(EntryWidget);
 	}
 }
 
 bool UKCHUDRecipeListWidget::CanReuseRecipeItems(const TArray<FKCRecipeViewData>& Recipes) const
 {
-	if (RecipeItems.Num() != Recipes.Num())
+	if (PreviewRecipeViewModels.Num() != Recipes.Num())
 	{
 		return false;
 	}
 
 	for (int32 RecipeIndex = 0; RecipeIndex < Recipes.Num(); ++RecipeIndex)
 	{
-		const UKCHUDRecipeListItem* RecipeItem = RecipeItems[RecipeIndex];
-		if (!RecipeItem || RecipeItem->Recipe.RecipeRowName != Recipes[RecipeIndex].RecipeRowName)
+		const UKCHUDRecipeViewModel* RecipeViewModel = PreviewRecipeViewModels[RecipeIndex];
+		if (!RecipeViewModel || RecipeViewModel->GetRecipe().RecipeRowName != Recipes[RecipeIndex].RecipeRowName)
 		{
 			return false;
 		}

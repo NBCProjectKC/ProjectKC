@@ -8,6 +8,8 @@
 class AActor;
 class UPrimitiveComponent;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FKCBestInteractableChangedNativeDelegate, AActor*);
+
 UCLASS(ClassGroup = (Player), meta = (BlueprintSpawnableComponent))
 class PROJECTKC_API UKCPlayerInteractionComponent : public USphereComponent
 {
@@ -16,11 +18,24 @@ class PROJECTKC_API UKCPlayerInteractionComponent : public USphereComponent
 public:
 	UKCPlayerInteractionComponent();
 
+	virtual void BeginPlay() override;
+	virtual void TickComponent(
+		float DeltaTime,
+		ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
+
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryInteract();
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AActor* GetBestInteractable() const;
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	AActor* GetCurrentBestInteractable() const;
+
+	void RefreshBestInteractable();
+
+	FKCBestInteractableChangedNativeDelegate OnBestInteractableChanged;
 
 private:
 	UFUNCTION(Server, Reliable)
@@ -47,4 +62,7 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	TEnumAsByte<ECollisionChannel> InteractionTraceChannel = ECC_Visibility;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> CurrentBestInteractable;
 };

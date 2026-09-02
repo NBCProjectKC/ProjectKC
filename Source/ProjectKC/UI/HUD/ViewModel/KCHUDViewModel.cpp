@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "ProjectKC/GameSystem/KCGameState.h"
+#include "ProjectKC/GameSystem/Recipe/KCDishRuinedStruct.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeStruct.h"
 #include "ProjectKC/GameSystem/Recipe/KCRecipeTierType.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
@@ -16,6 +17,7 @@
 #include "ProjectKC/Messages/Struct/KCPotProgressChangedStruct.h"
 #include "ProjectKC/Messages/Struct/KCScoreChangedStruct.h"
 #include "ProjectKC/Player/KCPlayerController.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeViewModel.h"
 
 void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 {
@@ -44,6 +46,11 @@ void UKCHUDViewModel::StartListening(UObject* WorldContextObject)
 		this,
 		&ThisClass::HandleActiveRecipesChanged);
 
+	DishRuinedHandle = MessageSystem.RegisterListener<FKCDishRuinedStruct>(
+		KCGameplayTags::Message_Dish_Ruined,
+		this,
+		&ThisClass::HandleDishRuined);
+
 	PotIngredientsChangedHandle = MessageSystem.RegisterListener<FKCPotIngredientsChangedStruct>(
 		KCGameplayTags::Message_Game_PotIngredientsChanged,
 		this,
@@ -66,6 +73,7 @@ void UKCHUDViewModel::StopListening()
 	ScoreChangedHandle.Unregister();
 	PhaseChangedHandle.Unregister();
 	ActiveRecipesChangedHandle.Unregister();
+	DishRuinedHandle.Unregister();
 	PotIngredientsChangedHandle.Unregister();
 	PotProgressChangedHandle.Unregister();
 	ListeningWorldContext.Reset();
@@ -79,6 +87,11 @@ void UKCHUDViewModel::SetCurrentPhase(EKCGamePhaseType NewPhase)
 int32 UKCHUDViewModel::GetTeamScore(int32 TeamId) const
 {
 	return TeamScores.IsValidIndex(TeamId) ? TeamScores[TeamId] : 0;
+}
+
+FText UKCHUDViewModel::GetTeamScoreText(int32 TeamId) const
+{
+	return FText::AsNumber(GetTeamScore(TeamId));
 }
 
 void UKCHUDViewModel::SetTeamScore(int32 TeamId, int32 NewScore)
@@ -119,7 +132,9 @@ void UKCHUDViewModel::SetRemainingMatchSeconds(int32 NewRemainingSeconds)
 	}
 
 	RemainingMatchSeconds = NewRemainingSeconds;
+	RemainingMatchTimeText = MakeMatchTimeText(RemainingMatchSeconds);
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(RemainingMatchSeconds);
+	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(RemainingMatchTimeText);
 	OnMatchTimerChangedNative.Broadcast(RemainingMatchSeconds);
 }
 
@@ -138,11 +153,13 @@ void UKCHUDViewModel::SetLocalTeamId(int32 NewTeamId)
 	LocalTeamId = NewTeamId;
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(LocalTeamId);
 	RebuildSubmittedStates();
+	RefreshRecipeViewModelLocalTeams();
 }
 
 void UKCHUDViewModel::SetRecipes(const TArray<FKCRecipeViewData>& NewRecipes)
 {
 	Recipes = NewRecipes;
+	RebuildRecipeViewModels();
 	UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(Recipes);
 	OnRecipesChangedNative.Broadcast();
 }
@@ -229,6 +246,16 @@ void UKCHUDViewModel::HandleActiveRecipesChanged(FGameplayTag Channel, const FKC
 	SetRecipes(NewRecipes);
 	RebuildSubmittedStates();
 	OnRecipesChanged();
+}
+
+void UKCHUDViewModel::HandleDishRuined(FGameplayTag Channel, const FKCDishRuinedStruct& Message)
+{
+	SyncLocalTeamIdFromContext();
+
+	if (Message.TeamId == LocalTeamId)
+	{
+		OnLocalDishRuinedNative.Broadcast();
+	}
 }
 
 void UKCHUDViewModel::HandlePotIngredientsChanged(FGameplayTag Channel, const FKCPotIngredientsChangedStruct& Message)
@@ -482,6 +509,47 @@ void UKCHUDViewModel::RebuildCookingStates()
 	SetRecipes(NewRecipes);
 }
 
+void UKCHUDViewModel::RebuildRecipeViewModels()
+{
+	if (RecipeViewModels.Num() != Recipes.Num())
+	{
+		RecipeViewModels.Reset();
+		RecipeViewModels.Reserve(Recipes.Num());
+
+		for (int32 RecipeIndex = 0; RecipeIndex < Recipes.Num(); ++RecipeIndex)
+		{
+			UKCHUDRecipeViewModel* RecipeViewModel = NewObject<UKCHUDRecipeViewModel>(this);
+			if (!RecipeViewModel)
+			{
+				continue;
+			}
+
+			RecipeViewModel->SetLocalTeamId(LocalTeamId);
+			RecipeViewModels.Add(RecipeViewModel);
+		}
+	}
+
+	for (int32 RecipeIndex = 0; RecipeIndex < Recipes.Num() && RecipeViewModels.IsValidIndex(RecipeIndex); ++RecipeIndex)
+	{
+		if (UKCHUDRecipeViewModel* RecipeViewModel = RecipeViewModels[RecipeIndex])
+		{
+			RecipeViewModel->SetLocalTeamId(LocalTeamId);
+			RecipeViewModel->SetRecipe(Recipes[RecipeIndex]);
+		}
+	}
+}
+
+void UKCHUDViewModel::RefreshRecipeViewModelLocalTeams()
+{
+	for (UKCHUDRecipeViewModel* RecipeViewModel : RecipeViewModels)
+	{
+		if (RecipeViewModel)
+		{
+			RecipeViewModel->SetLocalTeamId(LocalTeamId);
+		}
+	}
+}
+
 FKCRecipeViewData UKCHUDViewModel::BuildRecipeViewData(FName RecipeRowName) const
 {
 	FKCRecipeViewData RecipeViewData;
@@ -575,4 +643,13 @@ FText UKCHUDViewModel::MakeDisplayNameFromTag(const FGameplayTag& Tag)
 	}
 
 	return FText::FromString(TagString);
+}
+
+FText UKCHUDViewModel::MakeMatchTimeText(int32 Seconds)
+{
+	Seconds = FMath::Max(0, Seconds);
+	return FText::FromString(FString::Printf(
+		TEXT("%02d:%02d"),
+		Seconds / 60,
+		Seconds % 60));
 }

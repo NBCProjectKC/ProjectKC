@@ -22,6 +22,7 @@
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
+#include "ProjectKC/UI/Interaction/Component/KCPlayerInteractionPromptComponent.h"
 #include "ProjectKC/UI/World/Player/Component/KCPlayerOverHeadComponent.h"
 #include "ProjectKC/UI/World/Player/Struct/KCPlayerDisplayInfoStruct.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
@@ -179,6 +180,9 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	InteractionComponent->SetupAttachment(RootComponent);
 	PlayerOverHeadComponent = CreateDefaultSubobject<UKCPlayerOverHeadComponent>(
 		TEXT("PlayerOverHead"));
+	InteractionPromptComponent =
+		CreateDefaultSubobject<UKCPlayerInteractionPromptComponent>(
+			TEXT("InteractionPrompt"));
 
 #if WITH_EDITORONLY_DATA
 	HeldItemPreviewMesh =
@@ -302,6 +306,12 @@ UKCKnockbackComponent* AKCPlayerCharacter::GetKnockbackComponent() const
 UKCPlayerInteractionComponent* AKCPlayerCharacter::GetInteractionComponent() const
 {
 	return InteractionComponent;
+}
+
+UKCPlayerInteractionPromptComponent*
+AKCPlayerCharacter::GetInteractionPromptComponent() const
+{
+	return InteractionPromptComponent;
 }
 
 void AKCPlayerCharacter::RefreshHeldItemPreview()
