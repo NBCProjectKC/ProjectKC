@@ -19,6 +19,7 @@ class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
+class UKCPlayerCustomizationComponent;
 class UKCPlayerOverHeadComponent;
 class UKCPlayerInteractionPromptComponent;
 class UKCPlayerInteractionComponent;
@@ -77,6 +78,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Projectile|Preview")
 	UKCProjectileTrajectoryPreviewComponent*
 	GetProjectileTrajectoryPreviewComponent() const;
+	
+	UFUNCTION(BlueprintPure, Category = "KC|Customization")
+	UKCPlayerCustomizationComponent* GetPlayerCustomizationComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UKCPlayerInteractionComponent* GetInteractionComponent() const;
@@ -173,6 +177,10 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCProjectileTrajectoryPreviewComponent>
 		ProjectileTrajectoryPreviewComponent;
+		
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerCustomizationComponent> PlayerCustomizationComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
 		meta = (AllowPrivateAccess = "true"))

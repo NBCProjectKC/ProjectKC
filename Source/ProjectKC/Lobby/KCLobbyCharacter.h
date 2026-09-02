@@ -39,6 +39,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	const FKCPlayerInfoStruct& GetPlayerInfo() const { return PlayerInfo; }
 
+	/** PlayerInfo의 PlayerState를 비소유 로비 캐릭터 외형에 연결합니다. */
+	void RefreshCustomizationPresentation();
+
 public:
 	/** @brief 플레이어 정보가 갱신되었을 때 발생하는 델리게이트 */
 	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Events")
