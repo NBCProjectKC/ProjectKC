@@ -183,10 +183,8 @@ void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
 	// 2. 글자 수 제한 초과 검사
 	if (TrimmedMessage.Len() > MaxChatMessageLength)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(INDEX_NONE, 3.0f, FColor::Red, TEXT("[경고] 메시지가 너무 깁니다. (최대 100자)"));
-		}
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SendChatMessage Failed: Message exceeds max length (%d > %d)"),
+			TrimmedMessage.Len(), MaxChatMessageLength);
 		return;
 	}
 
@@ -194,10 +192,8 @@ void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
 	const double CurrentTime = FPlatformTime::Seconds();
 	if (CurrentTime - LastChatMessageTimeSeconds < ChatCooldownSeconds)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(INDEX_NONE, 2.0f, FColor::Yellow, TEXT("[경고] 메시지를 너무 빠르게 보낼 수 없습니다."));
-		}
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SendChatMessage Rejected: Cooldown active (%.2fs remaining)"),
+			ChatCooldownSeconds - (CurrentTime - LastChatMessageTimeSeconds));
 		return;
 	}
 
@@ -247,22 +243,10 @@ void AKCLobbyPlayerController::Server_SendChatMessage_Implementation(const FStri
 
 void AKCLobbyPlayerController::Client_ReceiveChatMessage_Implementation(const FString& SenderName, const FString& Message)
 {
-	// 1. [로컬 테스트용 1] 화면 디버그 메시지 출력 (밝은 시안 색상, 7초 유지)
-	if (GEngine)
-	{
-		const FString FormattedScreenMsg = FString::Printf(TEXT("[%s]: %s"), *SenderName, *Message);
-		GEngine->AddOnScreenDebugMessage(
-			INDEX_NONE,
-			7.0f,
-			FColor(100, 220, 255),
-			FormattedScreenMsg
-		);
-	}
-
-	// 2. [로컬 테스트용 2] 출력 로그창(Output Log) 출력
+	// 1. 출력 로그창(Output Log) 출력
 	UE_LOG(LogKCLobby, Log, TEXT("[Chat] [%s]: %s"), *SenderName, *Message);
 
-	// 3. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
+	// 2. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
 	OnChatMessageReceived.Broadcast(SenderName, Message);
 }
 
