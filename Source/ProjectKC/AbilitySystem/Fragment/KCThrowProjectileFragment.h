@@ -37,10 +37,17 @@ public:
 		meta = (ShowOnlyInnerProperties))
 	FKCProjectileExplosionConfigStruct ExplosionConfig;
 
+	/** 폭발 반경의 각 대상에게 지연 실행할 Target 전용 Fragment 목록이다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		Instanced,
+		BlueprintReadOnly,
+		Category = "Projectile|Target Effects")
+	TArray<TObjectPtr<UKCActionFragment>> ExplosionTargetFragments;
+
 private:
 	AActor* ResolveLaunchOrigin(const FKCActionExecutionContext& Context) const;
 	UObject* ResolveEffectSourceObject(
 		const FKCActionExecutionContext& Context,
 		AActor* LaunchOrigin) const;
 };
-

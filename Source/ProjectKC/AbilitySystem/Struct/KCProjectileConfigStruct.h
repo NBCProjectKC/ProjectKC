@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ProjectKC/AbilitySystem/Struct/KCGameplayEffectRecipeStruct.h"
 #include "KCProjectileConfigStruct.generated.h"
 
 class AKCActionProjectile;
@@ -92,38 +91,6 @@ struct PROJECTKC_API FKCProjectileLaunchConfigStruct
 	bool Validate(FString& OutError) const;
 };
 
-/** 폭발 중심에서 대상에게 전달할 선택적 넉백 설정이다. */
-USTRUCT(BlueprintType)
-struct PROJECTKC_API FKCProjectileKnockbackConfigStruct
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Knockback")
-	bool bEnabled = true;
-
-	UPROPERTY(
-		EditDefaultsOnly,
-		BlueprintReadOnly,
-		Category = "Knockback",
-		meta = (EditCondition = "bEnabled", ClampMin = "0.0"))
-	float HorizontalSpeed = 950.0f;
-
-	UPROPERTY(
-		EditDefaultsOnly,
-		BlueprintReadOnly,
-		Category = "Knockback",
-		meta = (EditCondition = "bEnabled", ClampMin = "0.0"))
-	float VerticalSpeed = 350.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Knockback", meta = (EditCondition = "bEnabled"))
-	bool bOverrideHorizontalVelocity = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Knockback", meta = (EditCondition = "bEnabled"))
-	bool bOverrideVerticalVelocity = true;
-
-	bool Validate(FString& OutError) const;
-};
-
 /** 생성 뒤 원본 아이템과 독립적으로 유지되는 폭발 결과 설정이다. */
 USTRUCT(BlueprintType)
 struct PROJECTKC_API FKCProjectileExplosionConfigStruct
@@ -171,23 +138,9 @@ struct PROJECTKC_API FKCProjectileExplosionConfigStruct
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion")
 	bool bAffectInstigator = false;
 
-	/** true면 Visibility Trace가 가려진 대상에는 효과와 넉백을 적용하지 않는다. */
+	/** true면 Visibility Trace가 가려진 대상에는 Target Fragment를 실행하지 않는다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion")
 	bool bRequireLineOfSight = false;
-
-	UPROPERTY(
-		EditDefaultsOnly,
-		BlueprintReadOnly,
-		Category = "Explosion|Effect",
-		meta = (ShowOnlyInnerProperties))
-	FKCGameplayEffectRecipeStruct EffectRecipe;
-
-	UPROPERTY(
-		EditDefaultsOnly,
-		BlueprintReadOnly,
-		Category = "Explosion|Knockback",
-		meta = (ShowOnlyInnerProperties))
-	FKCProjectileKnockbackConfigStruct Knockback;
 
 	/** 폭발 위치에서 한 번 재생할 사운드다. 비워도 된다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion|Effects")
@@ -201,4 +154,3 @@ struct PROJECTKC_API FKCProjectileExplosionConfigStruct
 	bool ExplodesOnImpact() const;
 	bool Validate(FString& OutError) const;
 };
-

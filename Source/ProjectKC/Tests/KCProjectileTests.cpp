@@ -14,6 +14,9 @@
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Damage.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCDropHeldItemFragment.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCThrowProjectileFragment.h"
 #include "ProjectKC/AbilitySystem/Projectile/KCActionProjectile.h"
 #include "ProjectKC/AbilitySystem/Struct/KCSetByCallerValueStruct.h"
@@ -32,9 +35,6 @@ namespace KCProjectileTests
 	{
 		Fragment->LaunchConfig.ProjectileMesh =
 			NewObject<UStaticMesh>(AssetOuter);
-		Fragment->ExplosionConfig.EffectRecipe.EffectClass =
-			UGameplayEffect::StaticClass();
-		Fragment->ExplosionConfig.Knockback.bEnabled = false;
 	}
 
 	UKCItemDefinition* MakeSeaUrchinDefinition(UObject* Outer)
@@ -94,12 +94,12 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 		NewObject<UKCThrowProjectileFragment>();
 	FString Error;
 	TestFalse(
-		TEXT("외형과 폭발 GE가 없는 Throw Projectile 설정은 거부한다."),
+		TEXT("투사체 외형이 없는 Throw Projectile 설정은 거부한다."),
 		Fragment->Validate(Error));
 
 	KCProjectileTests::ConfigureValidFragment(Fragment, Fragment);
 	TestTrue(
-		TEXT("투사체 클래스·메시·폭발 GE를 갖춘 설정은 유효하다."),
+		TEXT("투사체 클래스·메시와 폭발 범위를 갖춘 설정은 유효하다."),
 		Fragment->Validate(Error));
 	TestTrue(
 		TEXT("Throw Projectile은 성공 여부가 소비를 확정하도록 기본 필수 Fragment다."),
@@ -108,6 +108,32 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Throw Projectile은 소스에서 실행되는 Fragment다."),
 		Fragment->ApplicationScope,
 		EKCActionScope::Source);
+
+	UKCApplyGameplayEffectFragment* UnsupportedDeferredFragment =
+		NewObject<UKCApplyGameplayEffectFragment>(Fragment);
+	UnsupportedDeferredFragment->EffectRecipe.EffectClass =
+		UGameplayEffect::StaticClass();
+	UnsupportedDeferredFragment->bTrackUntilAbilityEnds = true;
+	Fragment->ExplosionTargetFragments.Add(UnsupportedDeferredFragment);
+	TestFalse(
+		TEXT("GA 종료까지 추적하는 Effect Fragment는 폭발 지연 실행에서 거부한다."),
+		Fragment->Validate(Error));
+	UnsupportedDeferredFragment->bTrackUntilAbilityEnds = false;
+	TestTrue(
+		TEXT("일회성 Gameplay Effect Fragment는 폭발 지연 실행을 지원한다."),
+		Fragment->Validate(Error));
+
+	UKCDropHeldItemFragment* DropHeldItem =
+		NewObject<UKCDropHeldItemFragment>(Fragment);
+	DropHeldItem->ApplicationScope = EKCActionScope::Source;
+	Fragment->ExplosionTargetFragments.Add(DropHeldItem);
+	TestFalse(
+		TEXT("폭발 대상 Fragment는 Source Scope를 사용할 수 없다."),
+		Fragment->Validate(Error));
+	DropHeldItem->ApplicationScope = EKCActionScope::Target;
+	TestTrue(
+		TEXT("지연 실행 가능한 Target Fragment는 Throw Projectile 아래 중첩할 수 있다."),
+		Fragment->Validate(Error));
 
 	Fragment->ExplosionConfig.FuseDuration =
 		Fragment->ExplosionConfig.MaximumLifetime;
@@ -165,18 +191,61 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 		OtherPlayer->GetAbilitySystemComponent()->AddAttributeSetSubobject(
 			OtherPlayer->GetCharacterAttributes());
 
+		AKCWorldItemActor* OtherHeldItem =
+			TestWorld->SpawnActor<AKCWorldItemActor>();
+		UKCHeldItemComponent* OtherHeldItemComponent =
+			OtherPlayer->GetHeldItemComponent();
+		if (TestNotNull(
+				TEXT("폭발 Target Fragment가 드롭시킬 아이템을 스폰한다."),
+				OtherHeldItem) &&
+			TestTrue(
+				TEXT("폭발 대상 플레이어의 손 소켓을 설정한다."),
+				KCProjectileTests::ConfigureHolderHand(
+					OtherPlayer,
+					OtherHeldItemComponent)))
+		{
+			UKCItemDefinition* OtherHeldDefinition =
+				KCProjectileTests::MakeSeaUrchinDefinition(OtherHeldItem);
+			TestTrue(
+				TEXT("폭발 대상이 들 아이템 Definition을 초기화한다."),
+				OtherHeldItem->InitializeItem(OtherHeldDefinition));
+			TestTrue(
+				TEXT("폭발 대상 플레이어가 아이템을 든다."),
+				OtherHeldItemComponent->TryPickUp(OtherHeldItem));
+		}
+
 		FKCProjectileLaunchConfigStruct LaunchConfig;
 		LaunchConfig.ProjectileClass = AKCActionProjectile::StaticClass();
 		LaunchConfig.ProjectileMesh = NewObject<UStaticMesh>(TestWorld);
 
 		FKCProjectileExplosionConfigStruct ExplosionConfig;
-		ExplosionConfig.EffectRecipe.EffectClass = UKCGE_Damage::StaticClass();
+		ExplosionConfig.ExplosionRadius = 500.0f;
+
+		TArray<TObjectPtr<UKCActionFragment>> ExplosionTargetFragments;
+		UKCApplyGameplayEffectFragment* DamageFragment =
+			NewObject<UKCApplyGameplayEffectFragment>(TestWorld);
+		DamageFragment->ApplicationScope = EKCActionScope::Target;
+		DamageFragment->bRequired = true;
+		DamageFragment->EffectRecipe.EffectClass = UKCGE_Damage::StaticClass();
 		FKCSetByCallerValueStruct DamageValue;
 		DamageValue.DataTag = TAG_KC_Data_Damage_Flat;
 		DamageValue.Magnitude = -20.0f;
-		ExplosionConfig.EffectRecipe.SetByCallers.Add(DamageValue);
-		ExplosionConfig.ExplosionRadius = 500.0f;
-		ExplosionConfig.Knockback.bEnabled = false;
+		DamageFragment->EffectRecipe.SetByCallers.Add(DamageValue);
+		ExplosionTargetFragments.Add(DamageFragment);
+
+		UKCKnockbackFragment* KnockbackFragment =
+			NewObject<UKCKnockbackFragment>(TestWorld);
+		KnockbackFragment->ApplicationScope = EKCActionScope::Target;
+		KnockbackFragment->bRequired = true;
+		KnockbackFragment->HorizontalSpeed = 120.0f;
+		KnockbackFragment->VerticalSpeed = 80.0f;
+		ExplosionTargetFragments.Add(KnockbackFragment);
+
+		UKCDropHeldItemFragment* DropHeldItem =
+			NewObject<UKCDropHeldItemFragment>(TestWorld);
+		DropHeldItem->ApplicationScope = EKCActionScope::Target;
+		DropHeldItem->bRequired = true;
+		ExplosionTargetFragments.Add(DropHeldItem);
 
 		AKCActionProjectile* Projectile =
 			TestWorld->SpawnActor<AKCActionProjectile>(
@@ -192,6 +261,7 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				Projectile->InitializeProjectile(
 					LaunchConfig,
 					ExplosionConfig,
+					ExplosionTargetFragments,
 					SourcePlayer->GetAbilitySystemComponent(),
 					SourcePlayer,
 					SourcePlayer,
@@ -235,9 +305,15 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				SourcePlayer->GetCharacterAttributes()->GetHealth(),
 				SourceHealthBefore);
 			TestEqual(
-				TEXT("피아 구분 없이 반경 안의 다른 플레이어는 폭발 GE를 받는다."),
+				TEXT("중첩 Damage Fragment가 설정한 피해만 적용한다."),
 				OtherPlayer->GetCharacterAttributes()->GetHealth(),
 				OtherHealthBefore - 20.0f);
+			TestFalse(
+				TEXT("폭발 대상에게 중첩한 Drop Held Item Fragment가 실행된다."),
+				OtherHeldItemComponent->HasHeldItem());
+			TestTrue(
+				TEXT("드롭된 아이템 Actor는 소비되지 않고 World에 남는다."),
+				IsValid(OtherHeldItem));
 			TestFalse(
 				TEXT("폭발 결과 처리 뒤 투사체 Actor를 제거한다."),
 				IsValid(Projectile));

@@ -72,26 +72,6 @@ bool FKCProjectileLaunchConfigStruct::Validate(FString& OutError) const
 	return true;
 }
 
-bool FKCProjectileKnockbackConfigStruct::Validate(FString& OutError) const
-{
-	OutError.Reset();
-	if (!bEnabled)
-	{
-		return true;
-	}
-
-	if (!FMath::IsFinite(HorizontalSpeed) || HorizontalSpeed < 0.0f ||
-		!FMath::IsFinite(VerticalSpeed) || VerticalSpeed < 0.0f ||
-		(FMath::IsNearlyZero(HorizontalSpeed) &&
-		 FMath::IsNearlyZero(VerticalSpeed)))
-	{
-		OutError = TEXT("넉백 속도는 0 이상의 유한한 수이며 둘 중 하나는 0보다 커야 합니다.");
-		return false;
-	}
-
-	return true;
-}
-
 bool FKCProjectileExplosionConfigStruct::UsesFuse() const
 {
 	return DetonationMode == EKCProjectileDetonationMode::OnFuse ||
@@ -133,24 +113,5 @@ bool FKCProjectileExplosionConfigStruct::Validate(FString& OutError) const
 		return false;
 	}
 
-	FString EffectError;
-	if (!EffectRecipe.Validate(EffectError))
-	{
-		OutError = FString::Printf(
-			TEXT("EffectRecipe가 유효하지 않습니다: %s"),
-			*EffectError);
-		return false;
-	}
-
-	FString KnockbackError;
-	if (!Knockback.Validate(KnockbackError))
-	{
-		OutError = FString::Printf(
-			TEXT("Knockback이 유효하지 않습니다: %s"),
-			*KnockbackError);
-		return false;
-	}
-
 	return true;
 }
-

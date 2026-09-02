@@ -160,6 +160,7 @@ bool UKCGA_Base::ExecuteActionHook(
 	Context.TargetAbilitySystem = TargetAbilitySystem;
 	Context.SourceActor = GetAvatarActorFromActorInfo();
 	Context.TargetActor = TargetActor;
+	Context.EffectSourceObject = GetCurrentSourceObject();
 	if (HitResult)
 	{
 		Context.HitResult = *HitResult;

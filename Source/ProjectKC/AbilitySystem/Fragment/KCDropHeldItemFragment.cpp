@@ -29,6 +29,11 @@ bool UKCDropHeldItemFragment::Validate(FString& OutError) const
 	return true;
 }
 
+bool UKCDropHeldItemFragment::SupportsDeferredExecution() const
+{
+	return true;
+}
+
 bool UKCDropHeldItemFragment::CanExecute(
 	const FKCActionExecutionContext& Context,
 	FString& OutError) const

@@ -26,6 +26,8 @@ struct PROJECTKC_API FKCActionExecutionContext
 	UAbilitySystemComponent* TargetAbilitySystem = nullptr;
 	AActor* SourceActor = nullptr;
 	AActor* TargetActor = nullptr;
+	/** Ability나 원본 아이템이 사라진 뒤에도 EffectContext에 유지할 논리적 Source다. */
+	UObject* EffectSourceObject = nullptr;
 	FHitResult HitResult;
 	bool bHasHitResult = false;
 
