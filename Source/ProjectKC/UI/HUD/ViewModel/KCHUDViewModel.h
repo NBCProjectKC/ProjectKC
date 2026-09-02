@@ -5,85 +5,23 @@
 #include "GameplayTagContainer.h"
 #include "ProjectKC/GameSystem/KCGamePhaseType.h"
 #include "ProjectKC/UI/Common/Core/KCViewModelBase.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeTypes.h"
 #include "TimerManager.h"
 #include "KCHUDViewModel.generated.h"
 
 class UTexture2D;
 class UKCItemDefinition;
 class AKCPlayerState;
+class UKCHUDRecipeViewModel;
 struct FKCActiveRecipesChangedStruct;
+struct FKCDishRuinedStruct;
 struct FKCGamePhaseChangedStruct;
 struct FKCPotIngredientsChangedStruct;
 struct FKCPotProgressChangedStruct;
 struct FKCScoreChangedStruct;
 
-USTRUCT(BlueprintType)
-struct FKCRecipeIngredientViewData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	FText DisplayName;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI", meta = (Categories = "Item.Id"))
-	FGameplayTag IngredientId;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	TSoftObjectPtr<UTexture2D> Icon;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bSubmitted = false;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	int32 SubmittedTeamId = INDEX_NONE;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bSubmittedByTeam0 = false;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bSubmittedByTeam1 = false;
-};
-
-USTRUCT(BlueprintType)
-struct FKCRecipeViewData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI", meta = (ClampMin = "0", ClampMax = "5"))
-	int32 DifficultyStars = 0;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	FName RecipeRowName;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	FText DisplayName;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	TSoftObjectPtr<UTexture2D> FoodIcon;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	TArray<FKCRecipeIngredientViewData> Ingredients;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	float Team0Progress = 0.0f;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	float Team1Progress = 0.0f;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bTeam0ProgressVisible = false;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bTeam1ProgressVisible = false;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bTeam0Cooking = false;
-
-	UPROPERTY(BlueprintReadWrite, Category = "KC|UI")
-	bool bTeam1Cooking = false;
-};
-
 DECLARE_MULTICAST_DELEGATE(FKCRecipesChangedNativeDelegate);
+DECLARE_MULTICAST_DELEGATE(FKCLocalDishRuinedNativeDelegate);
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCTeamScoresChangedNativeDelegate, const TArray<int32>&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCMatchTimerChangedNativeDelegate, int32);
 
@@ -131,6 +69,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	int32 GetTeamScore(int32 TeamId) const;
 
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	FText GetTeamScoreText(int32 TeamId) const;
+
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetTeamScore(int32 TeamId, int32 NewScore);
 
@@ -143,11 +84,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	int32 GetRemainingMatchSeconds() const { return RemainingMatchSeconds; }
 
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	FText GetRemainingMatchTimeText() const { return RemainingMatchTimeText; }
+
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetRemainingMatchSeconds(int32 NewRemainingSeconds);
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	const TArray<FKCRecipeViewData>& GetRecipes() const { return Recipes; }
+
+	const TArray<TObjectPtr<UKCHUDRecipeViewModel>>& GetRecipeViewModels() const { return RecipeViewModels; }
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
 	int32 GetLocalTeamId() const { return LocalTeamId; }
@@ -180,6 +126,7 @@ public:
 	FKCRecipesChangedNativeDelegate OnRecipesChangedNative;
 	FKCMatchTimerChangedNativeDelegate OnMatchTimerChangedNative;
 	FKCPotProgressChangedNativeDelegate OnPotProgressChangedNative;
+	FKCLocalDishRuinedNativeDelegate OnLocalDishRuinedNative;
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "KC|UI")
@@ -201,6 +148,7 @@ private:
 	void HandleScoreChanged(FGameplayTag Channel, const FKCScoreChangedStruct& Message);
 	void HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message);
 	void HandleActiveRecipesChanged(FGameplayTag Channel, const FKCActiveRecipesChangedStruct& Message);
+	void HandleDishRuined(FGameplayTag Channel, const FKCDishRuinedStruct& Message);
 	void HandlePotIngredientsChanged(FGameplayTag Channel, const FKCPotIngredientsChangedStruct& Message);
 	void HandlePotProgressChanged(FGameplayTag Channel, const FKCPotProgressChangedStruct& Message);
 	void SyncFromGameState();
@@ -212,9 +160,12 @@ private:
 	void UnbindLocalTeamPlayerState();
 	void RebuildSubmittedStates();
 	void RebuildCookingStates();
+	void RebuildRecipeViewModels();
+	void RefreshRecipeViewModelLocalTeams();
 	FKCRecipeViewData BuildRecipeViewData(FName RecipeRowName) const;
 	TSoftObjectPtr<UTexture2D> FindIngredientIcon(const FGameplayTag& IngredientTag) const;
 	static FText MakeDisplayNameFromTag(const FGameplayTag& Tag);
+	static FText MakeMatchTimeText(int32 Seconds);
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	EKCGamePhaseType CurrentPhase = EKCGamePhaseType::Waiting;
@@ -225,8 +176,14 @@ private:
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	int32 RemainingMatchSeconds = 0;
 
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	FText RemainingMatchTimeText;
+
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCRecipeViewData> Recipes;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UKCHUDRecipeViewModel>> RecipeViewModels;
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	int32 LocalTeamId = 0;
@@ -244,6 +201,7 @@ private:
 	FGameplayMessageListenerHandle ScoreChangedHandle;
 	FGameplayMessageListenerHandle PhaseChangedHandle;
 	FGameplayMessageListenerHandle ActiveRecipesChangedHandle;
+	FGameplayMessageListenerHandle DishRuinedHandle;
 	FGameplayMessageListenerHandle PotIngredientsChangedHandle;
 	FGameplayMessageListenerHandle PotProgressChangedHandle;
 	FTimerHandle MatchTimerRefreshHandle;

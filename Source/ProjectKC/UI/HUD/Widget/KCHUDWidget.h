@@ -41,6 +41,7 @@ private:
 	void HandleMatchTimerChanged(int32 RemainingSeconds);
 	void HandleRecipesChanged();
 	void HandlePotProgressChanged(int32 TeamId, const FKCPotProgressViewData& PotProgress);
+	void HandleLocalDishRuined();
 	void RefreshHUD();
 	void RefreshScore();
 	void RefreshRecipes();

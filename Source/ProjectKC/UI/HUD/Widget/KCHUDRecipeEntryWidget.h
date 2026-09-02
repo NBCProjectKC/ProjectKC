@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/IUserObjectListEntry.h"
 #include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
-#include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeTypes.h"
 #include "KCHUDRecipeEntryWidget.generated.h"
 
 class UTextBlock;
@@ -15,9 +15,10 @@ class UTexture2D;
 class UProgressBar;
 class UListView;
 class UImage;
+class UBorder;
 class UWidgetAnimation;
-class UKCHUDRecipeListItem;
 class UKCRecipeIngredientListItem;
+class UKCHUDRecipeViewModel;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTKC_API UKCHUDRecipeEntryWidget : public UKCUserWidget, public IUserObjectListEntry
@@ -29,6 +30,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetRecipe(const FKCRecipeViewData& Recipe);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetRecipeViewModel(UKCHUDRecipeViewModel* InRecipeViewModel);
 
 protected:
 	virtual void NativeOnListItemObjectSet(UObject* ListItemObject) override;
@@ -52,6 +56,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UImage> Team2CookingImage;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UBorder> Team1CookingBorder;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UBorder> Team2CookingBorder;
 
 	UPROPERTY(Transient, meta = (BindWidgetAnimOptional))
 	TObjectPtr<UWidgetAnimation> Team1Cooking;
@@ -75,12 +85,12 @@ protected:
 	TObjectPtr<UProgressBar> Team2ProgressBar;
 
 private:
-	void BindRecipeListItem(UKCHUDRecipeListItem* RecipeItem);
-	void UnbindRecipeListItem();
-	void HandleRecipeListItemChanged(const FKCRecipeViewData& Recipe);
+	void BindRecipeViewModel(UKCHUDRecipeViewModel* InRecipeViewModel);
+	void UnbindRecipeViewModel();
+	void HandleRecipeViewModelChanged(const FKCRecipeViewData& Recipe);
 	void RefreshDifficultyStars(int32 DifficultyStars);
 	void RefreshCookingIndicators(const FKCRecipeViewData& Recipe);
-	void ApplyCookingIndicator(UImage* CookingImage, UWidgetAnimation* CookingAnimation, bool bCooking);
+	void ApplyCookingIndicator(UBorder* CookingBorder, UImage* CookingImage, UWidgetAnimation* CookingAnimation, bool bCooking);
 	void RefreshIngredientList(const TArray<FKCRecipeIngredientViewData>& Ingredients);
 	bool CanReuseIngredientItems(const TArray<FKCRecipeIngredientViewData>& Ingredients) const;
 	void RefreshTestIngredientWidgets(const TArray<FKCRecipeIngredientViewData>& Ingredients);
@@ -89,6 +99,6 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCRecipeIngredientListItem>> IngredientItems;
 
-	TWeakObjectPtr<UKCHUDRecipeListItem> BoundRecipeItem;
+	TWeakObjectPtr<UKCHUDRecipeViewModel> RecipeViewModel;
 	FDelegateHandle RecipeChangedHandle;
 };

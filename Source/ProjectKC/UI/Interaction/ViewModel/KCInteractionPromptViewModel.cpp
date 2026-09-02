@@ -10,6 +10,16 @@ void UKCInteractionPromptViewModel::SetInputText(const FText& NewInputText)
 	UE_MVVM_SET_PROPERTY_VALUE(InputText, NewInputText);
 }
 
+void UKCInteractionPromptViewModel::SetUsesInputKey(bool bNewUsesInputKey)
+{
+	UE_MVVM_SET_PROPERTY_VALUE(bUsesInputKey, bNewUsesInputKey);
+}
+
+void UKCInteractionPromptViewModel::SetInputKey(FKey NewInputKey)
+{
+	UE_MVVM_SET_PROPERTY_VALUE(InputKey, NewInputKey);
+}
+
 void UKCInteractionPromptViewModel::SetActionText(const FText& NewActionText)
 {
 	UE_MVVM_SET_PROPERTY_VALUE(ActionText, NewActionText);
@@ -18,6 +28,35 @@ void UKCInteractionPromptViewModel::SetActionText(const FText& NewActionText)
 void UKCInteractionPromptViewModel::SetTargetActor(AActor* NewTargetActor)
 {
 	UE_MVVM_SET_PROPERTY_VALUE(TargetActor, NewTargetActor);
+}
+
+void UKCInteractionPromptViewModel::SetIcon(TSoftObjectPtr<UTexture2D> NewIcon)
+{
+	UE_MVVM_SET_PROPERTY_VALUE(Icon, NewIcon);
+}
+
+void UKCInteractionPromptViewModel::SetPromptData(
+	AActor* NewTargetActor,
+	const FKCInteractionPromptEntry& PromptEntry)
+{
+	SetTargetActor(NewTargetActor);
+	SetInputText(PromptEntry.InputText);
+	SetUsesInputKey(PromptEntry.bUsesInputKey);
+	SetInputKey(PromptEntry.InputKey);
+	SetActionText(PromptEntry.ActionText);
+	SetIcon(PromptEntry.Icon);
+	SetVisible(true);
+}
+
+void UKCInteractionPromptViewModel::ClearPrompt()
+{
+	SetVisible(false);
+	SetInputText(FText::GetEmpty());
+	SetUsesInputKey(false);
+	SetInputKey(FKey());
+	SetActionText(FText::GetEmpty());
+	SetIcon(nullptr);
+	SetTargetActor(nullptr);
 }
 
 void UKCInteractionPromptViewModel::SetPreviewData(bool bNewVisible, const FText& NewInputText, const FText& NewActionText)

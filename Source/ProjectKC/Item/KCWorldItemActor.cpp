@@ -12,6 +12,7 @@
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/Messages/KCGameplayTags.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCWorldItem, Log, All);
@@ -44,6 +45,27 @@ void AKCWorldItemActor::Interact_Implementation(AActor* Interactor)
 	{
 		HolderItemComponent->TryPickUp(this);
 	}
+}
+
+FGameplayTag AKCWorldItemActor::GetInteractionPromptTag_Implementation(
+	AActor* Interactor) const
+{
+	const UKCHeldItemComponent* HeldItemComponent = Interactor
+		? Interactor->FindComponentByClass<UKCHeldItemComponent>()
+		: nullptr;
+	if (!CanBePickedUp() || !HeldItemComponent ||
+		HeldItemComponent->HasHeldItem())
+	{
+		return FGameplayTag();
+	}
+
+	return KCGameplayTags::Interaction_Item_PickUp;
+}
+
+FVector AKCWorldItemActor::GetInteractionPromptWorldLocation_Implementation(
+	AActor* Interactor) const
+{
+	return ItemMesh ? ItemMesh->Bounds.Origin : GetActorLocation();
 }
 
 void AKCWorldItemActor::OnConstruction(const FTransform& Transform)

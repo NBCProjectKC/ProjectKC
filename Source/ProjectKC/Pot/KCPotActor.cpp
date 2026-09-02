@@ -128,6 +128,27 @@ void AKCPotActor::Interact_Implementation(AActor* Interactor)
 	}
 }
 
+FGameplayTag AKCPotActor::GetInteractionPromptTag_Implementation(
+	AActor* Interactor) const
+{
+	const UKCHeldItemComponent* HeldItemComponent = Interactor
+		? Interactor->FindComponentByClass<UKCHeldItemComponent>()
+		: nullptr;
+	if (PotState != EKCPotStateType::Idle || !HeldItemComponent ||
+		!HeldItemComponent->HasHeldItem())
+	{
+		return FGameplayTag();
+	}
+
+	return KCGameplayTags::Interaction_Pot_SubmitIngredient;
+}
+
+FVector AKCPotActor::GetInteractionPromptWorldLocation_Implementation(
+	AActor* Interactor) const
+{
+	return InteractionVolume ? InteractionVolume->Bounds.Origin : GetActorLocation();
+}
+
 void AKCPotActor::OnInteractionVolumeBeginOverlap(
 	UPrimitiveComponent* OverlappedComponent,
 	AActor* OtherActor,
