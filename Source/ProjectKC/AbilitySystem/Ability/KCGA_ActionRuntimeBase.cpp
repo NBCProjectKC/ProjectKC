@@ -2,11 +2,17 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "GameplayAbilitySpec.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "TimerManager.h"
+#include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Task/KCAbilityTask_ActionTraceWindow.h"
+#include "ProjectKC/Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/Item/KCWorldItemActor.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCActionRuntime, Log, All);
 
@@ -21,6 +27,27 @@ UKCGA_ActionRuntimeBase::UKCGA_ActionRuntimeBase()
 	AddSupportedActionHook(TAG_KC_ActionHook_OnComplete);
 }
 
+bool UKCGA_ActionRuntimeBase::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(
+		Handle,
+		ActorInfo,
+		SourceTags,
+		TargetTags,
+		OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	const AKCWorldItemActor* SourceItem = ResolveSourceItem(Handle, ActorInfo);
+	return !SourceItem || SourceItem->IsUsable();
+}
+
 void UKCGA_ActionRuntimeBase::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -31,6 +58,10 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	bFinishingAction = false;
+	bDurabilityConsumedThisActivation = false;
+	bUseConsumptionPendingThisActivation = false;
+	StopActiveDurabilityDrain(false);
+	ActiveSourceItem = nullptr;
 	ActiveTraceTask = nullptr;
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
@@ -38,6 +69,7 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	{
 		return;
 	}
+	ActiveSourceItem = ResolveSourceItem(Handle, ActorInfo);
 
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
 	const UKCActionTargeting* Targeting =
@@ -118,6 +150,9 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 		return;
 	}
 
+	TryConsumeActiveItemDurability(EKCItemDurabilityConsumeMode::OnUse);
+	StartActiveDurabilityDrain();
+
 	if (TraceWindowTargeting)
 	{
 		ActiveTraceTask = UKCAbilityTask_ActionTraceWindow::Create(
@@ -141,11 +176,25 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	bool bWasCancelled)
 {
 	bFinishingAction = true;
+	StopActiveDurabilityDrain(true);
+	AKCWorldItemActor* PendingConsumptionItem =
+		bUseConsumptionPendingThisActivation
+			? ActiveSourceItem.Get()
+			: nullptr;
+	bUseConsumptionPendingThisActivation = false;
 	ActivationTarget = nullptr;
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	// Ability 종료 중에는 GAS가 Task 배열을 순회해 직접 정리한다.
 	ActiveTraceTask = nullptr;
+	ActiveSourceItem = nullptr;
+
+	// 실제 제거는 다음 틱이므로 현재 Ability 종료 스택과 몽타주 정리는
+	// 끝까지 진행된다. Super 이후 SourceObject 상태에 의존하지 않게 먼저 예약한다.
+	if (IsValid(PendingConsumptionItem))
+	{
+		PendingConsumptionItem->FinalizePendingUseConsumption();
+	}
 
 	Super::EndAbility(
 		Handle,
@@ -181,23 +230,160 @@ FKCActionTargetingContext UKCGA_ActionRuntimeBase::BuildTargetingContext() const
 	return Context;
 }
 
-void UKCGA_ActionRuntimeBase::ExecuteTargets(
+bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 	const TArray<FKCActionTarget>& Targets)
 {
+	bool bConfirmedHit = false;
+	bool bAnyExecutionSucceeded = false;
 	for (const FKCActionTarget& Target : Targets)
 	{
 		if (!IsValid(Target.Actor))
 		{
 			continue;
 		}
+		bConfirmedHit |= Target.bHasHitResult;
 
 		UAbilitySystemComponent* TargetAbilitySystem =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target.Actor);
-		ExecuteActionHook(
+		bAnyExecutionSucceeded |= ExecuteActionHook(
 			TAG_KC_ActionHook_OnExecute,
 			TargetAbilitySystem,
 			Target.Actor,
 			Target.bHasHitResult ? &Target.HitResult : nullptr);
+	}
+
+	if (bConfirmedHit && !bDurabilityConsumedThisActivation &&
+		TryConsumeActiveItemDurability(
+			EKCItemDurabilityConsumeMode::OnFirstHit))
+	{
+		bDurabilityConsumedThisActivation = true;
+	}
+
+	if (bAnyExecutionSucceeded &&
+		!bUseConsumptionPendingThisActivation &&
+		TryBeginActiveItemUseConsumption())
+	{
+		bUseConsumptionPendingThisActivation = true;
+	}
+
+	return bAnyExecutionSucceeded;
+}
+
+AKCWorldItemActor* UKCGA_ActionRuntimeBase::ResolveSourceItem(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!ActorInfo || !ActorInfo->AbilitySystemComponent.IsValid())
+	{
+		return nullptr;
+	}
+
+	const FGameplayAbilitySpec* Spec =
+		ActorInfo->AbilitySystemComponent->FindAbilitySpecFromHandle(Handle);
+	const UKCAbilitySourceComponent* SourceComponent = Spec
+		? Cast<UKCAbilitySourceComponent>(Spec->SourceObject.Get())
+		: nullptr;
+	return SourceComponent
+		? Cast<AKCWorldItemActor>(SourceComponent->GetOwner())
+		: nullptr;
+}
+
+bool UKCGA_ActionRuntimeBase::TryConsumeActiveItemDurability(
+	EKCItemDurabilityConsumeMode ConsumeMode,
+	float ConsumptionScale)
+{
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
+	return Item && Item->TryConsumeDurability(ConsumeMode, ConsumptionScale);
+}
+
+bool UKCGA_ActionRuntimeBase::TryBeginActiveItemUseConsumption()
+{
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
+	return Item && Item->TryBeginUseConsumption();
+}
+
+void UKCGA_ActionRuntimeBase::StartActiveDurabilityDrain()
+{
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
+	const UKCItemDefinition* ItemDefinition = Item
+		? Item->GetItemDefinition()
+		: nullptr;
+	UWorld* World = GetWorld();
+	if (!World || !ItemDefinition ||
+		ItemDefinition->Durability.ConsumeMode !=
+			EKCItemDurabilityConsumeMode::WhileActive)
+	{
+		return;
+	}
+
+	bDurabilityDrainActive = true;
+	LastDurabilityDrainTimeSeconds = World->GetTimeSeconds();
+	World->GetTimerManager().SetTimer(
+		DurabilityDrainTimerHandle,
+		this,
+		&UKCGA_ActionRuntimeBase::TickActiveDurabilityDrain,
+		0.1f,
+		true);
+}
+
+void UKCGA_ActionRuntimeBase::StopActiveDurabilityDrain(
+	bool bConsumeRemainingTime)
+{
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(DurabilityDrainTimerHandle);
+	}
+
+	if (bDurabilityDrainActive && bConsumeRemainingTime && World)
+	{
+		const double CurrentTimeSeconds = World->GetTimeSeconds();
+		const float ElapsedSeconds = static_cast<float>(FMath::Max(
+			0.0,
+			CurrentTimeSeconds - LastDurabilityDrainTimeSeconds));
+		if (ElapsedSeconds > 0.0f)
+		{
+			TryConsumeActiveItemDurability(
+				EKCItemDurabilityConsumeMode::WhileActive,
+				ElapsedSeconds);
+		}
+	}
+
+	bDurabilityDrainActive = false;
+	LastDurabilityDrainTimeSeconds = 0.0;
+}
+
+void UKCGA_ActionRuntimeBase::TickActiveDurabilityDrain()
+{
+	if (!bDurabilityDrainActive || !IsActive() || IsFinishingAction())
+	{
+		StopActiveDurabilityDrain(false);
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	AKCWorldItemActor* Item = ActiveSourceItem.Get();
+	if (!World || !Item)
+	{
+		StopActiveDurabilityDrain(false);
+		return;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	const float ElapsedSeconds = static_cast<float>(FMath::Max(
+		0.0,
+		CurrentTimeSeconds - LastDurabilityDrainTimeSeconds));
+	LastDurabilityDrainTimeSeconds = CurrentTimeSeconds;
+	if (ElapsedSeconds > 0.0f)
+	{
+		TryConsumeActiveItemDurability(
+			EKCItemDurabilityConsumeMode::WhileActive,
+			ElapsedSeconds);
+	}
+
+	if (Item->IsBroken())
+	{
+		FinishAction(true, false);
 	}
 }
 

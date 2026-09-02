@@ -3,12 +3,17 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Misc/DataValidation.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/Messages/KCGameplayTags.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCWorldItem, Log, All);
 
@@ -40,6 +45,27 @@ void AKCWorldItemActor::Interact_Implementation(AActor* Interactor)
 	{
 		HolderItemComponent->TryPickUp(this);
 	}
+}
+
+FGameplayTag AKCWorldItemActor::GetInteractionPromptTag_Implementation(
+	AActor* Interactor) const
+{
+	const UKCHeldItemComponent* HeldItemComponent = Interactor
+		? Interactor->FindComponentByClass<UKCHeldItemComponent>()
+		: nullptr;
+	if (!CanBePickedUp() || !HeldItemComponent ||
+		HeldItemComponent->HasHeldItem())
+	{
+		return FGameplayTag();
+	}
+
+	return KCGameplayTags::Interaction_Item_PickUp;
+}
+
+FVector AKCWorldItemActor::GetInteractionPromptWorldLocation_Implementation(
+	AActor* Interactor) const
+{
+	return ItemMesh ? ItemMesh->Bounds.Origin : GetActorLocation();
 }
 
 void AKCWorldItemActor::OnConstruction(const FTransform& Transform)
@@ -88,7 +114,8 @@ void AKCWorldItemActor::BeginPlay()
 bool AKCWorldItemActor::InitializeItem(UKCItemDefinition* NewDefinition)
 {
 	if (!HasAuthority() || RuntimeState.State != EKCWorldItemState::World ||
-		!IsValid(NewDefinition))
+		!IsValid(NewDefinition) || bUseConsumptionPending ||
+		bUseConsumptionDestructionScheduled)
 	{
 		return false;
 	}
@@ -103,6 +130,9 @@ bool AKCWorldItemActor::InitializeItem(UKCItemDefinition* NewDefinition)
 		return false;
 	}
 
+	ResetDurability();
+	bUseConsumptionPending = false;
+	bUseConsumptionDestructionScheduled = false;
 	ApplyStatePresentation();
 	ForceNetUpdate();
 	return true;
@@ -148,7 +178,7 @@ bool AKCWorldItemActor::EnterHeldState(
 
 	// 사용 Ability 부여에 실패해도 운반은 가능하다.
 	// 사용만 막히고, TryActivate()가 부여된 Handle이 없으므로 자연히 false를 반환한다.
-	if (IsUsable())
+	if (bDefinitionValid && ItemDefinition->IsUsable())
 	{
 		UKCAbilitySystemComponent* HolderAbilitySystem =
 			Cast<UKCAbilitySystemComponent>(
@@ -216,7 +246,8 @@ bool AKCWorldItemActor::PressUse(
 
 bool AKCWorldItemActor::ReleaseUse(FGameplayAbilitySpecHandle PressedHandle)
 {
-	return IsUsable() && AbilitySourceComponent->ReleaseInput(PressedHandle);
+	return bDefinitionValid && ItemDefinition->IsUsable() &&
+		AbilitySourceComponent->ReleaseInput(PressedHandle);
 }
 
 bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
@@ -230,12 +261,100 @@ bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
 bool AKCWorldItemActor::CanBePickedUp() const
 {
 	return RuntimeState.State == EKCWorldItemState::World &&
-		bDefinitionValid;
+		bDefinitionValid && !bUseConsumptionPending;
 }
 
 bool AKCWorldItemActor::IsUsable() const
 {
-	return bDefinitionValid && ItemDefinition->IsUsable();
+	return bDefinitionValid && ItemDefinition->IsUsable() &&
+		!IsBroken() && !bUseConsumptionPending;
+}
+
+bool AKCWorldItemActor::UsesDurability() const
+{
+	return bDefinitionValid && ItemDefinition &&
+		ItemDefinition->Durability.IsEnabled();
+}
+
+bool AKCWorldItemActor::IsBroken() const
+{
+	return UsesDurability() && CurrentDurability <= 0.0f;
+}
+
+float AKCWorldItemActor::GetCurrentDurability() const
+{
+	return CurrentDurability;
+}
+
+float AKCWorldItemActor::GetMaximumDurability() const
+{
+	return FKCItemDurabilityStruct::MaximumDurability;
+}
+
+float AKCWorldItemActor::GetDurabilityNormalized() const
+{
+	return FMath::Clamp(
+		CurrentDurability / FKCItemDurabilityStruct::MaximumDurability,
+		0.0f,
+		1.0f);
+}
+
+bool AKCWorldItemActor::IsUseConsumptionPending() const
+{
+	return bUseConsumptionPending;
+}
+
+bool AKCWorldItemActor::TryBeginUseConsumption()
+{
+	if (!HasAuthority() || !bDefinitionValid || !ItemDefinition ||
+		ItemDefinition->UseLifecycle !=
+			EKCItemUseLifecycle::ConsumeOnSuccessfulExecute ||
+		bUseConsumptionPending || bUseConsumptionDestructionScheduled)
+	{
+		return false;
+	}
+
+	bUseConsumptionPending = true;
+	ApplyStatePresentation();
+	ForceNetUpdate();
+	return true;
+}
+
+bool AKCWorldItemActor::FinalizePendingUseConsumption()
+{
+	if (!HasAuthority() || !bUseConsumptionPending ||
+		bUseConsumptionDestructionScheduled)
+	{
+		return false;
+	}
+
+	bUseConsumptionDestructionScheduled = true;
+	GetWorldTimerManager().SetTimerForNextTick(
+		this,
+		&AKCWorldItemActor::DestroyConsumedItem);
+	return true;
+}
+
+bool AKCWorldItemActor::TryConsumeDurability(
+	EKCItemDurabilityConsumeMode ConsumeMode,
+	float ConsumptionScale)
+{
+	if (!HasAuthority() || !UsesDurability() || IsBroken() ||
+		ItemDefinition->Durability.ConsumeMode != ConsumeMode ||
+		!FMath::IsFinite(ConsumptionScale) || ConsumptionScale <= 0.0f)
+	{
+		return false;
+	}
+
+	const float Consumption =
+		ItemDefinition->Durability.ConsumeAmount * ConsumptionScale;
+	if (!FMath::IsFinite(Consumption) || Consumption <= 0.0f)
+	{
+		return false;
+	}
+
+	SetCurrentDurability(CurrentDurability - Consumption);
+	return true;
 }
 
 EKCWorldItemState AKCWorldItemActor::GetItemState() const
@@ -265,6 +384,8 @@ void AKCWorldItemActor::GetLifetimeReplicatedProps(
 
 	DOREPLIFETIME(AKCWorldItemActor, RuntimeState);
 	DOREPLIFETIME(AKCWorldItemActor, ItemDefinition);
+	DOREPLIFETIME(AKCWorldItemActor, CurrentDurability);
+	DOREPLIFETIME(AKCWorldItemActor, bUseConsumptionPending);
 }
 
 void AKCWorldItemActor::OnRep_RuntimeState()
@@ -279,6 +400,44 @@ void AKCWorldItemActor::OnRep_ItemDefinition()
 	RefreshDefinition();
 	ApplyStatePresentation();
 	RefreshReplicatedAttachment();
+}
+
+void AKCWorldItemActor::OnRep_CurrentDurability(float PreviousDurability)
+{
+	BroadcastDurabilityChanged(PreviousDurability);
+}
+
+void AKCWorldItemActor::OnRep_UseConsumptionPending()
+{
+	ApplyStatePresentation();
+}
+
+void AKCWorldItemActor::MulticastPlayBreakEffects_Implementation(
+	FVector_NetQuantize BreakLocation,
+	FRotator BreakRotation)
+{
+	if (GetNetMode() == NM_DedicatedServer || !ItemDefinition)
+	{
+		return;
+	}
+
+	if (ItemDefinition->Durability.BreakSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			ItemDefinition->Durability.BreakSound,
+			BreakLocation,
+			BreakRotation);
+	}
+
+	if (ItemDefinition->Durability.BreakVFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			ItemDefinition->Durability.BreakVFX,
+			BreakLocation,
+			BreakRotation);
+	}
 }
 
 bool AKCWorldItemActor::RefreshDefinition(FString* OutError)
@@ -410,7 +569,9 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 
 void AKCWorldItemActor::ApplyStatePresentation()
 {
-	if (!bDefinitionValid)
+	ItemMesh->SetVisibility(!bUseConsumptionPending, true);
+
+	if (!bDefinitionValid || bUseConsumptionPending)
 	{
 		ItemMesh->SetSimulatePhysics(false);
 		ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -434,4 +595,110 @@ void AKCWorldItemActor::ApplyStatePresentation()
 void AKCWorldItemActor::BroadcastStateChanged()
 {
 	OnItemStateChanged.Broadcast(RuntimeState.State, RuntimeState.Holder);
+}
+
+void AKCWorldItemActor::ResetDurability()
+{
+	bBreakDestructionScheduled = false;
+	SetCurrentDurability(FKCItemDurabilityStruct::MaximumDurability);
+}
+
+void AKCWorldItemActor::SetCurrentDurability(float NewDurability)
+{
+	const float ClampedDurability = FMath::Clamp(
+		NewDurability,
+		0.0f,
+		FKCItemDurabilityStruct::MaximumDurability);
+	if (FMath::IsNearlyEqual(CurrentDurability, ClampedDurability))
+	{
+		return;
+	}
+
+	const float PreviousDurability = CurrentDurability;
+	CurrentDurability = ClampedDurability;
+	ForceNetUpdate();
+	BroadcastDurabilityChanged(PreviousDurability);
+}
+
+void AKCWorldItemActor::BroadcastDurabilityChanged(float PreviousDurability)
+{
+	OnDurabilityChanged.Broadcast(PreviousDurability, CurrentDurability);
+	if (PreviousDurability > 0.0f && CurrentDurability <= 0.0f)
+	{
+		OnItemBroken.Broadcast();
+		HandleBroken();
+	}
+}
+
+void AKCWorldItemActor::HandleBroken()
+{
+	if (!HasAuthority() || !ShouldDestroyWhenBroken() ||
+		bBreakDestructionScheduled)
+	{
+		return;
+	}
+
+	bBreakDestructionScheduled = true;
+	MulticastPlayBreakEffects(GetActorLocation(), GetActorRotation());
+
+	// 명중 처리나 Ability 실행 도중 Source Actor를 바로 없애지 않는다.
+	// 다음 틱에 Ability/보유 참조를 먼저 정리한 뒤 Actor를 파괴한다.
+	GetWorldTimerManager().SetTimerForNextTick(
+		this,
+		&AKCWorldItemActor::DestroyBrokenItem);
+}
+
+void AKCWorldItemActor::DestroyBrokenItem()
+{
+	bBreakDestructionScheduled = false;
+	if (!HasAuthority() || !IsBroken() || !ShouldDestroyWhenBroken())
+	{
+		return;
+	}
+
+	DestroyItemActor();
+}
+
+void AKCWorldItemActor::DestroyConsumedItem()
+{
+	bUseConsumptionDestructionScheduled = false;
+	if (!HasAuthority() || !bUseConsumptionPending)
+	{
+		return;
+	}
+
+	DestroyItemActor();
+}
+
+void AKCWorldItemActor::DestroyItemActor()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (RuntimeState.State == EKCWorldItemState::Held &&
+		IsValid(RuntimeState.Holder))
+	{
+		if (UKCHeldItemComponent* HolderItemComponent =
+			RuntimeState.Holder->FindComponentByClass<UKCHeldItemComponent>())
+		{
+			HolderItemComponent->ClearHeldItemForDestruction(this);
+		}
+	}
+
+	// 비정상 보유 참조에서도 활성 Ability와 부착 상태가 남지 않게 한다.
+	if (RuntimeState.State == EKCWorldItemState::Held)
+	{
+		ExitHeldState(GetActorTransform(), FVector::ZeroVector);
+	}
+
+	Destroy();
+}
+
+bool AKCWorldItemActor::ShouldDestroyWhenBroken() const
+{
+	return UsesDurability() &&
+		ItemDefinition->Durability.BreakBehavior ==
+			EKCItemBreakBehavior::Destroy;
 }

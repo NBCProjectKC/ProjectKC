@@ -1,5 +1,6 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDRecipeEntryWidget.h"
 
+#include "Components/Border.h"
 #include "Components/CheckBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
@@ -10,8 +11,8 @@
 #include "Components/Widget.h"
 #include "Components/VerticalBox.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeViewModel.h"
 #include "ProjectKC/UI/HUD/Widget/KCRecipeEntryIngredient.h"
-#include "ProjectKC/UI/HUD/Widget/KCHUDRecipeListWidget.h"
 
 void UKCHUDRecipeEntryWidget::NativePreConstruct()
 {
@@ -21,16 +22,21 @@ void UKCHUDRecipeEntryWidget::NativePreConstruct()
 
 void UKCHUDRecipeEntryWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
-	if (UKCHUDRecipeListItem* RecipeItem = Cast<UKCHUDRecipeListItem>(ListItemObject))
+	if (UKCHUDRecipeViewModel* InRecipeViewModel = Cast<UKCHUDRecipeViewModel>(ListItemObject))
 	{
-		BindRecipeListItem(RecipeItem);
-		SetRecipe(RecipeItem->Recipe);
+		SetRecipeViewModel(InRecipeViewModel);
 	}
 }
 
 void UKCHUDRecipeEntryWidget::NativeOnEntryReleased()
 {
-	UnbindRecipeListItem();
+	UnbindRecipeViewModel();
+}
+
+void UKCHUDRecipeEntryWidget::SetRecipeViewModel(UKCHUDRecipeViewModel* InRecipeViewModel)
+{
+	BindRecipeViewModel(InRecipeViewModel);
+	SetRecipe(InRecipeViewModel ? InRecipeViewModel->GetRecipe() : FKCRecipeViewData());
 }
 
 void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
@@ -58,36 +64,36 @@ void UKCHUDRecipeEntryWidget::SetRecipe(const FKCRecipeViewData& Recipe)
 	RefreshIngredientList(Recipe.Ingredients);
 }
 
-void UKCHUDRecipeEntryWidget::BindRecipeListItem(UKCHUDRecipeListItem* RecipeItem)
+void UKCHUDRecipeEntryWidget::BindRecipeViewModel(UKCHUDRecipeViewModel* InRecipeViewModel)
 {
-	if (BoundRecipeItem.Get() == RecipeItem)
+	if (RecipeViewModel.Get() == InRecipeViewModel)
 	{
 		return;
 	}
 
-	UnbindRecipeListItem();
-	BoundRecipeItem = RecipeItem;
+	UnbindRecipeViewModel();
+	RecipeViewModel = InRecipeViewModel;
 
-	if (RecipeItem)
+	if (InRecipeViewModel)
 	{
-		RecipeChangedHandle = RecipeItem->OnRecipeChangedNative.AddUObject(
+		RecipeChangedHandle = InRecipeViewModel->OnRecipeChangedNative.AddUObject(
 			this,
-			&ThisClass::HandleRecipeListItemChanged);
+			&ThisClass::HandleRecipeViewModelChanged);
 	}
 }
 
-void UKCHUDRecipeEntryWidget::UnbindRecipeListItem()
+void UKCHUDRecipeEntryWidget::UnbindRecipeViewModel()
 {
-	if (UKCHUDRecipeListItem* RecipeItem = BoundRecipeItem.Get())
+	if (UKCHUDRecipeViewModel* BoundRecipeViewModel = RecipeViewModel.Get())
 	{
-		RecipeItem->OnRecipeChangedNative.Remove(RecipeChangedHandle);
+		BoundRecipeViewModel->OnRecipeChangedNative.Remove(RecipeChangedHandle);
 	}
 
-	BoundRecipeItem.Reset();
+	RecipeViewModel.Reset();
 	RecipeChangedHandle.Reset();
 }
 
-void UKCHUDRecipeEntryWidget::HandleRecipeListItemChanged(const FKCRecipeViewData& Recipe)
+void UKCHUDRecipeEntryWidget::HandleRecipeViewModelChanged(const FKCRecipeViewData& Recipe)
 {
 	SetRecipe(Recipe);
 }
@@ -132,15 +138,18 @@ void UKCHUDRecipeEntryWidget::RefreshDifficultyStars(const int32 DifficultyStars
 
 void UKCHUDRecipeEntryWidget::RefreshCookingIndicators(const FKCRecipeViewData& Recipe)
 {
-	ApplyCookingIndicator(Team1CookingImage.Get(), Team1Cooking.Get(), Recipe.bTeam0Cooking);
-	ApplyCookingIndicator(Team2CookingImage.Get(), Team2Cooking.Get(), Recipe.bTeam1Cooking);
+	ApplyCookingIndicator(Team1CookingBorder.Get(), Team1CookingImage.Get(), Team1Cooking.Get(), Recipe.bTeam0Cooking);
+	ApplyCookingIndicator(Team2CookingBorder.Get(), Team2CookingImage.Get(), Team2Cooking.Get(), Recipe.bTeam1Cooking);
 }
 
-void UKCHUDRecipeEntryWidget::ApplyCookingIndicator(UImage* CookingImage, UWidgetAnimation* CookingAnimation, const bool bCooking)
+void UKCHUDRecipeEntryWidget::ApplyCookingIndicator(UBorder* CookingBorder, UImage* CookingImage, UWidgetAnimation* CookingAnimation, const bool bCooking)
 {
-	if (CookingImage)
+	if (CookingBorder)
 	{
-		CookingImage->SetVisibility(bCooking
+		// CookingImage->SetVisibility(bCooking
+		// 	? ESlateVisibility::SelfHitTestInvisible
+		// 	: ESlateVisibility::Hidden);
+		CookingBorder->SetVisibility(bCooking
 			? ESlateVisibility::SelfHitTestInvisible
 			: ESlateVisibility::Hidden);
 	}

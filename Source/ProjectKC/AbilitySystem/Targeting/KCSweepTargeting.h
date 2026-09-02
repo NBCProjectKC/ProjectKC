@@ -22,6 +22,7 @@ public:
 	UKCSweepTargeting();
 
 	virtual bool Validate(FString& OutError) const override;
+	virtual bool ProducesHitResults() const override { return true; }
 
 	virtual void GatherTargets(
 		const FKCActionTargetingContext& Context,

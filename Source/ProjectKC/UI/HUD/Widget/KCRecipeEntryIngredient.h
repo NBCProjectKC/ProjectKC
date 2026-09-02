@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/IUserObjectListEntry.h"
-#include "ProjectKC/UI/HUD/ViewModel/KCHUDViewModel.h"
+#include "ProjectKC/UI/HUD/ViewModel/KCHUDRecipeTypes.h"
 #include "UI/Common/Widget/KCUserWidget.h"
 #include "KCRecipeEntryIngredient.generated.h"
 

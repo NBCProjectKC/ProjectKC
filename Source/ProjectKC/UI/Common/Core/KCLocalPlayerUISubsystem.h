@@ -13,10 +13,14 @@ class PROJECTKC_API UKCLocalPlayerUISubsystem : public ULocalPlayerSubsystem
 	GENERATED_BODY()
 
 public:
-	/**
-	* @param bPersistAcrossLevelTravel =true 일 때, 레벨 파괴에도 위젯이 파괴되지 않음
-	*/
-	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel = false);
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	UKCUserWidget* SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void ClearScreenWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void ClearHUDWidget();
@@ -31,7 +35,7 @@ private:
 	APlayerController* GetOwningPlayerController() const;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UKCUserWidget> ActiveHUDWidget;
+	TObjectPtr<UKCUserWidget> ActiveScreenWidget;
 
 	UPROPERTY(Transient)
 	TArray<FText> PendingToastMessages;

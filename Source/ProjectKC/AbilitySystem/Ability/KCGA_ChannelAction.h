@@ -34,9 +34,22 @@ protected:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo) override;
 
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
+
 	virtual bool TryBeginExecutionWindow() override;
 
 private:
+	void StartFixedIntervalExecution();
+	void StopFixedIntervalExecution();
+	void HandleFixedIntervalPulse();
+
 	UPROPERTY(Transient)
 	TObjectPtr<UKCAbilityTask_PlayActionMontage> ActiveMontageTask;
+
+	FTimerHandle FixedIntervalTimerHandle;
 };

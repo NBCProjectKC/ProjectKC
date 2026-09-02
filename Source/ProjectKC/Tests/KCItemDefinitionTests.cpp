@@ -6,10 +6,13 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "GameplayEffect.h"
+#include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
-#include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCItemSocketTrailTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCSelfTargeting.h"
+#include "ProjectKC/AbilitySystem/Targeting/KCSweepTargeting.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 
 namespace KCItemDefinitionTests
@@ -33,6 +36,23 @@ namespace KCItemDefinitionTests
 	{
 		UKCSingleActionDefinition* Definition =
 			NewObject<UKCSingleActionDefinition>(Outer);
+		Definition->ActionTargeting = NewObject<UKCSelfTargeting>(Definition);
+		Definition->ActionMontage.Montage = NewObject<UAnimMontage>(Definition);
+
+		FKCActionHookStruct Hook;
+		Hook.HookTag = TAG_KC_ActionHook_OnExecute;
+		UKCApplyGameplayEffectFragment* Fragment =
+			NewObject<UKCApplyGameplayEffectFragment>(Definition);
+		Fragment->EffectRecipe.EffectClass = UGameplayEffect::StaticClass();
+		Hook.Fragments.Add(Fragment);
+		Definition->ActionHooks.Add(MoveTemp(Hook));
+		return Definition;
+	}
+
+	UKCChannelActionDefinition* MakeValidChannelUseAbility(UObject* Outer)
+	{
+		UKCChannelActionDefinition* Definition =
+			NewObject<UKCChannelActionDefinition>(Outer);
 		Definition->ActionTargeting = NewObject<UKCSelfTargeting>(Definition);
 		Definition->ActionMontage.Montage = NewObject<UAnimMontage>(Definition);
 
@@ -104,6 +124,156 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("사용 Action은 별도 Data Asset이 아니라 Item Definition에 포함된다."),
 		UsableItem->UseAction->GetOuter() == UsableItem);
+	TestTrue(
+		TEXT("기존 아이템의 기본 사용 수명주기는 Persistent다."),
+		UsableItem->UseLifecycle == EKCItemUseLifecycle::Persistent);
+
+	UKCItemDefinition* ConsumableWithoutUse =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableWithoutUse->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestFalse(
+		TEXT("성공 후 소비 아이템에는 UseAction이 필요하다."),
+		ConsumableWithoutUse->Validate(Error));
+
+	UKCItemDefinition* ConsumableWithoutRequiredFragment =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableWithoutRequiredFragment->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(
+			ConsumableWithoutRequiredFragment);
+	ConsumableWithoutRequiredFragment->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestFalse(
+		TEXT("성공 후 소비에는 성공을 확정할 필수 Fragment가 필요하다."),
+		ConsumableWithoutRequiredFragment->Validate(Error));
+
+	UKCItemDefinition* ConsumableItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(ConsumableItem);
+	ConsumableItem->UseAction->ActionHooks[0].Fragments[0]->bRequired = true;
+	ConsumableItem->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestTrue(
+		TEXT("필수 실행 결과가 있는 Single Action은 성공 후 소비할 수 있다."),
+		ConsumableItem->Validate(Error));
+
+	UKCItemDefinition* ConsumableChannelItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableChannelItem->UseAction =
+		KCItemDefinitionTests::MakeValidChannelUseAbility(
+			ConsumableChannelItem);
+	ConsumableChannelItem->UseAction->ActionHooks[0].Fragments[0]->bRequired = true;
+	ConsumableChannelItem->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	TestFalse(
+		TEXT("성공 후 소비는 반복 실행되는 Channel Action에 설정할 수 없다."),
+		ConsumableChannelItem->Validate(Error));
+
+	UKCItemDefinition* ConsumableDurabilityItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ConsumableDurabilityItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(
+			ConsumableDurabilityItem);
+	ConsumableDurabilityItem->UseAction->ActionHooks[0].Fragments[0]->bRequired = true;
+	ConsumableDurabilityItem->UseLifecycle =
+		EKCItemUseLifecycle::ConsumeOnSuccessfulExecute;
+	ConsumableDurabilityItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnUse;
+	ConsumableDurabilityItem->Durability.ConsumeAmount = 100.0f;
+	TestFalse(
+		TEXT("일회용 소비와 내구도 소모를 동시에 설정할 수 없다."),
+		ConsumableDurabilityItem->Validate(Error));
+
+	UKCItemDefinition* DurabilityWithoutUse =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	DurabilityWithoutUse->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnUse;
+	DurabilityWithoutUse->Durability.ConsumeAmount = 25.0f;
+	TestFalse(
+		TEXT("UseAction이 없는 아이템에는 내구도 소모 규칙을 설정할 수 없다."),
+		DurabilityWithoutUse->Validate(Error));
+
+	UKCItemDefinition* InvalidDurabilityAmount =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	InvalidDurabilityAmount->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(InvalidDurabilityAmount);
+	InvalidDurabilityAmount->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnUse;
+	InvalidDurabilityAmount->Durability.ConsumeAmount = 0.0f;
+	TestFalse(
+		TEXT("활성 내구도 규칙의 소모량은 0보다 커야 한다."),
+		InvalidDurabilityAmount->Validate(Error));
+
+	UKCItemDefinition* OnUseItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	OnUseItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(OnUseItem);
+	OnUseItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnUse;
+	OnUseItem->Durability.ConsumeAmount = 25.0f;
+	TestTrue(
+		TEXT("일반 Action은 사용 확정 시 내구도를 소모할 수 있다."),
+		OnUseItem->Validate(Error));
+
+	UKCItemDefinition* NonTraceHitItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	NonTraceHitItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(NonTraceHitItem);
+	NonTraceHitItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnFirstHit;
+	NonTraceHitItem->Durability.ConsumeAmount = 25.0f;
+	TestFalse(
+		TEXT("명중 소모 규칙은 HitResult를 제공하는 Targeting이 필요하다."),
+		NonTraceHitItem->Validate(Error));
+
+	UKCItemDefinition* SweepHitItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	SweepHitItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(SweepHitItem);
+	SweepHitItem->UseAction->ActionTargeting =
+		NewObject<UKCSweepTargeting>(SweepHitItem->UseAction);
+	SweepHitItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnFirstHit;
+	SweepHitItem->Durability.ConsumeAmount = 25.0f;
+	TestTrue(
+		TEXT("Sweep Action은 최초 유효 명중 시 내구도를 소모할 수 있다."),
+		SweepHitItem->Validate(Error));
+
+	UKCItemDefinition* TraceHitItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	TraceHitItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(TraceHitItem);
+	TraceHitItem->UseAction->ActionTargeting =
+		NewObject<UKCItemSocketTrailTargeting>(TraceHitItem->UseAction);
+	TraceHitItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::OnFirstHit;
+	TraceHitItem->Durability.ConsumeAmount = 25.0f;
+	TestTrue(
+		TEXT("TraceWindow Action은 최초 유효 명중 시 내구도를 소모할 수 있다."),
+		TraceHitItem->Validate(Error));
+
+	UKCItemDefinition* NonChannelContinuousItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	NonChannelContinuousItem->UseAction =
+		KCItemDefinitionTests::MakeValidUseAbility(NonChannelContinuousItem);
+	NonChannelContinuousItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::WhileActive;
+	NonChannelContinuousItem->Durability.ConsumeAmount = 20.0f;
+	TestFalse(
+		TEXT("초당 내구도 소모 규칙은 Channel Action이 필요하다."),
+		NonChannelContinuousItem->Validate(Error));
+
+	UKCItemDefinition* ContinuousItem =
+		KCItemDefinitionTests::MakeCarryOnlyItem();
+	ContinuousItem->UseAction =
+		KCItemDefinitionTests::MakeValidChannelUseAbility(ContinuousItem);
+	ContinuousItem->Durability.ConsumeMode =
+		EKCItemDurabilityConsumeMode::WhileActive;
+	ContinuousItem->Durability.ConsumeAmount = 20.0f;
+	TestTrue(
+		TEXT("Channel Action은 활성 시간에 비례해 내구도를 소모할 수 있다."),
+		ContinuousItem->Validate(Error));
 
 	UKCItemDefinition* InvalidUseItem =
 		KCItemDefinitionTests::MakeCarryOnlyItem();

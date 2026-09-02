@@ -1,0 +1,156 @@
+#include "ProjectKC/AbilitySystem/Struct/KCProjectileConfigStruct.h"
+
+#include "ProjectKC/AbilitySystem/Projectile/KCActionProjectile.h"
+
+namespace
+{
+	bool IsFiniteVector(const FVector& Value)
+	{
+		return FMath::IsFinite(Value.X) &&
+			FMath::IsFinite(Value.Y) &&
+			FMath::IsFinite(Value.Z) &&
+			!Value.ContainsNaN();
+	}
+}
+
+bool FKCProjectileLaunchConfigStruct::Validate(FString& OutError) const
+{
+	OutError.Reset();
+	if (!ProjectileClass ||
+		ProjectileClass->HasAnyClassFlags(CLASS_Abstract))
+	{
+		OutError = TEXT("ProjectileClass에는 생성 가능한 투사체 Actor가 필요합니다.");
+		return false;
+	}
+
+	if (!ProjectileMesh)
+	{
+		OutError = TEXT("ProjectileMesh가 비어 있습니다.");
+		return false;
+	}
+
+	if (!IsFiniteVector(ProjectileMeshScale) ||
+		ProjectileMeshScale.X <= 0.0f ||
+		ProjectileMeshScale.Y <= 0.0f ||
+		ProjectileMeshScale.Z <= 0.0f)
+	{
+		OutError = TEXT("ProjectileMeshScale의 각 축은 0보다 큰 유한한 수여야 합니다.");
+		return false;
+	}
+
+	if (!FMath::IsFinite(CollisionRadius) || CollisionRadius <= 0.0f)
+	{
+		OutError = TEXT("CollisionRadius는 0보다 큰 유한한 수여야 합니다.");
+		return false;
+	}
+
+	if (!FMath::IsFinite(SpawnForwardOffset) ||
+		!FMath::IsFinite(SpawnUpOffset) ||
+		!FMath::IsFinite(ForwardSpeed) || ForwardSpeed < 0.0f ||
+		!FMath::IsFinite(UpwardSpeed) || UpwardSpeed < 0.0f ||
+		!FMath::IsFinite(GravityScale) || GravityScale < 0.0f)
+	{
+		OutError = TEXT("생성 오프셋과 이동 수치는 유효한 범위의 유한한 수여야 합니다.");
+		return false;
+	}
+
+	if (FMath::IsNearlyZero(ForwardSpeed) && FMath::IsNearlyZero(UpwardSpeed))
+	{
+		OutError = TEXT("ForwardSpeed와 UpwardSpeed가 모두 0입니다.");
+		return false;
+	}
+
+	if (bShouldBounce &&
+		(!FMath::IsFinite(Bounciness) || Bounciness < 0.0f ||
+		 Bounciness > 1.0f || !FMath::IsFinite(Friction) ||
+		 Friction < 0.0f || Friction > 1.0f))
+	{
+		OutError = TEXT("Bounciness와 Friction은 0~1 사이의 유한한 수여야 합니다.");
+		return false;
+	}
+
+	return true;
+}
+
+bool FKCProjectileKnockbackConfigStruct::Validate(FString& OutError) const
+{
+	OutError.Reset();
+	if (!bEnabled)
+	{
+		return true;
+	}
+
+	if (!FMath::IsFinite(HorizontalSpeed) || HorizontalSpeed < 0.0f ||
+		!FMath::IsFinite(VerticalSpeed) || VerticalSpeed < 0.0f ||
+		(FMath::IsNearlyZero(HorizontalSpeed) &&
+		 FMath::IsNearlyZero(VerticalSpeed)))
+	{
+		OutError = TEXT("넉백 속도는 0 이상의 유한한 수이며 둘 중 하나는 0보다 커야 합니다.");
+		return false;
+	}
+
+	return true;
+}
+
+bool FKCProjectileExplosionConfigStruct::UsesFuse() const
+{
+	return DetonationMode == EKCProjectileDetonationMode::OnFuse ||
+		DetonationMode == EKCProjectileDetonationMode::OnImpactOrFuse;
+}
+
+bool FKCProjectileExplosionConfigStruct::ExplodesOnImpact() const
+{
+	return DetonationMode == EKCProjectileDetonationMode::OnImpact ||
+		DetonationMode == EKCProjectileDetonationMode::OnImpactOrFuse;
+}
+
+bool FKCProjectileExplosionConfigStruct::Validate(FString& OutError) const
+{
+	OutError.Reset();
+	if (!FMath::IsFinite(MaximumLifetime) || MaximumLifetime <= 0.0f)
+	{
+		OutError = TEXT("MaximumLifetime은 0보다 큰 유한한 수여야 합니다.");
+		return false;
+	}
+
+	if (UsesFuse() &&
+		(!FMath::IsFinite(FuseDuration) || FuseDuration <= 0.0f ||
+		 FuseDuration >= MaximumLifetime))
+	{
+		OutError = TEXT("FuseDuration은 0보다 크고 MaximumLifetime보다 작아야 합니다.");
+		return false;
+	}
+
+	if (!FMath::IsFinite(ExplosionRadius) || ExplosionRadius <= 0.0f)
+	{
+		OutError = TEXT("ExplosionRadius는 0보다 큰 유한한 수여야 합니다.");
+		return false;
+	}
+
+	if (MaximumTargets < 0)
+	{
+		OutError = TEXT("MaximumTargets는 0 이상이어야 합니다.");
+		return false;
+	}
+
+	FString EffectError;
+	if (!EffectRecipe.Validate(EffectError))
+	{
+		OutError = FString::Printf(
+			TEXT("EffectRecipe가 유효하지 않습니다: %s"),
+			*EffectError);
+		return false;
+	}
+
+	FString KnockbackError;
+	if (!Knockback.Validate(KnockbackError))
+	{
+		OutError = FString::Printf(
+			TEXT("Knockback이 유효하지 않습니다: %s"),
+			*KnockbackError);
+		return false;
+	}
+
+	return true;
+}
+
