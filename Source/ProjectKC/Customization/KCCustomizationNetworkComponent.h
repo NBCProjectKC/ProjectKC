@@ -19,6 +19,27 @@ struct FKCServerCustomizationUpload
 	void Reset() { *this = FKCServerCustomizationUpload(); }
 };
 
+struct FKCClientCustomizationUpload
+{
+	int32 UploadId = INDEX_NONE;
+	int32 NextChunkIndex = 0;
+	uint32 ContentHash = 0;
+	TArray<uint8> Bytes;
+
+	void Reset() { *this = FKCClientCustomizationUpload(); }
+};
+
+struct FKCServerCustomizationDownload
+{
+	TWeakObjectPtr<AKCPlayerState> PlayerState;
+	uint32 Revision = 0;
+	uint32 ContentHash = 0;
+	int32 NextChunkIndex = 0;
+	TArray<uint8> Bytes;
+
+	void Reset() { *this = FKCServerCustomizationDownload(); }
+};
+
 struct FKCClientCustomizationDownload
 {
 	TWeakObjectPtr<AKCPlayerState> PlayerState;
@@ -77,6 +98,16 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerCommitCustomizationUpload(int32 UploadId);
 
+	UFUNCTION(Client, Reliable)
+	void ClientRequestCustomizationUploadChunk(
+		int32 UploadId,
+		int32 ChunkIndex);
+
+	UFUNCTION(Client, Reliable)
+	void ClientFinishCustomizationUpload(
+		int32 UploadId,
+		bool bSucceeded);
+
 	UFUNCTION(Server, Reliable)
 	void ServerRequestCustomizationPayload(
 		AKCPlayerState* TargetPlayerState,
@@ -91,6 +122,17 @@ private:
 		int32 TotalBytes,
 		int32 TotalChunks);
 
+	UFUNCTION(Server, Reliable)
+	void ServerAcknowledgeCustomizationDownloadChunk(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision,
+		int32 NextChunkIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerCancelCustomizationDownload(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision);
+
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveCustomizationChunk(
 		AKCPlayerState* TargetPlayerState,
@@ -103,17 +145,30 @@ private:
 		AKCPlayerState* TargetPlayerState,
 		uint32 Revision);
 
+	UFUNCTION(Client, Reliable)
+	void ClientAbortCustomizationDownload(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision);
+
 	class APlayerController* GetOwningPlayerController() const;
 	bool ApplyReceivedCustomization(
 		AKCPlayerState* TargetPlayerState,
 		const TArray<uint8>& Payload);
 	UKCPlayerCustomizationComponent* ResolveCustomizationComponent(
 		AKCPlayerState* TargetPlayerState) const;
-	void ResetCustomizationDownload(AKCPlayerState* TargetPlayerState);
+	void TryStartNextCustomizationDownload();
+	void FinishCustomizationDownload(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision);
 
 	int32 NextCustomizationUploadId = 1;
+	FKCClientCustomizationUpload ActiveClientCustomizationUpload;
+	TArray<uint8> PendingClientCustomizationUpload;
 	FKCServerCustomizationUpload ActiveCustomizationUpload;
+	FKCServerCustomizationDownload ActiveServerCustomizationDownload;
 	FKCClientCustomizationDownload ActiveCustomizationDownload;
+	TWeakObjectPtr<AKCPlayerState> ActiveCustomizationRequestPlayerState;
+	uint32 ActiveCustomizationRequestRevision = 0;
 	TMap<TWeakObjectPtr<AKCPlayerState>, FKCCachedCustomizationData> CustomizationCache;
 	TMap<TWeakObjectPtr<AKCPlayerState>, TWeakObjectPtr<UKCPlayerCustomizationComponent>> PendingCustomizationTargets;
 	TMap<TWeakObjectPtr<AKCPlayerState>, uint32> PendingCustomizationRevisions;

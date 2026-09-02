@@ -464,6 +464,9 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 	if (!bCurrentUseDefaultAppearance &&
 		(!RuntimePaintTarget || !RuntimePaintTarget->CompactPaintPatchHistory(PaintHistory)))
 	{
+		UE_LOG(LogKCPlayerCustomization, Warning,
+			TEXT("Customization upload skipped: failed to compact paint history for Owner=%s"),
+			*GetNameSafe(GetOwner()));
 		return;
 	}
 
@@ -473,6 +476,11 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 		bCurrentUseDefaultAppearance,
 		Payload))
 	{
+		UE_LOG(LogKCPlayerCustomization, Warning,
+			TEXT("Customization upload rejected: Owner=%s, Entries=%d, Default=%s"),
+			*GetNameSafe(GetOwner()),
+			PaintHistory.Entries.Num(),
+			bCurrentUseDefaultAppearance ? TEXT("true") : TEXT("false"));
 		return;
 	}
 

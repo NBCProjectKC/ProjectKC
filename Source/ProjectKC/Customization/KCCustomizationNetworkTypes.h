@@ -40,7 +40,8 @@ namespace KCCustomizationNetwork
 {
 	inline constexpr int32 ChunkSizeBytes = 32 * 1024;
 	inline constexpr int32 MaxPayloadBytes = 5 * 1024 * 1024;
-	inline constexpr int32 MaxPatchEntries = 4;
+	// CompactPaintPatchHistory는 메시마다 Color와 MaterialSettings를 각각 1개로 압축합니다.
+	inline constexpr int32 MaxPatchEntries = 8;
 	inline constexpr int32 ExpectedRenderTargetSize = 512;
 
 	PROJECTKC_API uint32 ComputePayloadHash(const TArray<uint8>& Payload);
