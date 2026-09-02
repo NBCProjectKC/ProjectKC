@@ -23,6 +23,14 @@ public:
 		FString& OutError) const override;
 	virtual bool Execute(const FKCActionExecutionContext& Context) const override;
 
+	/** 실제 투척과 로컬 궤적 미리보기가 공유하는 발사 위치·속도 계산이다. */
+	bool BuildLaunchSolution(
+		const AActor* SourceActor,
+		const AActor* LaunchOrigin,
+		float ChargeAlpha,
+		FTransform& OutSpawnTransform,
+		FVector& OutInitialVelocity) const;
+
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,

@@ -131,16 +131,17 @@ bool UKCThrowProjectileFragment::Execute(
 	}
 
 	AActor* LaunchOrigin = ResolveLaunchOrigin(Context);
-	FVector Forward = Context.SourceActor->GetActorForwardVector();
-	if (!Forward.Normalize())
+	FTransform SpawnTransform;
+	FVector InitialVelocity;
+	if (!BuildLaunchSolution(
+		Context.SourceActor,
+		LaunchOrigin,
+		Context.InputChargeAlpha,
+		SpawnTransform,
+		InitialVelocity))
 	{
 		return false;
 	}
-
-	const FVector SpawnLocation = LaunchOrigin->GetActorLocation() +
-		Forward * LaunchConfig.SpawnForwardOffset +
-		FVector::UpVector * LaunchConfig.SpawnUpOffset;
-	const FTransform SpawnTransform(Forward.Rotation(), SpawnLocation);
 
 	UWorld* World = LaunchOrigin->GetWorld();
 	AKCActionProjectile* Projectile =
@@ -156,8 +157,6 @@ bool UKCThrowProjectileFragment::Execute(
 	}
 
 	UGameplayStatics::FinishSpawningActor(Projectile, SpawnTransform);
-	const FVector InitialVelocity = Forward * LaunchConfig.ForwardSpeed +
-		FVector::UpVector * LaunchConfig.UpwardSpeed;
 	if (!Projectile->InitializeProjectile(
 		LaunchConfig,
 		ExplosionConfig,
@@ -173,6 +172,36 @@ bool UKCThrowProjectileFragment::Execute(
 	}
 
 	return true;
+}
+
+bool UKCThrowProjectileFragment::BuildLaunchSolution(
+	const AActor* SourceActor,
+	const AActor* LaunchOrigin,
+	float ChargeAlpha,
+	FTransform& OutSpawnTransform,
+	FVector& OutInitialVelocity) const
+{
+	OutSpawnTransform = FTransform::Identity;
+	OutInitialVelocity = FVector::ZeroVector;
+	if (!IsValid(SourceActor) || !IsValid(LaunchOrigin))
+	{
+		return false;
+	}
+
+	FVector Forward = SourceActor->GetActorForwardVector();
+	if (!Forward.Normalize())
+	{
+		return false;
+	}
+
+	const FVector SpawnLocation = LaunchOrigin->GetActorLocation() +
+		Forward * LaunchConfig.SpawnForwardOffset +
+		FVector::UpVector * LaunchConfig.SpawnUpOffset;
+	OutSpawnTransform = FTransform(Forward.Rotation(), SpawnLocation);
+	OutInitialVelocity =
+		Forward * LaunchConfig.ResolveForwardSpeed(ChargeAlpha) +
+		FVector::UpVector * LaunchConfig.UpwardSpeed;
+	return !OutInitialVelocity.ContainsNaN();
 }
 
 AActor* UKCThrowProjectileFragment::ResolveLaunchOrigin(

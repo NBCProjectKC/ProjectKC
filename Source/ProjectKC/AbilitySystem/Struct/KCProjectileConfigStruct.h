@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "KCProjectileConfigStruct.generated.h"
 
 class AKCActionProjectile;
@@ -68,6 +69,75 @@ struct PROJECTKC_API FKCProjectileLaunchConfigStruct
 		meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float UpwardSpeed = 350.0f;
 
+	/** true면 Press 동안 충전하고 Release 때 투척한다. ForwardSpeed가 최대 속도다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Launch|Charge")
+	bool bEnableCharge = false;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Launch|Charge",
+		meta = (
+			EditCondition = "bEnableCharge",
+			EditConditionHides,
+			ClampMin = "0.0",
+			UIMin = "0.0"))
+	float MinimumForwardSpeed = 500.0f;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Launch|Charge",
+		meta = (
+			EditCondition = "bEnableCharge",
+			EditConditionHides,
+			ClampMin = "0.01",
+			UIMin = "0.1",
+			UIMax = "3.0"))
+	float MaximumChargeDuration = 1.5f;
+
+	/** 소유 클라이언트에 첫 Blocking Hit까지의 점선 궤적과 착탄 마커를 표시한다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Launch|Charge|Preview",
+		meta = (EditCondition = "bEnableCharge", EditConditionHides))
+	bool bShowTrajectoryPreview = true;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Launch|Charge|Preview",
+		meta = (
+			EditCondition = "bEnableCharge && bShowTrajectoryPreview",
+			EditConditionHides,
+			ClampMin = "0.1",
+			UIMin = "0.5",
+			UIMax = "5.0"))
+	float PreviewMaximumSimulationTime = 3.0f;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Launch|Charge|Preview",
+		meta = (
+			EditCondition = "bEnableCharge && bShowTrajectoryPreview",
+			EditConditionHides,
+			ClampMin = "1.0",
+			ClampMax = "60.0",
+			UIMin = "10.0",
+			UIMax = "30.0"))
+	float PreviewSimulationFrequency = 20.0f;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Launch|Charge|Preview",
+		meta = (
+			EditCondition = "bEnableCharge && bShowTrajectoryPreview",
+			EditConditionHides))
+	TEnumAsByte<ECollisionChannel> PreviewTraceChannel = ECC_Visibility;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
 	float GravityScale = 1.0f;
 
@@ -88,6 +158,8 @@ struct PROJECTKC_API FKCProjectileLaunchConfigStruct
 		meta = (EditCondition = "bShouldBounce", ClampMin = "0.0", ClampMax = "1.0"))
 	float Friction = 0.2f;
 
+	float CalculateChargeAlpha(float HeldDuration) const;
+	float ResolveForwardSpeed(float ChargeAlpha) const;
 	bool Validate(FString& OutError) const;
 };
 

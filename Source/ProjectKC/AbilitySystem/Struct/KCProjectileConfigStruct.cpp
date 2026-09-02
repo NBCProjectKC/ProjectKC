@@ -13,6 +13,31 @@ namespace
 	}
 }
 
+float FKCProjectileLaunchConfigStruct::CalculateChargeAlpha(
+	float HeldDuration) const
+{
+	if (!bEnableCharge)
+	{
+		return 1.0f;
+	}
+
+	return FMath::Clamp(
+		HeldDuration / FMath::Max(MaximumChargeDuration, UE_SMALL_NUMBER),
+		0.0f,
+		1.0f);
+}
+
+float FKCProjectileLaunchConfigStruct::ResolveForwardSpeed(
+	float ChargeAlpha) const
+{
+	return bEnableCharge
+		? FMath::Lerp(
+			MinimumForwardSpeed,
+			ForwardSpeed,
+			FMath::Clamp(ChargeAlpha, 0.0f, 1.0f))
+		: ForwardSpeed;
+}
+
 bool FKCProjectileLaunchConfigStruct::Validate(FString& OutError) const
 {
 	OutError.Reset();
@@ -57,6 +82,28 @@ bool FKCProjectileLaunchConfigStruct::Validate(FString& OutError) const
 	if (FMath::IsNearlyZero(ForwardSpeed) && FMath::IsNearlyZero(UpwardSpeed))
 	{
 		OutError = TEXT("ForwardSpeed와 UpwardSpeed가 모두 0입니다.");
+		return false;
+	}
+
+	if (bEnableCharge &&
+		(!FMath::IsFinite(MinimumForwardSpeed) ||
+		 MinimumForwardSpeed < 0.0f ||
+		 MinimumForwardSpeed > ForwardSpeed ||
+		 !FMath::IsFinite(MaximumChargeDuration) ||
+		 MaximumChargeDuration <= 0.0f))
+	{
+		OutError = TEXT("충전 투척은 0 이상 최대 ForwardSpeed 이하의 MinimumForwardSpeed와 0보다 큰 MaximumChargeDuration이 필요합니다.");
+		return false;
+	}
+
+	if (bEnableCharge && bShowTrajectoryPreview &&
+		(!FMath::IsFinite(PreviewMaximumSimulationTime) ||
+		 PreviewMaximumSimulationTime <= 0.0f ||
+		 !FMath::IsFinite(PreviewSimulationFrequency) ||
+		 PreviewSimulationFrequency < 1.0f ||
+		 PreviewSimulationFrequency > 60.0f))
+	{
+		OutError = TEXT("궤적 미리보기의 Simulation Time은 0보다 크고 Frequency는 1~60이어야 합니다.");
 		return false;
 	}
 

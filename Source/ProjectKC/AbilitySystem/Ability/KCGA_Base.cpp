@@ -85,6 +85,7 @@ void UKCGA_Base::ActivateAbility(
 
 	ActiveDefinition = const_cast<UKCAbilityDefinition*>(Definition);
 	TrackedActiveEffects.Reset();
+	ExecutionChargeAlpha = 1.0f;
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 }
@@ -112,6 +113,7 @@ void UKCGA_Base::EndAbility(
 
 	TrackedActiveEffects.Reset();
 	ActiveDefinition = nullptr;
+	ExecutionChargeAlpha = 1.0f;
 
 	Super::EndAbility(
 		Handle,
@@ -161,6 +163,7 @@ bool UKCGA_Base::ExecuteActionHook(
 	Context.SourceActor = GetAvatarActorFromActorInfo();
 	Context.TargetActor = TargetActor;
 	Context.EffectSourceObject = GetCurrentSourceObject();
+	Context.InputChargeAlpha = ExecutionChargeAlpha;
 	if (HitResult)
 	{
 		Context.HitResult = *HitResult;
@@ -222,6 +225,16 @@ bool UKCGA_Base::ExecuteActionHook(
 const UKCAbilityDefinition* UKCGA_Base::GetActiveDefinition() const
 {
 	return ActiveDefinition;
+}
+
+void UKCGA_Base::SetExecutionChargeAlpha(float ChargeAlpha)
+{
+	ExecutionChargeAlpha = FMath::Clamp(ChargeAlpha, 0.0f, 1.0f);
+}
+
+float UKCGA_Base::GetExecutionChargeAlpha() const
+{
+	return ExecutionChargeAlpha;
 }
 
 bool UKCGA_Base::ApplyGameplayEffectRecipe(

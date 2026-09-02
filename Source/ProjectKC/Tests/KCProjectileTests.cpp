@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameplayEffect.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Damage.h"
@@ -56,6 +57,10 @@ namespace KCProjectileTests
 		UKCThrowProjectileFragment* ThrowFragment =
 			NewObject<UKCThrowProjectileFragment>(Action);
 		ConfigureValidFragment(ThrowFragment, Definition);
+		ThrowFragment->LaunchConfig.bEnableCharge = true;
+		ThrowFragment->LaunchConfig.MinimumForwardSpeed = 400.0f;
+		ThrowFragment->LaunchConfig.MaximumChargeDuration = 1.0f;
+		ThrowFragment->LaunchConfig.bShowTrajectoryPreview = false;
 		ExecuteHook.Fragments.Add(ThrowFragment);
 		Action->ActionHooks.Add(MoveTemp(ExecuteHook));
 		Definition->UseAction = Action;
@@ -108,6 +113,32 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Throw Projectile은 소스에서 실행되는 Fragment다."),
 		Fragment->ApplicationScope,
 		EKCActionScope::Source);
+
+	Fragment->LaunchConfig.bEnableCharge = true;
+	Fragment->LaunchConfig.MinimumForwardSpeed =
+		Fragment->LaunchConfig.ForwardSpeed + 1.0f;
+	TestFalse(
+		TEXT("최대 속도보다 큰 충전 최소 속도는 거부한다."),
+		Fragment->Validate(Error));
+	Fragment->LaunchConfig.MinimumForwardSpeed = 400.0f;
+	Fragment->LaunchConfig.MaximumChargeDuration = 2.0f;
+	TestTrue(
+		TEXT("유효한 충전 속도와 시간은 허용한다."),
+		Fragment->Validate(Error));
+	TestEqual(
+		TEXT("최소 충전은 최소 전방 속도를 사용한다."),
+		Fragment->LaunchConfig.ResolveForwardSpeed(0.0f),
+		400.0f);
+	TestEqual(
+		TEXT("절반 충전은 전방 속도를 선형 보간한다."),
+		Fragment->LaunchConfig.ResolveForwardSpeed(
+			Fragment->LaunchConfig.CalculateChargeAlpha(1.0f)),
+		800.0f);
+	TestEqual(
+		TEXT("최대 시간을 넘긴 충전은 최대 전방 속도로 고정한다."),
+		Fragment->LaunchConfig.ResolveForwardSpeed(
+			Fragment->LaunchConfig.CalculateChargeAlpha(10.0f)),
+		Fragment->LaunchConfig.ForwardSpeed);
 
 	UKCApplyGameplayEffectFragment* UnsupportedDeferredFragment =
 		NewObject<UKCApplyGameplayEffectFragment>(Fragment);
@@ -346,10 +377,34 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 			}
 
 			TestTrue(
-				TEXT("성게 사용은 Throw Projectile Fragment를 성공시킨다."),
+				TEXT("성게 Press는 충전 Action을 시작한다."),
 				HeldItemComponent->PressHeldItemUse());
+			TestFalse(
+				TEXT("충전 중에는 투사체 생성 성공과 소비를 확정하지 않는다."),
+				SeaUrchin->IsUseConsumptionPending());
+
+			int32 ProjectileCountWhileCharging = 0;
+			for (TActorIterator<AKCActionProjectile> It(TestWorld); It; ++It)
+			{
+				++ProjectileCountWhileCharging;
+			}
+			TestEqual(
+				TEXT("Press만으로는 충전 투사체를 생성하지 않는다."),
+				ProjectileCountWhileCharging,
+				ProjectileCountBefore);
+
+			const float ChargeStartWorldTime = TestWorld->GetTimeSeconds();
+			TestWorld->Tick(LEVELTICK_All, 0.5f);
+			const float ActualHeldDuration = static_cast<float>(
+				TestWorld->GetTimeSeconds() - ChargeStartWorldTime);
 			TestTrue(
-				TEXT("투사체 생성 성공은 성게 원본 소비를 예약한다."),
+				TEXT("테스트 World에서 충전 시간이 진행된다."),
+				ActualHeldDuration > 0.0f);
+			TestTrue(
+				TEXT("Release가 현재 충전량으로 투척을 실행한다."),
+				HeldItemComponent->ReleaseHeldItemUse());
+			TestTrue(
+				TEXT("Release의 투사체 생성 성공은 성게 원본 소비를 예약한다."),
 				SeaUrchin->IsUseConsumptionPending());
 
 			AKCActionProjectile* SpawnedProjectile = nullptr;
@@ -367,13 +422,37 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				TEXT("생성된 성게 투사체는 투척자를 무시한다."),
 				SpawnedProjectile &&
 					SpawnedProjectile->GetIgnoredSourceActor() == SourcePlayer);
+			if (SpawnedProjectile)
+			{
+				const FVector ChargedVelocity =
+					SpawnedProjectile->GetProjectileMovement()->Velocity;
+				const UKCSingleActionDefinition* SingleAction =
+					Cast<UKCSingleActionDefinition>(Definition->UseAction);
+				const UKCThrowProjectileFragment* ChargedThrow = SingleAction
+					? SingleAction->FindChargedThrowProjectileFragment()
+					: nullptr;
+				const float ExpectedForwardSpeed = ChargedThrow
+					? ChargedThrow->LaunchConfig.ResolveForwardSpeed(
+						ChargedThrow->LaunchConfig.CalculateChargeAlpha(
+							ActualHeldDuration))
+					: 0.0f;
+				TestEqual(
+					TEXT("실제 전방 속도는 서버 충전 시간으로 계산한 값과 같다."),
+					static_cast<float>(FVector::DotProduct(
+						ChargedVelocity,
+						SourcePlayer->GetActorForwardVector())),
+					ExpectedForwardSpeed,
+					5.0f);
+				TestTrue(
+					TEXT("입력을 유지한 만큼 최소 투척 속도보다 강해진다."),
+					ExpectedForwardSpeed > 400.0f);
+				TestTrue(
+					TEXT("충전 중에도 상향 속도는 350으로 유지한다."),
+					FMath::IsNearlyEqual(ChargedVelocity.Z, 350.0f, 1.0f));
+			}
 
-			TestWorld->Tick(LEVELTICK_All, 1.0f / 60.0f);
-			TestFalse(
-				TEXT("성공 사용 뒤 원본 성게 아이템은 다음 틱에 제거된다."),
-				IsValid(SeaUrchin));
 			TestTrue(
-				TEXT("원본 성게가 소비되어도 생성된 투사체는 유지된다."),
+				TEXT("원본 성게의 소비 예약 뒤에도 생성된 투사체는 유지된다."),
 				IsValid(SpawnedProjectile));
 		}
 	}
