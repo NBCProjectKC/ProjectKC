@@ -90,6 +90,20 @@ bool FKCItemDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("Ability가 없는 아이템은 사용할 수 없다."),
 		CarryOnlyItem->IsUsable());
+	TestEqual(
+		TEXT("기존 아이템은 분류를 명시하기 전까지 Unspecified다."),
+		CarryOnlyItem->ItemCategory,
+		EKCItemCategory::Unspecified);
+	TestEqual(
+		TEXT("별도 설정이 없는 아이템은 기본 Held Pose를 사용한다."),
+		CarryOnlyItem->Presentation.HeldPose,
+		EKCHeldPose::Default);
+	CarryOnlyItem->ItemCategory = EKCItemCategory::Ingredient;
+	CarryOnlyItem->Presentation.HeldPose = EKCHeldPose::IngredientCarry;
+	TestEqual(
+		TEXT("재료 분류와 들기 자세는 독립적으로 설정할 수 있다."),
+		CarryOnlyItem->Presentation.HeldPose,
+		EKCHeldPose::IngredientCarry);
 
 	UStaticMeshSocket* GripSocket =
 		CarryOnlyItem->Presentation.StaticMesh->FindSocket(

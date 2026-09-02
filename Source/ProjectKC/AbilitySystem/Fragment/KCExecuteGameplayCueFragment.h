@@ -12,6 +12,7 @@ class PROJECTKC_API UKCExecuteGameplayCueFragment : public UKCActionFragment
 
 public:
 	virtual bool Validate(FString& OutError) const override;
+	virtual bool SupportsDeferredExecution() const override;
 	virtual bool CanExecute(
 		const FKCActionExecutionContext& Context,
 		FString& OutError) const override;

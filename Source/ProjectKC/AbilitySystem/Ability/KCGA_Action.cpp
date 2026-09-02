@@ -1,6 +1,8 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Action.h"
 
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCThrowProjectileFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Task/KCAbilityTask_PlayActionMontage.h"
@@ -19,10 +21,66 @@ void UKCGA_Action::ActivateAbility(
 	const FGameplayEventData* TriggerEventData)
 {
 	bExecuteAttempted = false;
+	bWaitingForInputRelease = false;
+	ChargeStartTimeSeconds = 0.0;
 	ActiveMontageTask = nullptr;
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	if (!IsActive())
+	{
+		return;
+	}
+
+	if (ShouldDeferActionExecutionStart())
+	{
+		bWaitingForInputRelease = true;
+		ChargeStartTimeSeconds = GetWorld()
+			? GetWorld()->GetTimeSeconds()
+			: 0.0;
+		return;
+	}
+
+	BeginExecutionSequence();
+}
+
+void UKCGA_Action::InputReleased(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo)
+{
+	Super::InputReleased(Handle, ActorInfo, ActivationInfo);
+	if (!bWaitingForInputRelease || IsFinishingAction() || !IsActive())
+	{
+		return;
+	}
+
+	bWaitingForInputRelease = false;
+	const UKCSingleActionDefinition* Definition =
+		Cast<UKCSingleActionDefinition>(GetActiveDefinition());
+	const UKCThrowProjectileFragment* ChargedThrow = Definition
+		? Definition->FindChargedThrowProjectileFragment()
+		: nullptr;
+	const double CurrentTimeSeconds = GetWorld()
+		? GetWorld()->GetTimeSeconds()
+		: ChargeStartTimeSeconds;
+	const float HeldDuration = static_cast<float>(FMath::Max(
+		0.0,
+		CurrentTimeSeconds - ChargeStartTimeSeconds));
+	SetExecutionChargeAlpha(ChargedThrow
+		? ChargedThrow->LaunchConfig.CalculateChargeAlpha(HeldDuration)
+		: 1.0f);
+
+	if (!BeginActionExecution())
+	{
+		return;
+	}
+
+	BeginExecutionSequence();
+}
+
+void UKCGA_Action::BeginExecutionSequence()
+{
+	if (!HasActionExecutionStarted() || IsFinishingAction() || !IsActive())
 	{
 		return;
 	}
@@ -61,6 +119,13 @@ void UKCGA_Action::ActivateAbility(
 		this,
 		&UKCGA_Action::HandleMontageInterrupted);
 	ActiveMontageTask->ReadyForActivation();
+}
+
+bool UKCGA_Action::ShouldDeferActionExecutionStart() const
+{
+	const UKCSingleActionDefinition* Definition =
+		Cast<UKCSingleActionDefinition>(GetActiveDefinition());
+	return Definition && Definition->ExecutesOnInputRelease();
 }
 
 void UKCGA_Action::HandleExecuteEvent(FGameplayEventData Payload)

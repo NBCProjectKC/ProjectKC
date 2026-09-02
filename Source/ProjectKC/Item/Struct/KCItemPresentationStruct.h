@@ -5,6 +5,17 @@
 
 class UStaticMesh;
 
+/** 아이템을 들고 있는 동안 AnimBP가 선택할 공용 자세 키다. */
+UENUM(BlueprintType)
+enum class EKCHeldPose : uint8
+{
+	Default UMETA(DisplayName = "Default"),
+	IngredientCarry UMETA(DisplayName = "Ingredient Carry"),
+	OneHandTool UMETA(DisplayName = "One Hand Tool"),
+	TwoHandTool UMETA(DisplayName = "Two Hand Tool"),
+	ThrowReady UMETA(DisplayName = "Throw Ready")
+};
+
 /** 월드와 손에서 아이템을 표현하는 데 필요한 공통 데이터다. */
 USTRUCT(BlueprintType)
 struct PROJECTKC_API FKCItemPresentationStruct
@@ -20,6 +31,10 @@ struct PROJECTKC_API FKCItemPresentationStruct
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
 	FName GripSocketName = TEXT("Grip");
+
+	/** 실제 Anim Sequence는 AnimBP가 이 키에 매핑한다. 아이템에는 자세 종류만 저장한다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Animation")
+	EKCHeldPose HeldPose = EKCHeldPose::Default;
 
 	UPROPERTY(
 		EditDefaultsOnly,

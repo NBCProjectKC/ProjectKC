@@ -27,6 +27,11 @@ bool UKCExecuteGameplayCueFragment::Validate(FString& OutError) const
 	return true;
 }
 
+bool UKCExecuteGameplayCueFragment::SupportsDeferredExecution() const
+{
+	return true;
+}
+
 bool UKCExecuteGameplayCueFragment::CanExecute(
 	const FKCActionExecutionContext& Context,
 	FString& OutError) const
@@ -57,7 +62,7 @@ bool UKCExecuteGameplayCueFragment::Execute(
 
 	UObject* SourceObject = Context.Ability
 		? Context.Ability->GetCurrentSourceObject()
-		: nullptr;
+		: Context.EffectSourceObject;
 	AActor* EffectCauser = Cast<AActor>(SourceObject);
 	if (!EffectCauser)
 	{

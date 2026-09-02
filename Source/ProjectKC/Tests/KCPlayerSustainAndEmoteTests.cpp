@@ -54,6 +54,10 @@ bool FKCPlayerSustainAndEmoteContractTest::RunTest(const FString& Parameters)
 		NewObject<USkeletalMeshComponent>();
 	UKCPlayerAnimInstance* AnimInstance =
 		NewObject<UKCPlayerAnimInstance>(AnimInstanceOuter);
+	TestEqual(
+		TEXT("아이템을 들지 않은 AnimInstance는 기본 Held Pose를 사용한다."),
+		AnimInstance->HeldPose,
+		EKCHeldPose::Default);
 	TestTrue(
 		TEXT("평상시에는 플레이어 지면 IK를 허용한다."),
 		AnimInstance->bAllowGroundIK);

@@ -7,7 +7,6 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Projectile/KCActionProjectile.h"
-#include "ProjectKC/AbilitySystem/Struct/KCSetByCallerValueStruct.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
 
@@ -38,28 +37,69 @@ bool UKCThrowProjectileFragment::Validate(FString& OutError) const
 		return false;
 	}
 
+	for (int32 Index = 0; Index < ExplosionTargetFragments.Num(); ++Index)
+	{
+		const UKCActionFragment* Fragment = ExplosionTargetFragments[Index];
+		if (!IsValid(Fragment))
+		{
+			OutError = FString::Printf(
+				TEXT("ExplosionTargetFragments[%d]가 비어 있습니다."),
+				Index);
+			return false;
+		}
+
+		if (Fragment->ApplicationScope != EKCActionScope::Target)
+		{
+			OutError = FString::Printf(
+				TEXT("ExplosionTargetFragments[%d] '%s'는 Target Scope여야 합니다."),
+				Index,
+				*GetNameSafe(Fragment));
+			return false;
+		}
+
+		if (!Fragment->SupportsDeferredExecution())
+		{
+			OutError = FString::Printf(
+				TEXT("ExplosionTargetFragments[%d] '%s'는 지연 실행을 지원하지 않습니다."),
+				Index,
+				*GetNameSafe(Fragment));
+			return false;
+		}
+
+		FString FragmentError;
+		if (!Fragment->Validate(FragmentError))
+		{
+			OutError = FString::Printf(
+				TEXT("ExplosionTargetFragments[%d] '%s'가 유효하지 않습니다: %s"),
+				Index,
+				*GetNameSafe(Fragment),
+				*FragmentError);
+			return false;
+		}
+	}
+
 	return true;
 }
 
 bool UKCThrowProjectileFragment::DeclaresSetByCallerTag(
 	FGameplayTag DataTag) const
 {
-	return ExplosionConfig.EffectRecipe.SetByCallers.ContainsByPredicate(
-		[DataTag](const FKCSetByCallerValueStruct& Value)
+	return ExplosionTargetFragments.ContainsByPredicate(
+		[DataTag](const UKCActionFragment* Fragment)
 		{
-			return Value.DataTag.MatchesTagExact(DataTag);
+			return IsValid(Fragment) &&
+				Fragment->DeclaresSetByCallerTag(DataTag);
 		});
 }
 
 void UKCThrowProjectileFragment::AppendDeclaredSetByCallerTags(
 	FGameplayTagContainer& OutTags) const
 {
-	for (const FKCSetByCallerValueStruct& Value :
-		ExplosionConfig.EffectRecipe.SetByCallers)
+	for (const UKCActionFragment* Fragment : ExplosionTargetFragments)
 	{
-		if (Value.DataTag.IsValid())
+		if (IsValid(Fragment))
 		{
-			OutTags.AddTag(Value.DataTag);
+			Fragment->AppendDeclaredSetByCallerTags(OutTags);
 		}
 	}
 }
@@ -91,16 +131,17 @@ bool UKCThrowProjectileFragment::Execute(
 	}
 
 	AActor* LaunchOrigin = ResolveLaunchOrigin(Context);
-	FVector Forward = Context.SourceActor->GetActorForwardVector();
-	if (!Forward.Normalize())
+	FTransform SpawnTransform;
+	FVector InitialVelocity;
+	if (!BuildLaunchSolution(
+		Context.SourceActor,
+		LaunchOrigin,
+		Context.InputChargeAlpha,
+		SpawnTransform,
+		InitialVelocity))
 	{
 		return false;
 	}
-
-	const FVector SpawnLocation = LaunchOrigin->GetActorLocation() +
-		Forward * LaunchConfig.SpawnForwardOffset +
-		FVector::UpVector * LaunchConfig.SpawnUpOffset;
-	const FTransform SpawnTransform(Forward.Rotation(), SpawnLocation);
 
 	UWorld* World = LaunchOrigin->GetWorld();
 	AKCActionProjectile* Projectile =
@@ -116,11 +157,10 @@ bool UKCThrowProjectileFragment::Execute(
 	}
 
 	UGameplayStatics::FinishSpawningActor(Projectile, SpawnTransform);
-	const FVector InitialVelocity = Forward * LaunchConfig.ForwardSpeed +
-		FVector::UpVector * LaunchConfig.UpwardSpeed;
 	if (!Projectile->InitializeProjectile(
 		LaunchConfig,
 		ExplosionConfig,
+		ExplosionTargetFragments,
 		Context.SourceAbilitySystem,
 		ResolveEffectSourceObject(Context, LaunchOrigin),
 		Context.SourceActor,
@@ -132,6 +172,36 @@ bool UKCThrowProjectileFragment::Execute(
 	}
 
 	return true;
+}
+
+bool UKCThrowProjectileFragment::BuildLaunchSolution(
+	const AActor* SourceActor,
+	const AActor* LaunchOrigin,
+	float ChargeAlpha,
+	FTransform& OutSpawnTransform,
+	FVector& OutInitialVelocity) const
+{
+	OutSpawnTransform = FTransform::Identity;
+	OutInitialVelocity = FVector::ZeroVector;
+	if (!IsValid(SourceActor) || !IsValid(LaunchOrigin))
+	{
+		return false;
+	}
+
+	FVector Forward = SourceActor->GetActorForwardVector();
+	if (!Forward.Normalize())
+	{
+		return false;
+	}
+
+	const FVector SpawnLocation = LaunchOrigin->GetActorLocation() +
+		Forward * LaunchConfig.SpawnForwardOffset +
+		FVector::UpVector * LaunchConfig.SpawnUpOffset;
+	OutSpawnTransform = FTransform(Forward.Rotation(), SpawnLocation);
+	OutInitialVelocity =
+		Forward * LaunchConfig.ResolveForwardSpeed(ChargeAlpha) +
+		FVector::UpVector * LaunchConfig.UpwardSpeed;
+	return !OutInitialVelocity.ContainsNaN();
 }
 
 AActor* UKCThrowProjectileFragment::ResolveLaunchOrigin(
