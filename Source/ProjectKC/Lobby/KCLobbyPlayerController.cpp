@@ -5,12 +5,14 @@
 
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Customization/KCCustomizationNetworkComponent.h"
+#include "ProjectKC/Lobby/KCLobbyCharacter.h"
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 
@@ -27,12 +29,14 @@ void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	SetupLobbyUI();
+	RefreshLobbyCustomizationPresentations();
 }
 
 void AKCLobbyPlayerController::PostSeamlessTravel()
 {
 	Super::PostSeamlessTravel();
 	SetupLobbyUI();
+	RefreshLobbyCustomizationPresentations();
 }
 
 void AKCLobbyPlayerController::OnRep_PlayerState()
@@ -42,6 +46,29 @@ void AKCLobbyPlayerController::OnRep_PlayerState()
 	if (IsLocalPlayerController() && LobbyWidgetInstance)
 	{
 		LobbyWidgetInstance->TryBindPlayerState();
+	}
+
+	RefreshLobbyCustomizationPresentations();
+}
+
+void AKCLobbyPlayerController::RefreshLobbyCustomizationPresentations()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<AKCLobbyCharacter> CharacterIterator(World);
+		CharacterIterator;
+		++CharacterIterator)
+	{
+		CharacterIterator->RefreshCustomizationPresentation();
 	}
 }
 

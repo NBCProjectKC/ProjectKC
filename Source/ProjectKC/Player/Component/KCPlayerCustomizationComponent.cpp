@@ -77,20 +77,64 @@ void UKCPlayerCustomizationComponent::EndPlay(const EEndPlayReason::Type EndPlay
 
 void UKCPlayerCustomizationComponent::InitializeForPawn()
 {
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	AKCPlayerState* PlayerState = OwnerPawn
+		? OwnerPawn->GetPlayerState<AKCPlayerState>()
+		: nullptr;
+	APlayerController* LocalPlayerController =
+		OwnerPawn && OwnerPawn->IsLocallyControlled()
+			? Cast<APlayerController>(OwnerPawn->GetController())
+			: nullptr;
+	InitializeForPlayerState(PlayerState, LocalPlayerController);
+}
+
+void UKCPlayerCustomizationComponent::InitializeForPresentation(
+	AKCPlayerState* InPlayerState,
+	APlayerController* LocalPlayerController)
+{
+	if (LocalPlayerController &&
+		(!LocalPlayerController->IsLocalController() ||
+		 LocalPlayerController->PlayerState != InPlayerState))
+	{
+		LocalPlayerController = nullptr;
+	}
+
+	InitializeForPlayerState(InPlayerState, LocalPlayerController);
+}
+
+void UKCPlayerCustomizationComponent::InitializeForPlayerState(
+	AKCPlayerState* InPlayerState,
+	APlayerController* LocalPlayerController)
+{
+	const bool bPlayerStateChanged =
+		BoundCustomizationPlayerState.Get() != InPlayerState;
+	if (bPlayerStateChanged)
+	{
+		UnbindCustomizationPlayerState();
+		bLocalSaveApplied = false;
+		bCurrentUseDefaultAppearance = true;
+		AppliedCustomizationRevision = 0;
+		AppliedCustomizationHash = 0;
+		if (IsRuntimeAppearanceReady())
+		{
+			ApplyCustomizationData(FRuntimeMeshPaintPatchHistory(), true);
+		}
+	}
+
+	PresentationLocalPlayerController = LocalPlayerController;
 	if (!CreateRuntimeAppearance())
 	{
 		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
 		return;
 	}
 
-	BindCustomizationPlayerState();
+	BindCustomizationPlayerState(InPlayerState);
 
-	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (OwnerPawn && OwnerPawn->IsLocallyControlled() && !bLocalSaveApplied)
+	if (LocalPlayerController && !bLocalSaveApplied)
 	{
 		ApplyLocalSavedCustomization();
 	}
-	else if (OwnerPawn && OwnerPawn->IsLocallyControlled() && bLocalSaveApplied)
+	else if (LocalPlayerController && bLocalSaveApplied)
 	{
 		TryUploadLocalCustomization();
 	}
@@ -350,29 +394,28 @@ void UKCPlayerCustomizationComponent::HideLegacyEyeMesh() const
 	}
 }
 
-void UKCPlayerCustomizationComponent::BindCustomizationPlayerState()
+void UKCPlayerCustomizationComponent::BindCustomizationPlayerState(
+	AKCPlayerState* InPlayerState)
 {
-	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	AKCPlayerState* PlayerState = OwnerPawn
-		? OwnerPawn->GetPlayerState<AKCPlayerState>()
-		: nullptr;
-	if (BoundCustomizationPlayerState.Get() == PlayerState)
+	if (BoundCustomizationPlayerState.Get() == InPlayerState)
 	{
-		if (PlayerState)
+		if (InPlayerState)
 		{
-			HandleCustomizationDescriptorChanged(PlayerState->GetCustomizationDescriptor());
+			HandleCustomizationDescriptorChanged(
+				InPlayerState->GetCustomizationDescriptor());
 		}
 		return;
 	}
 
 	UnbindCustomizationPlayerState();
-	BoundCustomizationPlayerState = PlayerState;
-	if (PlayerState)
+	BoundCustomizationPlayerState = InPlayerState;
+	if (InPlayerState)
 	{
-		PlayerState->OnCustomizationDescriptorChanged.AddUObject(
+		InPlayerState->OnCustomizationDescriptorChanged.AddUObject(
 			this,
 			&ThisClass::HandleCustomizationDescriptorChanged);
-		HandleCustomizationDescriptorChanged(PlayerState->GetCustomizationDescriptor());
+		HandleCustomizationDescriptorChanged(
+			InPlayerState->GetCustomizationDescriptor());
 	}
 }
 
@@ -385,15 +428,30 @@ void UKCPlayerCustomizationComponent::UnbindCustomizationPlayerState()
 	BoundCustomizationPlayerState.Reset();
 }
 
+APlayerController* UKCPlayerCustomizationComponent::ResolveLocalPlayerController() const
+{
+	if (APlayerController* PresentationController =
+		PresentationLocalPlayerController.Get())
+	{
+		return PresentationController;
+	}
+
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	return OwnerPawn && OwnerPawn->IsLocallyControlled()
+		? Cast<APlayerController>(OwnerPawn->GetController())
+		: nullptr;
+}
+
 void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 {
-	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn || !OwnerPawn->IsLocallyControlled() || !bLocalSaveApplied)
+	APlayerController* PlayerController = ResolveLocalPlayerController();
+	if (!PlayerController ||
+		!PlayerController->IsLocalController() ||
+		!bLocalSaveApplied)
 	{
 		return;
 	}
 
-	APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController());
 	UKCCustomizationNetworkComponent* NetworkComponent = PlayerController
 		? PlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>()
 		: nullptr;
@@ -447,7 +505,11 @@ void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
 		return;
 	}
 
-	APlayerController* LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	APlayerController* LocalPlayerController = ResolveLocalPlayerController();
+	if (!LocalPlayerController)
+	{
+		LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	}
 	UKCCustomizationNetworkComponent* NetworkComponent = LocalPlayerController
 		? LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>()
 		: nullptr;

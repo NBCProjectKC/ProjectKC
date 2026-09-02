@@ -9,6 +9,7 @@ class UMaterialInterface;
 class URuntimeMeshPaintTargetComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
+class APlayerController;
 class AKCPlayerState;
 struct FKCCustomizationDescriptor;
 
@@ -26,6 +27,14 @@ public:
 
 	/** Pawn의 소유권이 정해지거나 갱신될 때 호출합니다. 중복 호출해도 안전합니다. */
 	void InitializeForPawn();
+
+	/**
+	 * Possess되지 않는 로비 표시 캐릭터를 특정 PlayerState에 연결합니다.
+	 * LocalPlayerController는 해당 PlayerState가 로컬 플레이어일 때만 전달합니다.
+	 */
+	void InitializeForPresentation(
+		AKCPlayerState* InPlayerState,
+		APlayerController* LocalPlayerController);
 
 	/** 로컬 플레이어의 SaveGame 데이터를 현재 외형에 적용합니다. */
 	UFUNCTION(BlueprintCallable, Category = "KC|Customization|Player")
@@ -94,8 +103,12 @@ private:
 	UStaticMeshComponent* FindAvatarBody() const;
 	void HideLegacyEyeMesh() const;
 	void DestroyRuntimeAppearance();
-	void BindCustomizationPlayerState();
+	void InitializeForPlayerState(
+		AKCPlayerState* InPlayerState,
+		APlayerController* LocalPlayerController);
+	void BindCustomizationPlayerState(AKCPlayerState* InPlayerState);
 	void UnbindCustomizationPlayerState();
+	APlayerController* ResolveLocalPlayerController() const;
 	void TryUploadLocalCustomization();
 	void HandleCustomizationDescriptorChanged(const FKCCustomizationDescriptor& Descriptor);
 
@@ -119,4 +132,5 @@ private:
 	uint32 AppliedCustomizationRevision = 0;
 	uint32 AppliedCustomizationHash = 0;
 	TWeakObjectPtr<AKCPlayerState> BoundCustomizationPlayerState;
+	TWeakObjectPtr<APlayerController> PresentationLocalPlayerController;
 };

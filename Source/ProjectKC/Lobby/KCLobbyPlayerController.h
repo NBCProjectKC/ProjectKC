@@ -95,6 +95,9 @@ protected:
 	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
 	void SetupLobbyUI();
 
+	/** PlayerState 복제 완료 후 기존 로비 표시 캐릭터들의 외형 연결을 갱신합니다. */
+	void RefreshLobbyCustomizationPresentations();
+
 	/** @brief 뷰포트에 생성할 로비 메인 UI 위젯 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TSubclassOf<UKCLobbyWidget> LobbyWidgetClass;

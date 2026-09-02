@@ -4,7 +4,9 @@
 
 #include "Customization/KCCustomizationNetworkComponent.h"
 #include "Customization/KCCustomizationNetworkTypes.h"
+#include "Lobby/KCLobbyCharacter.h"
 #include "Lobby/KCLobbyPlayerController.h"
+#include "Player/Component/KCPlayerCustomizationComponent.h"
 #include "Player/KCPlayerController.h"
 
 namespace
@@ -164,6 +166,26 @@ bool FKCCustomizationNetworkControllerComponentsTest::RunTest(const FString& Par
 			LobbyNetworkComponent->GetIsReplicated());
 	}
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FKCCustomizationLobbyPresentationDefaultsTest,
+	"ProjectKC.Customization.Lobby.PresentationDefaults",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FKCCustomizationLobbyPresentationDefaultsTest::RunTest(const FString& Parameters)
+{
+	const AKCLobbyCharacter* LobbyCharacterDefaults =
+		GetDefault<AKCLobbyCharacter>();
+	const UKCPlayerCustomizationComponent* CustomizationComponent =
+		LobbyCharacterDefaults
+			? LobbyCharacterDefaults->GetPlayerCustomizationComponent()
+			: nullptr;
+
+	TestNotNull(
+		TEXT("로비 표시 캐릭터가 플레이어 외형 컴포넌트를 상속한다."),
+		CustomizationComponent);
 	return true;
 }
 
