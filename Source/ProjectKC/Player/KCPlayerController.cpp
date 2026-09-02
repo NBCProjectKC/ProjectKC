@@ -7,6 +7,7 @@
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
+#include "Customization/KCCustomizationNetworkComponent.h"
 #include "Player/KCPlayerCharacter.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 #include "ProjectKC/UI/Common/Core/KCUISettings.h"
@@ -14,6 +15,8 @@
 
 AKCPlayerController::AKCPlayerController()
 {
+	CustomizationNetworkComponent = CreateDefaultSubobject<UKCCustomizationNetworkComponent>(
+		TEXT("CustomizationNetwork"));
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::Crosshairs;
 }

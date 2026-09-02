@@ -7,6 +7,7 @@
 struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
+class UKCCustomizationNetworkComponent;
 
 UCLASS()
 class PROJECTKC_API AKCPlayerController : public APlayerController
@@ -19,6 +20,11 @@ public:
 	virtual void ReceivedPlayer() override;
 	UFUNCTION(BlueprintPure, Category = "KC|Network")
 	float GetServerTime() const; 
+
+	UKCCustomizationNetworkComponent* GetCustomizationNetworkComponent() const
+	{
+		return CustomizationNetworkComponent;
+	}
 	
 protected:
 	virtual void BeginPlay() override;
@@ -43,8 +49,12 @@ private:
 	void ServerRequestServerTime(float TimeOfClientRequest);
 	UFUNCTION(Client, Reliable)
 	void ClientReportServerTime(float TimeOfClientRequest, float TimeServerReceivedClientRequest);
+
 	float ClientServerDelta = 0.0f;
 	float TimeSinceLastServerTimeSync = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, Category = "KC|Customization|Network")
+	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> PlayerMappingContext;

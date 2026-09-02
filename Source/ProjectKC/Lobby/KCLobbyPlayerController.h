@@ -10,6 +10,7 @@
 #include "KCLobbyPlayerController.generated.h"
 
 class UKCLobbyWidget;
+class UKCCustomizationNetworkComponent;
 
 /**
  * @brief 채팅 메시지 수신 시 UI(위젯)에 브로드캐스트할 다이나믹 멀티캐스트 델리게이트
@@ -50,6 +51,10 @@ public:
 	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void Client_SetStartGameButtonEnabled(bool bEnabled);
 
+	UKCCustomizationNetworkComponent* GetCustomizationNetworkComponent() const
+	{
+		return CustomizationNetworkComponent;
+	}
 	/* =========================================================================
 	 *  로비 채팅 시스템 (Lobby Chat System)
 	 * ========================================================================= */
@@ -90,6 +95,9 @@ protected:
 	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
 	void SetupLobbyUI();
 
+	/** PlayerState 복제 완료 후 기존 로비 표시 캐릭터들의 외형 연결을 갱신합니다. */
+	void RefreshLobbyCustomizationPresentations();
+
 	/** @brief 뷰포트에 생성할 로비 메인 UI 위젯 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TSubclassOf<UKCLobbyWidget> LobbyWidgetClass;
@@ -98,6 +106,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCLobbyWidget> LobbyWidgetInstance;
 
+	/** 로비에서도 인게임과 동일한 외형 업로드/다운로드 경로를 사용합니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization|Network")
+	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
 private:
 	/** @brief 도배 방지(쿨타임)를 위한 마지막 메시지 전송 시각 (초 단위) */
 	double LastChatMessageTimeSeconds = 0.0;
