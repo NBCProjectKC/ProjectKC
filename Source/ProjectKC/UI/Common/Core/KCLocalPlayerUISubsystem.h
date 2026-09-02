@@ -13,8 +13,10 @@ class PROJECTKC_API UKCLocalPlayerUISubsystem : public ULocalPlayerSubsystem
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "KC|UI")
-	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass);
+	/**
+	* @param bPersistAcrossLevelTravel =true 일 때, 레벨 파괴에도 위젯이 파괴되지 않음
+	*/
+	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel = false);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void ClearHUDWidget();

@@ -10,7 +10,8 @@
 #include "KCLobbyPlayerController.generated.h"
 
 class UKCLobbyWidget;
-
+class UKCLoadingScreen;
+class UKCLoadingTipDataAsset;
 /**
  * @class AKCLobbyPlayerController
  * @brief 기존 BP_PC_Lobby 블루프린트를 1:1 매핑한 C++ PlayerController 클래스
@@ -60,4 +61,18 @@ protected:
 	/** @brief 생성된 로비 메인 UI 위젯 인스턴스 */
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCLobbyWidget> LobbyWidgetInstance;
+	
+	/** @brief GasRange 진입 전 표시할 로딩화면 위젯 클래스
+	 * Client_OnMatchBegin에서 UKCLoadingScreenSubsystem::BeginPreload()에 전달
+	 *  BP_PC_Lobby 디테일 -> WBP_Loading 지정 필요 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TSubclassOf<UKCLoadingScreen> GasRangeLoadingScreenClass;
+	
+	/** @brief GasRange 진입 전 pre-load 할 PrimaryAssetType 목록 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TArray<FPrimaryAssetType> GasRangePreloadAssetTypes;
+	
+	/** @brief 로딩화면에 표시할 팁 문구 목록 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TObjectPtr<UKCLoadingTipDataAsset> LoadingTipsAsset;
 };

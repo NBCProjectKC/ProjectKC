@@ -1,11 +1,12 @@
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 
+#include "Blueprint/GameViewportSubsystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 
-UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass)
+UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel)
 {
 	ClearHUDWidget();
 
@@ -28,17 +29,33 @@ UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget
 	ActiveHUDWidget = CreateWidget<UKCUserWidget>(OwnerPlayerController, WidgetClass);
 	if (ActiveHUDWidget)
 	{
-		const bool bAddedToScreen = ActiveHUDWidget->AddToPlayerScreen();
+		bool bAddedToScreen = false;
 
-		UE_LOG(LogTemp, Log, TEXT("KC UI set HUD: Widget=%s, Class=%s, AddedToScreen=%s."),
-			*GetNameSafe(ActiveHUDWidget),
-			*GetNameSafe(WidgetClass),
-			bAddedToScreen ? TEXT("true") : TEXT("false"));
+		if (bPersistAcrossLevelTravel)
+		{
+			if (UGameViewportSubsystem* ViewportSubsystem = UGameViewportSubsystem::Get())
+			{
+				FGameViewportWidgetSlot Slot;
+				Slot.bAutoRemoveOnWorldRemoved = false;
+				ViewportSubsystem->AddWidgetForPlayer(ActiveHUDWidget, OwnerLocalPlayer, Slot);
+				bAddedToScreen = true;
+			}
+		}
+		else
+		{
+			bAddedToScreen = ActiveHUDWidget->AddToPlayerScreen();
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("KC UI set HUD: Widget=%s, Class=%s, AddedToScreen=%s, Persistent=%s."),
+		   *GetNameSafe(ActiveHUDWidget),
+		   *GetNameSafe(WidgetClass),
+		   bAddedToScreen ? TEXT("true") : TEXT("false"),
+		   bPersistAcrossLevelTravel ? TEXT("true") : TEXT("false"));
 	}
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("KC UI failed to set HUD: CreateWidget failed for %s."),
-			*GetNameSafe(WidgetClass));
+		   *GetNameSafe(WidgetClass));
 	}
 
 	return ActiveHUDWidget;
