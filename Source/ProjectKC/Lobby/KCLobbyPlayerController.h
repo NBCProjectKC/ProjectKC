@@ -13,6 +13,13 @@ class UKCLobbyWidget;
 class UKCCustomizationNetworkComponent;
 
 /**
+ * @brief 채팅 메시지 수신 시 UI(위젯)에 브로드캐스트할 다이나믹 멀티캐스트 델리게이트
+ * @param SenderName 메시지를 보낸 플레이어의 닉네임 (스팀 닉네임)
+ * @param Message 채팅 내용
+ */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnKCChatMessageReceivedDelegate, const FString&, SenderName, const FString&, Message);
+
+/**
  * @class AKCLobbyPlayerController
  * @brief 기존 BP_PC_Lobby 블루프린트를 1:1 매핑한 C++ PlayerController 클래스
  */
@@ -48,6 +55,35 @@ public:
 	{
 		return CustomizationNetworkComponent;
 	}
+	/* =========================================================================
+	 *  로비 채팅 시스템 (Lobby Chat System)
+	 * ========================================================================= */
+
+	/**
+	 * @brief 로컬에서 채팅 메시지를 전송하는 블루프린트 호출용 진입 함수
+	 * @param Message 보낼 메시지 문자열
+	 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Chat")
+	void SendChatMessage(const FString& Message);
+
+	/**
+	 * @brief 개발용 콘솔 명령어로 채팅을 즉시 보낼 수 있는 치트/Exec 함수
+	 * @note 콘솔 창(`)에 'SendChat 안녕하세요' 형식으로 입력하여 UI 없이 즉시 테스트 가능
+	 */
+	UFUNCTION(Exec, Category = "KC|Lobby|Chat")
+	void SendChat(const FString& Message);
+
+	/** @brief 클라이언트 -> 서버: 채팅 메시지 전송 요청 Server RPC */
+	UFUNCTION(Server, Reliable, WithValidation, Category = "KC|Lobby|Chat")
+	void Server_SendChatMessage(const FString& Message);
+
+	/** @brief 서버 -> 클라이언트: 전파된 채팅 메시지 수신 Client RPC */
+	UFUNCTION(Client, Reliable, Category = "KC|Lobby|Chat")
+	void Client_ReceiveChatMessage(const FString& SenderName, const FString& Message);
+
+	/** @brief 채팅 메시지가 수신되었을 때 승재님의 UI 위젯이 감지할 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Chat|Events")
+	FOnKCChatMessageReceivedDelegate OnChatMessageReceived;
 
 protected:
 	//~APlayerController interface
@@ -70,4 +106,13 @@ protected:
 	/** 로비에서도 인게임과 동일한 외형 업로드/다운로드 경로를 사용합니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization|Network")
 	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
+private:
+	/** @brief 도배 방지(쿨타임)를 위한 마지막 메시지 전송 시각 (초 단위) */
+	double LastChatMessageTimeSeconds = 0.0;
+
+	/** @brief 채팅 전송 최소 간격 (초 단위, 도배 방지용) */
+	static constexpr double ChatCooldownSeconds = 0.5;
+
+	/** @brief 1회 전송 가능한 최대 글자 수 */
+	static constexpr int32 MaxChatMessageLength = 100;
 };
