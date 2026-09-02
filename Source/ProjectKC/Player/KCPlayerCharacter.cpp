@@ -22,6 +22,7 @@
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
+#include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/UI/Interaction/Component/KCPlayerInteractionPromptComponent.h"
 #include "ProjectKC/UI/World/Player/Component/KCPlayerOverHeadComponent.h"
 #include "ProjectKC/UI/World/Player/Struct/KCPlayerDisplayInfoStruct.h"
@@ -161,6 +162,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
 	KnockbackComponent =
 		CreateDefaultSubobject<UKCKnockbackComponent>(TEXT("Knockback"));
+	PlayerCustomizationComponent =
+		CreateDefaultSubobject<UKCPlayerCustomizationComponent>(TEXT("PlayerCustomization"));
 
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoomComponent"));
 	CameraBoomComponent->SetupAttachment(RootComponent);
@@ -303,6 +306,11 @@ UKCKnockbackComponent* AKCPlayerCharacter::GetKnockbackComponent() const
 	return KnockbackComponent;
 }
 
+UKCPlayerCustomizationComponent* AKCPlayerCharacter::GetPlayerCustomizationComponent() const
+{
+	return PlayerCustomizationComponent;
+}
+
 UKCPlayerInteractionComponent* AKCPlayerCharacter::GetInteractionComponent() const
 {
 	return InteractionComponent;
@@ -382,6 +390,10 @@ void AKCPlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -395,6 +407,10 @@ void AKCPlayerCharacter::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::OnRep_Controller()
@@ -402,6 +418,10 @@ void AKCPlayerCharacter::OnRep_Controller()
 	Super::OnRep_Controller();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::OnRep_Owner()
@@ -421,6 +441,10 @@ void AKCPlayerCharacter::PawnClientRestart()
 	Super::PawnClientRestart();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::RefreshTeamAppearanceBinding()

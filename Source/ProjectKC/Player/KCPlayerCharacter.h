@@ -19,6 +19,7 @@ class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
+class UKCPlayerCustomizationComponent;
 class UKCPlayerOverHeadComponent;
 class UKCPlayerInteractionPromptComponent;
 class UKCPlayerInteractionComponent;
@@ -72,6 +73,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Knockback")
 	UKCKnockbackComponent* GetKnockbackComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|Customization")
+	UKCPlayerCustomizationComponent* GetPlayerCustomizationComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UKCPlayerInteractionComponent* GetInteractionComponent() const;
@@ -160,6 +164,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Knockback",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCKnockbackComponent> KnockbackComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerCustomizationComponent> PlayerCustomizationComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
 		meta = (AllowPrivateAccess = "true"))
