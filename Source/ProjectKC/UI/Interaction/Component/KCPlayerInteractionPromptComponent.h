@@ -60,6 +60,8 @@ private:
 	void UnbindInteractionComponent();
 	void BindHeldItemComponent();
 	void UnbindHeldItemComponent();
+	void BindObservedHeldItem(AKCWorldItemActor* NewHeldItem);
+	void UnbindObservedHeldItem();
 	void EnsureViewModel();
 	void EnsureWidgetComponent();
 	void EnsurePromptAssets();
@@ -67,6 +69,12 @@ private:
 
 	UFUNCTION()
 	void HandleHeldItemChanged(AKCWorldItemActor* NewHeldItem);
+
+	UFUNCTION()
+	void HandleObservedHeldItemBroken();
+
+	UFUNCTION()
+	void HandleObservedHeldItemDestroyed(AActor* DestroyedActor);
 
 	void SetTargetActor(AActor* NewTargetActor);
 	void ClearTargetActor();
@@ -88,6 +96,9 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<UKCHeldItemComponent> BoundHeldItemComponent;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AKCWorldItemActor> ObservedHeldItem;
 
 	bool bLocalPromptInitialized = false;
 };
