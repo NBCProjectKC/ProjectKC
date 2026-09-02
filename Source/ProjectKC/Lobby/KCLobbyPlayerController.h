@@ -10,6 +10,7 @@
 #include "KCLobbyPlayerController.generated.h"
 
 class UKCLobbyWidget;
+class UKCCustomizationNetworkComponent;
 
 /**
  * @class AKCLobbyPlayerController
@@ -43,6 +44,11 @@ public:
 	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void Client_SetStartGameButtonEnabled(bool bEnabled);
 
+	UKCCustomizationNetworkComponent* GetCustomizationNetworkComponent() const
+	{
+		return CustomizationNetworkComponent;
+	}
+
 protected:
 	//~APlayerController interface
 	virtual void BeginPlay() override;
@@ -60,4 +66,8 @@ protected:
 	/** @brief 생성된 로비 메인 UI 위젯 인스턴스 */
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCLobbyWidget> LobbyWidgetInstance;
+
+	/** 로비에서도 인게임과 동일한 외형 업로드/다운로드 경로를 사용합니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization|Network")
+	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
 };

@@ -4,6 +4,7 @@
  */
 
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
+#include "ProjectKC/Customization/KCCustomizationNetworkComponent.h"
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
@@ -14,6 +15,8 @@
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
+	CustomizationNetworkComponent = CreateDefaultSubobject<UKCCustomizationNetworkComponent>(
+		TEXT("CustomizationNetwork"));
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;

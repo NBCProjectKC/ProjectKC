@@ -2,16 +2,17 @@
 
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Customization/KCCustomizationNetworkComponent.h"
 #include "Customization/KCCustomizationNetworkTypes.h"
 #include "Customization/KCCustomizationSaveSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
-#include "Player/KCPlayerController.h"
 #include "Player/KCPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -392,8 +393,11 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 		return;
 	}
 
-	AKCPlayerController* PlayerController = Cast<AKCPlayerController>(OwnerPawn->GetController());
-	if (!PlayerController)
+	APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController());
+	UKCCustomizationNetworkComponent* NetworkComponent = PlayerController
+		? PlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>()
+		: nullptr;
+	if (!NetworkComponent)
 	{
 		return;
 	}
@@ -415,7 +419,7 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 	}
 
 	AppliedCustomizationHash = KCCustomizationNetwork::ComputePayloadHash(Payload);
-	PlayerController->UploadCustomizationPayload(Payload);
+	NetworkComponent->UploadCustomizationPayload(Payload);
 }
 
 void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
@@ -443,11 +447,13 @@ void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
 		return;
 	}
 
-	AKCPlayerController* LocalPlayerController = Cast<AKCPlayerController>(
-		UGameplayStatics::GetPlayerController(this, 0));
-	if (LocalPlayerController && BoundCustomizationPlayerState.IsValid())
+	APlayerController* LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	UKCCustomizationNetworkComponent* NetworkComponent = LocalPlayerController
+		? LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>()
+		: nullptr;
+	if (NetworkComponent && BoundCustomizationPlayerState.IsValid())
 	{
-		LocalPlayerController->RequestCustomizationPayload(
+		NetworkComponent->RequestCustomizationPayload(
 			BoundCustomizationPlayerState.Get(),
 			this);
 	}

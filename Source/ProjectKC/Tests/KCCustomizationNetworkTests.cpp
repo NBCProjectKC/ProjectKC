@@ -2,7 +2,10 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Customization/KCCustomizationNetworkComponent.h"
 #include "Customization/KCCustomizationNetworkTypes.h"
+#include "Lobby/KCLobbyPlayerController.h"
+#include "Player/KCPlayerController.h"
 
 namespace
 {
@@ -119,6 +122,48 @@ bool FKCCustomizationNetworkValidationTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("기본 외형 플래그와 페인트 데이터의 혼용을 거부한다."),
 		KCCustomizationNetwork::ValidateCustomizationData(MakeValidPaintHistory(), true));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FKCCustomizationNetworkControllerComponentsTest,
+	"ProjectKC.Customization.Network.ControllerComponents",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FKCCustomizationNetworkControllerComponentsTest::RunTest(const FString& Parameters)
+{
+	const AKCPlayerController* InGameControllerDefaults = GetDefault<AKCPlayerController>();
+	const AKCLobbyPlayerController* LobbyControllerDefaults =
+		GetDefault<AKCLobbyPlayerController>();
+
+	const UKCCustomizationNetworkComponent* InGameNetworkComponent =
+		InGameControllerDefaults
+			? InGameControllerDefaults->GetCustomizationNetworkComponent()
+			: nullptr;
+	const UKCCustomizationNetworkComponent* LobbyNetworkComponent =
+		LobbyControllerDefaults
+			? LobbyControllerDefaults->GetCustomizationNetworkComponent()
+			: nullptr;
+
+	TestNotNull(
+		TEXT("인게임 Controller에 공용 외형 네트워크 컴포넌트가 생성된다."),
+		InGameNetworkComponent);
+	TestNotNull(
+		TEXT("로비 Controller에 공용 외형 네트워크 컴포넌트가 생성된다."),
+		LobbyNetworkComponent);
+	if (InGameNetworkComponent)
+	{
+		TestTrue(
+			TEXT("인게임 외형 네트워크 컴포넌트는 복제된다."),
+			InGameNetworkComponent->GetIsReplicated());
+	}
+	if (LobbyNetworkComponent)
+	{
+		TestTrue(
+			TEXT("로비 외형 네트워크 컴포넌트는 복제된다."),
+			LobbyNetworkComponent->GetIsReplicated());
+	}
+
 	return true;
 }
 
