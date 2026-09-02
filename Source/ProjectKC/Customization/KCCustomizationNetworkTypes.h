@@ -1,0 +1,61 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Customization/KCCustomizationSaveGame.h"
+#include "KCCustomizationNetworkTypes.generated.h"
+
+/**
+ * PlayerState에 복제되는 작은 외형 식별자입니다.
+ * 실제 픽셀 데이터는 PlayerController의 요청형 청크 RPC로 전송합니다.
+ */
+USTRUCT()
+struct PROJECTKC_API FKCCustomizationDescriptor
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	uint32 Revision = 0;
+
+	UPROPERTY()
+	uint32 ContentHash = 0;
+
+	UPROPERTY()
+	int32 TargetSchemaVersion = UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
+
+	UPROPERTY()
+	bool bUseDefaultAppearance = true;
+
+	bool IsPublished() const { return Revision > 0; }
+
+	bool Matches(const FKCCustomizationDescriptor& Other) const
+	{
+		return Revision == Other.Revision &&
+			ContentHash == Other.ContentHash &&
+			TargetSchemaVersion == Other.TargetSchemaVersion &&
+			bUseDefaultAppearance == Other.bUseDefaultAppearance;
+	}
+};
+
+namespace KCCustomizationNetwork
+{
+	inline constexpr int32 ChunkSizeBytes = 32 * 1024;
+	inline constexpr int32 MaxPayloadBytes = 5 * 1024 * 1024;
+	inline constexpr int32 MaxPatchEntries = 4;
+	inline constexpr int32 ExpectedRenderTargetSize = 512;
+
+	PROJECTKC_API uint32 ComputePayloadHash(const TArray<uint8>& Payload);
+
+	PROJECTKC_API bool SerializePayload(
+		const FRuntimeMeshPaintPatchHistory& PaintHistory,
+		bool bUseDefaultAppearance,
+		TArray<uint8>& OutPayload);
+
+	PROJECTKC_API bool DeserializePayload(
+		const TArray<uint8>& Payload,
+		FRuntimeMeshPaintPatchHistory& OutPaintHistory,
+		bool& bOutUseDefaultAppearance);
+
+	PROJECTKC_API bool ValidateCustomizationData(
+		const FRuntimeMeshPaintPatchHistory& PaintHistory,
+		bool bUseDefaultAppearance);
+}

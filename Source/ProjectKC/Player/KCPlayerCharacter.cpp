@@ -434,6 +434,10 @@ void AKCPlayerCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::PawnClientRestart()

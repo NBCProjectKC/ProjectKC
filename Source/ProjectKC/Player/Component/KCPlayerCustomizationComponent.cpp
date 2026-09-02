@@ -2,13 +2,17 @@
 
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Customization/KCCustomizationNetworkTypes.h"
 #include "Customization/KCCustomizationSaveSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
+#include "Player/KCPlayerController.h"
+#include "Player/KCPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCPlayerCustomization, Log, All);
@@ -65,6 +69,7 @@ void UKCPlayerCustomizationComponent::BeginPlay()
 
 void UKCPlayerCustomizationComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindCustomizationPlayerState();
 	DestroyRuntimeAppearance();
 	Super::EndPlay(EndPlayReason);
 }
@@ -77,10 +82,16 @@ void UKCPlayerCustomizationComponent::InitializeForPawn()
 		return;
 	}
 
+	BindCustomizationPlayerState();
+
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (OwnerPawn && OwnerPawn->IsLocallyControlled() && !bLocalSaveApplied)
 	{
 		ApplyLocalSavedCustomization();
+	}
+	else if (OwnerPawn && OwnerPawn->IsLocallyControlled() && bLocalSaveApplied)
+	{
+		TryUploadLocalCustomization();
 	}
 }
 
@@ -111,6 +122,11 @@ bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
 		bUseDefaultAppearance,
 		LastApplyResult);
 	bLocalSaveApplied = bSucceeded;
+	if (bSucceeded)
+	{
+		bCurrentUseDefaultAppearance = bUseDefaultAppearance;
+		TryUploadLocalCustomization();
+	}
 
 	UE_LOG(LogKCPlayerCustomization, Log,
 		TEXT("Local customization apply: Owner=%s, Success=%s, SaveFound=%s, Default=%s, Result=%s"),
@@ -140,6 +156,10 @@ bool UKCPlayerCustomizationComponent::ApplyCustomizationData(
 		LastApplyResult = bReset
 			? EKCCustomizationSaveResult::Success
 			: EKCCustomizationSaveResult::ApplyFailed;
+		if (bReset)
+		{
+			bCurrentUseDefaultAppearance = true;
+		}
 		return bReset;
 	}
 
@@ -150,7 +170,29 @@ bool UKCPlayerCustomizationComponent::ApplyCustomizationData(
 	LastApplyResult = bApplied
 		? EKCCustomizationSaveResult::Success
 		: EKCCustomizationSaveResult::ApplyFailed;
+	if (bApplied)
+	{
+		bCurrentUseDefaultAppearance = false;
+	}
 	return bApplied;
+}
+
+bool UKCPlayerCustomizationComponent::ApplyNetworkCustomizationData(
+	const FRuntimeMeshPaintPatchHistory& PaintHistory,
+	const bool bUseDefaultAppearance,
+	const FKCCustomizationDescriptor& Descriptor)
+{
+	if (!Descriptor.IsPublished() ||
+		Descriptor.TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion ||
+		Descriptor.bUseDefaultAppearance != bUseDefaultAppearance ||
+		!ApplyCustomizationData(PaintHistory, bUseDefaultAppearance))
+	{
+		return false;
+	}
+
+	AppliedCustomizationRevision = Descriptor.Revision;
+	AppliedCustomizationHash = Descriptor.ContentHash;
+	return true;
 }
 
 bool UKCPlayerCustomizationComponent::IsRuntimeAppearanceReady() const
@@ -304,6 +346,110 @@ void UKCPlayerCustomizationComponent::HideLegacyEyeMesh() const
 			Component->SetVisibility(false, true);
 			Component->SetHiddenInGame(true, true);
 		}
+	}
+}
+
+void UKCPlayerCustomizationComponent::BindCustomizationPlayerState()
+{
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	AKCPlayerState* PlayerState = OwnerPawn
+		? OwnerPawn->GetPlayerState<AKCPlayerState>()
+		: nullptr;
+	if (BoundCustomizationPlayerState.Get() == PlayerState)
+	{
+		if (PlayerState)
+		{
+			HandleCustomizationDescriptorChanged(PlayerState->GetCustomizationDescriptor());
+		}
+		return;
+	}
+
+	UnbindCustomizationPlayerState();
+	BoundCustomizationPlayerState = PlayerState;
+	if (PlayerState)
+	{
+		PlayerState->OnCustomizationDescriptorChanged.AddUObject(
+			this,
+			&ThisClass::HandleCustomizationDescriptorChanged);
+		HandleCustomizationDescriptorChanged(PlayerState->GetCustomizationDescriptor());
+	}
+}
+
+void UKCPlayerCustomizationComponent::UnbindCustomizationPlayerState()
+{
+	if (AKCPlayerState* PlayerState = BoundCustomizationPlayerState.Get())
+	{
+		PlayerState->OnCustomizationDescriptorChanged.RemoveAll(this);
+	}
+	BoundCustomizationPlayerState.Reset();
+}
+
+void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
+{
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn || !OwnerPawn->IsLocallyControlled() || !bLocalSaveApplied)
+	{
+		return;
+	}
+
+	AKCPlayerController* PlayerController = Cast<AKCPlayerController>(OwnerPawn->GetController());
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	FRuntimeMeshPaintPatchHistory PaintHistory;
+	if (!bCurrentUseDefaultAppearance &&
+		(!RuntimePaintTarget || !RuntimePaintTarget->CompactPaintPatchHistory(PaintHistory)))
+	{
+		return;
+	}
+
+	TArray<uint8> Payload;
+	if (!KCCustomizationNetwork::SerializePayload(
+		PaintHistory,
+		bCurrentUseDefaultAppearance,
+		Payload))
+	{
+		return;
+	}
+
+	AppliedCustomizationHash = KCCustomizationNetwork::ComputePayloadHash(Payload);
+	PlayerController->UploadCustomizationPayload(Payload);
+}
+
+void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
+	const FKCCustomizationDescriptor& Descriptor)
+{
+	if (!Descriptor.IsPublished() ||
+		Descriptor.TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion ||
+		Descriptor.Revision == AppliedCustomizationRevision)
+	{
+		return;
+	}
+
+	if (AppliedCustomizationHash != 0 && AppliedCustomizationHash == Descriptor.ContentHash)
+	{
+		AppliedCustomizationRevision = Descriptor.Revision;
+		return;
+	}
+
+	if (Descriptor.bUseDefaultAppearance)
+	{
+		ApplyNetworkCustomizationData(
+			FRuntimeMeshPaintPatchHistory(),
+			true,
+			Descriptor);
+		return;
+	}
+
+	AKCPlayerController* LocalPlayerController = Cast<AKCPlayerController>(
+		UGameplayStatics::GetPlayerController(this, 0));
+	if (LocalPlayerController && BoundCustomizationPlayerState.IsValid())
+	{
+		LocalPlayerController->RequestCustomizationPayload(
+			BoundCustomizationPlayerState.Get(),
+			this);
 	}
 }
 

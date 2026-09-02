@@ -9,6 +9,8 @@ class UMaterialInterface;
 class URuntimeMeshPaintTargetComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
+class AKCPlayerState;
+struct FKCCustomizationDescriptor;
 
 /**
  * 플레이어의 그림 커스터마이징 외형을 독립적으로 생성하고 적용합니다.
@@ -34,6 +36,12 @@ public:
 	bool ApplyCustomizationData(
 		const FRuntimeMeshPaintPatchHistory& PaintHistory,
 		bool bUseDefaultAppearance);
+
+	/** 다운로드 검증을 마친 서버 권위 외형을 적용하고 Revision을 기록합니다. */
+	bool ApplyNetworkCustomizationData(
+		const FRuntimeMeshPaintPatchHistory& PaintHistory,
+		bool bUseDefaultAppearance,
+		const FKCCustomizationDescriptor& Descriptor);
 
 	UFUNCTION(BlueprintPure, Category = "KC|Customization|Player")
 	bool IsRuntimeAppearanceReady() const;
@@ -86,6 +94,10 @@ private:
 	UStaticMeshComponent* FindAvatarBody() const;
 	void HideLegacyEyeMesh() const;
 	void DestroyRuntimeAppearance();
+	void BindCustomizationPlayerState();
+	void UnbindCustomizationPlayerState();
+	void TryUploadLocalCustomization();
+	void HandleCustomizationDescriptorChanged(const FKCCustomizationDescriptor& Descriptor);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> EyesPaintMesh;
@@ -103,4 +115,8 @@ private:
 	TObjectPtr<URuntimeMeshPaintTargetComponent> RuntimePaintTarget;
 
 	bool bLocalSaveApplied = false;
+	bool bCurrentUseDefaultAppearance = true;
+	uint32 AppliedCustomizationRevision = 0;
+	uint32 AppliedCustomizationHash = 0;
+	TWeakObjectPtr<AKCPlayerState> BoundCustomizationPlayerState;
 };
