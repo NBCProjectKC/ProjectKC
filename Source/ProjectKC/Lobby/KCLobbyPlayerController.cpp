@@ -11,6 +11,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/Engine.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
@@ -164,5 +165,104 @@ void AKCLobbyPlayerController::Client_SetStartGameButtonEnabled_Implementation(b
 	{
 		LobbyWidgetInstance->SetStartGameButtonEnabled(bEnabled);
 	}
+}
+
+/* =========================================================================
+ *  로비 채팅 시스템 구현부 (Lobby Chat System Implementation)
+ * ========================================================================= */
+
+void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
+{
+	// 1. 공백 및 빈 문자열 로컬 사전 차단
+	const FString TrimmedMessage = Message.TrimStartAndEnd();
+	if (TrimmedMessage.IsEmpty())
+	{
+		return;
+	}
+
+	// 2. 글자 수 제한 초과 검사
+	if (TrimmedMessage.Len() > MaxChatMessageLength)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(INDEX_NONE, 3.0f, FColor::Red, TEXT("[경고] 메시지가 너무 깁니다. (최대 100자)"));
+		}
+		return;
+	}
+
+	// 3. 도배 방지 (쿨타임 검사)
+	const double CurrentTime = FPlatformTime::Seconds();
+	if (CurrentTime - LastChatMessageTimeSeconds < ChatCooldownSeconds)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(INDEX_NONE, 2.0f, FColor::Yellow, TEXT("[경고] 메시지를 너무 빠르게 보낼 수 없습니다."));
+		}
+		return;
+	}
+
+	LastChatMessageTimeSeconds = CurrentTime;
+
+	// 4. 서버로 전송
+	Server_SendChatMessage(TrimmedMessage);
+}
+
+void AKCLobbyPlayerController::SendChat(const FString& Message)
+{
+	SendChatMessage(Message);
+}
+
+bool AKCLobbyPlayerController::Server_SendChatMessage_Validate(const FString& Message)
+{
+	// 서버 측 유효성 검증
+	const FString Trimmed = Message.TrimStartAndEnd();
+	return !Trimmed.IsEmpty() && Trimmed.Len() <= MaxChatMessageLength;
+}
+
+void AKCLobbyPlayerController::Server_SendChatMessage_Implementation(const FString& Message)
+{
+	const FString TrimmedMessage = Message.TrimStartAndEnd();
+
+	// 1. 발신자 닉네임 가져오기 (스팀 프로필 닉네임 자동 반영)
+	FString SenderName = TEXT("Unknown");
+	if (PlayerState)
+	{
+		SenderName = PlayerState->GetPlayerName();
+	}
+
+	UE_LOG(LogKCLobby, Log, TEXT("[Server Chat] Broadcast from '%s': %s"), *SenderName, *TrimmedMessage);
+
+	// 2. 현재 월드에 접속 중인 모든 PlayerController를 찾아 Client RPC 브로드캐스트
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(It->Get()))
+			{
+				LobbyPC->Client_ReceiveChatMessage(SenderName, TrimmedMessage);
+			}
+		}
+	}
+}
+
+void AKCLobbyPlayerController::Client_ReceiveChatMessage_Implementation(const FString& SenderName, const FString& Message)
+{
+	// 1. [로컬 테스트용 1] 화면 디버그 메시지 출력 (밝은 시안 색상, 7초 유지)
+	if (GEngine)
+	{
+		const FString FormattedScreenMsg = FString::Printf(TEXT("[%s]: %s"), *SenderName, *Message);
+		GEngine->AddOnScreenDebugMessage(
+			INDEX_NONE,
+			7.0f,
+			FColor(100, 220, 255),
+			FormattedScreenMsg
+		);
+	}
+
+	// 2. [로컬 테스트용 2] 출력 로그창(Output Log) 출력
+	UE_LOG(LogKCLobby, Log, TEXT("[Chat] [%s]: %s"), *SenderName, *Message);
+
+	// 3. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
+	OnChatMessageReceived.Broadcast(SenderName, Message);
 }
 
