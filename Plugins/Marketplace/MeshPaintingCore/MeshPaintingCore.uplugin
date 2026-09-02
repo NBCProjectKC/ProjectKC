@@ -1,0 +1,35 @@
+{
+	"FileVersion": 3,
+	"Version": 2,
+	"VersionName": "1.1",
+	"FriendlyName": "Mesh Painting - Runtime & Multiplayer Ready",
+	"Description": "GPU-powered runtime mesh painting for Unreal Engine with static and skeletal mesh support, seam-safe UV projection, and multiplayer-ready paint replication.",
+	"Category": "Shared Orbit",
+	"CreatedBy": "Shared Orbit",
+	"CreatedByURL": "https://sharedorbit.github.io/Main/",
+	"DocsURL": "https://sharedorbit.github.io/MeshPaintingDoc/",
+	"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/5f357bc2-f458-4c4e-9acd-7d5c0f2f9f57",
+	"SupportURL": "https://discord.gg/aJVe2Nf3cs",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"SupportedTargetPlatforms": [
+		"Win64"
+	],
+	"Modules": [
+		{
+			"Name": "MeshPaintingCore",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		}
+	]
+}

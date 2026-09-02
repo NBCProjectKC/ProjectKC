@@ -4,6 +4,8 @@
  */
 
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
+#include "ProjectKC/Customization/KCCustomizationNetworkComponent.h"
+#include "ProjectKC/Lobby/KCLobbyCharacter.h"
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
@@ -11,12 +13,15 @@
 #include "Blueprint/UserWidget.h"
 #include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
+	CustomizationNetworkComponent = CreateDefaultSubobject<UKCCustomizationNetworkComponent>(
+		TEXT("CustomizationNetwork"));
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
@@ -26,12 +31,14 @@ void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	SetupLobbyUI();
+	RefreshLobbyCustomizationPresentations();
 }
 
 void AKCLobbyPlayerController::PostSeamlessTravel()
 {
 	Super::PostSeamlessTravel();
 	SetupLobbyUI();
+	RefreshLobbyCustomizationPresentations();
 }
 
 void AKCLobbyPlayerController::OnRep_PlayerState()
@@ -41,6 +48,29 @@ void AKCLobbyPlayerController::OnRep_PlayerState()
 	if (IsLocalPlayerController() && LobbyWidgetInstance)
 	{
 		LobbyWidgetInstance->TryBindPlayerState();
+	}
+
+	RefreshLobbyCustomizationPresentations();
+}
+
+void AKCLobbyPlayerController::RefreshLobbyCustomizationPresentations()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<AKCLobbyCharacter> CharacterIterator(World);
+		CharacterIterator;
+		++CharacterIterator)
+	{
+		CharacterIterator->RefreshCustomizationPresentation();
 	}
 }
 
@@ -205,10 +235,8 @@ void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
 	// 2. 글자 수 제한 초과 검사
 	if (TrimmedMessage.Len() > MaxChatMessageLength)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(INDEX_NONE, 3.0f, FColor::Red, TEXT("[경고] 메시지가 너무 깁니다. (최대 100자)"));
-		}
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SendChatMessage Failed: Message exceeds max length (%d > %d)"),
+			TrimmedMessage.Len(), MaxChatMessageLength);
 		return;
 	}
 
@@ -216,10 +244,8 @@ void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
 	const double CurrentTime = FPlatformTime::Seconds();
 	if (CurrentTime - LastChatMessageTimeSeconds < ChatCooldownSeconds)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(INDEX_NONE, 2.0f, FColor::Yellow, TEXT("[경고] 메시지를 너무 빠르게 보낼 수 없습니다."));
-		}
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SendChatMessage Rejected: Cooldown active (%.2fs remaining)"),
+			ChatCooldownSeconds - (CurrentTime - LastChatMessageTimeSeconds));
 		return;
 	}
 
@@ -269,22 +295,10 @@ void AKCLobbyPlayerController::Server_SendChatMessage_Implementation(const FStri
 
 void AKCLobbyPlayerController::Client_ReceiveChatMessage_Implementation(const FString& SenderName, const FString& Message)
 {
-	// 1. [로컬 테스트용 1] 화면 디버그 메시지 출력 (밝은 시안 색상, 7초 유지)
-	if (GEngine)
-	{
-		const FString FormattedScreenMsg = FString::Printf(TEXT("[%s]: %s"), *SenderName, *Message);
-		GEngine->AddOnScreenDebugMessage(
-			INDEX_NONE,
-			7.0f,
-			FColor(100, 220, 255),
-			FormattedScreenMsg
-		);
-	}
-
-	// 2. [로컬 테스트용 2] 출력 로그창(Output Log) 출력
+	// 1. 출력 로그창(Output Log) 출력
 	UE_LOG(LogKCLobby, Log, TEXT("[Chat] [%s]: %s"), *SenderName, *Message);
 
-	// 3. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
+	// 2. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
 	OnChatMessageReceived.Broadcast(SenderName, Message);
 }
 

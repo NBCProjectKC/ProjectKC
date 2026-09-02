@@ -1,0 +1,484 @@
+#include "/Engine/Public/Platform.ush"
+
+float4 BrushColor;
+float4 MaterialSettingsColor;
+
+struct FRuntimeMeshPaintGPUBrushPSOutput
+{
+	float4 Color : SV_Target0;
+#if WRITE_MATERIAL_SETTINGS
+	float4 MaterialSettings : SV_Target1;
+#endif
+};
+
+struct FRuntimeMeshPaintGPUProjectedBrushVSInput
+{
+	float2 PaintUV : ATTRIBUTE0;
+	float3 LocalPosition : ATTRIBUTE1;
+	float3 LocalNormal : ATTRIBUTE2;
+	float4 BoneIndices0 : ATTRIBUTE3;
+	float4 BoneWeights0 : ATTRIBUTE4;
+	float4 BoneIndices1 : ATTRIBUTE5;
+	float4 BoneWeights1 : ATTRIBUTE6;
+	float2 PaintUVPaddingDirection : ATTRIBUTE7;
+};
+
+struct FRuntimeMeshPaintGPUProjectedBrushVSOutput
+{
+	float4 Position : SV_POSITION;
+	float3 WorldPosition : TEXCOORD0;
+	float3 WorldNormal : TEXCOORD1;
+};
+
+struct FRuntimeMeshPaintGPUBrushVisibilityVSOutput
+{
+	float4 Position : SV_POSITION;
+	float3 WorldPosition : TEXCOORD0;
+	float3 WorldNormal : TEXCOORD1;
+};
+
+float4x4 LocalToWorld;
+float bSkeletal;
+float2 PaintUVPadding;
+float4x4 BoneMatrices[512];
+
+float3 ApplyBonePosition(float3 LocalPosition, float4 BoneIndices, float4 BoneWeights)
+{
+	float3 Result = 0.0f;
+	[unroll]
+	for (int InfluenceIndex = 0; InfluenceIndex < 4; ++InfluenceIndex)
+	{
+		const int BoneIndex = (int)round(BoneIndices[InfluenceIndex]);
+		Result += mul(float4(LocalPosition, 1.0f), BoneMatrices[BoneIndex]).xyz * BoneWeights[InfluenceIndex];
+	}
+	return Result;
+}
+
+float3 ApplyBoneNormal(float3 LocalNormal, float4 BoneIndices, float4 BoneWeights)
+{
+	float3 Result = 0.0f;
+	[unroll]
+	for (int InfluenceIndex = 0; InfluenceIndex < 4; ++InfluenceIndex)
+	{
+		const int BoneIndex = (int)round(BoneIndices[InfluenceIndex]);
+		Result += mul(float4(LocalNormal, 0.0f), BoneMatrices[BoneIndex]).xyz * BoneWeights[InfluenceIndex];
+	}
+	return Result;
+}
+
+float3 ResolveProjectedBrushLocalPosition(FRuntimeMeshPaintGPUProjectedBrushVSInput Input)
+{
+	float3 SkinnedLocalPosition = Input.LocalPosition;
+	if (bSkeletal > 0.5f)
+	{
+		SkinnedLocalPosition =
+			ApplyBonePosition(Input.LocalPosition, Input.BoneIndices0, Input.BoneWeights0) +
+			ApplyBonePosition(Input.LocalPosition, Input.BoneIndices1, Input.BoneWeights1);
+	}
+
+	return SkinnedLocalPosition;
+}
+
+float3 ResolveProjectedBrushLocalNormal(FRuntimeMeshPaintGPUProjectedBrushVSInput Input)
+{
+	float3 SkinnedLocalNormal = Input.LocalNormal;
+	if (bSkeletal > 0.5f)
+	{
+		SkinnedLocalNormal =
+			ApplyBoneNormal(Input.LocalNormal, Input.BoneIndices0, Input.BoneWeights0) +
+			ApplyBoneNormal(Input.LocalNormal, Input.BoneIndices1, Input.BoneWeights1);
+	}
+
+	return SkinnedLocalNormal;
+}
+
+float3 BrushRayStart;
+float3 BrushRayDirection;
+float BrushRayLength;
+float BrushRayCenterT;
+float BrushProjectionDepth;
+float3 BrushWorldCenter;
+float3 BrushWorldNormal;
+float BrushWorldRadius;
+float NormalThreshold;
+float bUseBrushScreenProjection;
+float3 BrushViewOrigin;
+float3 BrushViewDirection;
+float3 BrushViewRight;
+float3 BrushViewUp;
+float PreviewLineThickness;
+float4 PreviewColor;
+Texture2D BrushVisibilityDepthTexture;
+SamplerState BrushVisibilityDepthSampler;
+float2 BrushVisibilityDepthInvSize;
+float BrushVisibilityDepthTolerance;
+
+float4 SampleBrushVisibilityData(float2 VisibilityUV)
+{
+	return BrushVisibilityDepthTexture.SampleLevel(BrushVisibilityDepthSampler, VisibilityUV, 0);
+}
+
+float SampleClosestBrushVisibilityDepth(float2 VisibilityUV)
+{
+	return SampleBrushVisibilityData(VisibilityUV).r;
+}
+
+float IsBrushVisibilityDataValid(float4 VisibilityData)
+{
+	return VisibilityData.r < 0.999f ? 1.0f : 0.0f;
+}
+
+float3 DecodeBrushVisibilityNormal(float4 VisibilityData)
+{
+	return normalize(VisibilityData.yzw * 2.0f - 1.0f);
+}
+
+float4 SampleBrushCenterVisibilityData()
+{
+	float4 CenterData = float4(1.0f, 0.5f, 0.5f, 1.0f);
+
+	[unroll]
+	for (int SampleY = -2; SampleY <= 2; ++SampleY)
+	{
+		[unroll]
+		for (int SampleX = -2; SampleX <= 2; ++SampleX)
+		{
+			const float2 SampleUV = saturate(float2(0.5f, 0.5f) + float2(SampleX, SampleY) * BrushVisibilityDepthInvSize);
+			const float4 SampleData = SampleBrushVisibilityData(SampleUV);
+			if (SampleData.r < CenterData.r)
+			{
+				CenterData = SampleData;
+			}
+		}
+	}
+
+	return CenterData;
+}
+
+float SampleBrushCenterVisibilityDepth()
+{
+	return SampleBrushCenterVisibilityData().r;
+}
+
+float3 GetBrushVisibilityAxisX()
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return normalize(BrushViewRight);
+	}
+
+	const float3 SafeRayDirection = normalize(BrushRayDirection);
+	const float3 AxisSeed = abs(SafeRayDirection.z) < 0.999f ? float3(0.0f, 0.0f, 1.0f) : float3(0.0f, 1.0f, 0.0f);
+	return normalize(cross(AxisSeed, SafeRayDirection));
+}
+
+float3 GetBrushVisibilityAxisY(float3 AxisX)
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return normalize(BrushViewUp);
+	}
+
+	return cross(normalize(BrushRayDirection), AxisX);
+}
+
+float2 GetBrushRayLocalUV(float3 WorldPosition)
+{
+	const float3 AxisX = GetBrushVisibilityAxisX();
+	const float3 AxisY = GetBrushVisibilityAxisY(AxisX);
+	const float3 BrushRayCenter = BrushRayStart + normalize(BrushRayDirection) * BrushRayCenterT;
+	const float3 ToBrushRayCenter = WorldPosition - BrushRayCenter;
+	const float SafeRadius = max(BrushWorldRadius, 0.000001f);
+	return float2(dot(ToBrushRayCenter, AxisX), dot(ToBrushRayCenter, AxisY)) / SafeRadius;
+}
+
+float2 GetBrushVisualSurfaceLocalUV(float3 WorldPosition)
+{
+	if (bUseBrushScreenProjection <= 0.5f)
+	{
+		return GetBrushRayLocalUV(WorldPosition);
+	}
+
+	const float4 CenterData = SampleBrushCenterVisibilityData();
+	const float CenterDepth = CenterData.r;
+	if (CenterDepth >= 0.999f)
+	{
+		return float2(100000.0f, 100000.0f);
+	}
+
+	const float3 SurfaceNormal = DecodeBrushVisibilityNormal(CenterData);
+	float3 AxisX = BrushViewRight - SurfaceNormal * dot(BrushViewRight, SurfaceNormal);
+	if (dot(AxisX, AxisX) < 0.0001f)
+	{
+		AxisX = cross(BrushViewUp, SurfaceNormal);
+	}
+	if (dot(AxisX, AxisX) < 0.0001f)
+	{
+		const float3 AxisSeed = abs(SurfaceNormal.z) < 0.999f ? float3(0.0f, 0.0f, 1.0f) : float3(0.0f, 1.0f, 0.0f);
+		AxisX = cross(AxisSeed, SurfaceNormal);
+	}
+
+	AxisX = normalize(AxisX);
+	const float3 AxisY = normalize(cross(SurfaceNormal, AxisX));
+	const float3 BrushVisualCenter = BrushViewOrigin + normalize(BrushViewDirection) * (CenterDepth * BrushRayLength);
+	const float3 ToBrushVisualCenter = WorldPosition - BrushVisualCenter;
+	const float SafeRadius = max(BrushWorldRadius, 0.000001f);
+	return float2(dot(ToBrushVisualCenter, AxisX), dot(ToBrushVisualCenter, AxisY)) / SafeRadius;
+}
+
+float2 GetBrushFootprintLocalUV(float3 WorldPosition)
+{
+	return GetBrushVisualSurfaceLocalUV(WorldPosition);
+}
+
+float2 GetBrushVisibilityLocalUV(float3 WorldPosition)
+{
+	return GetBrushRayLocalUV(WorldPosition);
+}
+
+float2 GetBrushProjectedLocalUV(float3 WorldPosition)
+{
+	return GetBrushFootprintLocalUV(WorldPosition);
+}
+
+float2 GetBrushVisibilityTextureUV(float3 WorldPosition)
+{
+	const float2 BrushLocalUV = GetBrushVisibilityLocalUV(WorldPosition);
+	return float2(BrushLocalUV.x * 0.5f + 0.5f, 0.5f - BrushLocalUV.y * 0.5f);
+}
+
+float GetBrushVisibilityDepthValue(float3 WorldPosition, float RayT)
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return dot(WorldPosition - BrushViewOrigin, normalize(BrushViewDirection));
+	}
+
+	return RayT;
+}
+
+float GetBrushVisibilityDepthWindowMask(float VisibilityDepth)
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return VisibilityDepth > 0.0f && VisibilityDepth <= BrushRayLength ? 1.0f : 0.0f;
+	}
+
+	return VisibilityDepth > 0.0f && abs(VisibilityDepth - BrushRayCenterT) <= BrushProjectionDepth ? 1.0f : 0.0f;
+}
+
+float GetBrushNormalizedVisibilityDepthValue(float VisibilityDepth)
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return saturate(VisibilityDepth / max(BrushRayLength, 0.000001f));
+	}
+
+	const float DepthRange = max(BrushProjectionDepth * 2.0f, 0.000001f);
+	return saturate((VisibilityDepth - (BrushRayCenterT - BrushProjectionDepth)) / DepthRange);
+}
+
+float GetBrushVisibilityDepthToleranceValue()
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		const float WorldTolerance = max(BrushWorldRadius * 0.18f, 2.0f);
+		return max(WorldTolerance / max(BrushRayLength, 0.000001f), 0.000001f);
+	}
+
+	return BrushVisibilityDepthTolerance;
+}
+
+float3 GetBrushFacingDirection(float3 WorldPosition)
+{
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return -normalize(BrushViewDirection);
+	}
+
+	return -normalize(BrushRayDirection);
+}
+
+float GetBrushVisibilityNormalMask(float3 WorldPosition, float3 SafeWorldNormal)
+{
+	const float ViewNormalMask = dot(SafeWorldNormal, GetBrushFacingDirection(WorldPosition)) >= NormalThreshold ? 1.0f : 0.0f;
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return ViewNormalMask;
+	}
+
+	const float SurfaceNormalMask = dot(SafeWorldNormal, normalize(BrushWorldNormal)) >= NormalThreshold ? 1.0f : 0.0f;
+	return ViewNormalMask * SurfaceNormalMask;
+}
+
+float GetBrushPaintableNormalMask(float3 WorldPosition, float3 SafeWorldNormal)
+{
+	const float ViewNormalMask = dot(SafeWorldNormal, GetBrushFacingDirection(WorldPosition)) >= NormalThreshold ? 1.0f : 0.0f;
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		const float4 CenterData = SampleBrushCenterVisibilityData();
+		const float ValidCenterMask = IsBrushVisibilityDataValid(CenterData);
+		const float3 CenterNormal = DecodeBrushVisibilityNormal(CenterData);
+		const float SurfaceContinuityThreshold = max(NormalThreshold, 0.05f);
+		const float SurfaceContinuityMask = dot(SafeWorldNormal, CenterNormal) >= SurfaceContinuityThreshold ? 1.0f : 0.0f;
+		return ViewNormalMask * ValidCenterMask * SurfaceContinuityMask;
+	}
+
+	const float SurfaceNormalMask = dot(SafeWorldNormal, normalize(BrushWorldNormal)) >= NormalThreshold ? 1.0f : 0.0f;
+	return ViewNormalMask * SurfaceNormalMask;
+}
+
+float GetBrushScreenVisibilityDepthMask(float2 VisibilityUV, float CandidateDepth)
+{
+	const float Tolerance = GetBrushVisibilityDepthToleranceValue();
+	float AnyMatchingDepth = 0.0f;
+
+	[unroll]
+	for (int SampleY = -1; SampleY <= 1; ++SampleY)
+	{
+		[unroll]
+		for (int SampleX = -1; SampleX <= 1; ++SampleX)
+		{
+			const float2 SampleUV = saturate(VisibilityUV + float2(SampleX, SampleY) * BrushVisibilityDepthInvSize);
+			const float ClosestDepth = SampleClosestBrushVisibilityDepth(SampleUV);
+			const float ValidDepthMask = ClosestDepth < 0.999f ? 1.0f : 0.0f;
+			const float DepthMatchMask = abs(CandidateDepth - ClosestDepth) <= Tolerance ? 1.0f : 0.0f;
+			AnyMatchingDepth = max(AnyMatchingDepth, ValidDepthMask * DepthMatchMask);
+		}
+	}
+
+	return AnyMatchingDepth;
+}
+
+float GetBrushScreenVisibilityLayerMask(float CandidateDepth)
+{
+	if (bUseBrushScreenProjection <= 0.5f)
+	{
+		return 1.0f;
+	}
+
+	const float CenterDepth = SampleBrushCenterVisibilityDepth();
+	const float ValidCenterMask = CenterDepth < 0.999f ? 1.0f : 0.0f;
+	const float WorldTolerance = max(BrushWorldRadius, 2.0f);
+	const float LayerTolerance = max(
+		WorldTolerance / max(BrushRayLength, 0.000001f),
+		GetBrushVisibilityDepthToleranceValue() * 2.0f);
+	const float DepthLayerMask = abs(CandidateDepth - CenterDepth) <= LayerTolerance ? 1.0f : 0.0f;
+	return ValidCenterMask * DepthLayerMask;
+}
+
+float GetBrushVisibilityMask(float3 WorldPosition, float RayT)
+{
+	const float2 VisibilityUV = GetBrushVisibilityTextureUV(WorldPosition);
+	const float UVMask = all(VisibilityUV >= 0.0f) && all(VisibilityUV <= 1.0f) ? 1.0f : 0.0f;
+	const float VisibilityDepth = GetBrushVisibilityDepthValue(WorldPosition, RayT);
+	const float CandidateDepth = GetBrushNormalizedVisibilityDepthValue(VisibilityDepth);
+
+	if (bUseBrushScreenProjection > 0.5f)
+	{
+		return UVMask *
+			GetBrushScreenVisibilityDepthMask(saturate(VisibilityUV), CandidateDepth) *
+			GetBrushScreenVisibilityLayerMask(CandidateDepth);
+	}
+
+	const float ClosestDepth = SampleClosestBrushVisibilityDepth(saturate(VisibilityUV));
+	const float ValidDepthMask = ClosestDepth < 0.999f ? 1.0f : 0.0f;
+	const float DepthMatchMask = CandidateDepth <= ClosestDepth + GetBrushVisibilityDepthToleranceValue() ? 1.0f : 0.0f;
+	return UVMask * ValidDepthMask * DepthMatchMask;
+}
+
+FRuntimeMeshPaintGPUProjectedBrushVSOutput ProjectedMainVS(FRuntimeMeshPaintGPUProjectedBrushVSInput Input)
+{
+	FRuntimeMeshPaintGPUProjectedBrushVSOutput Output;
+
+	const float3 SkinnedLocalPosition = ResolveProjectedBrushLocalPosition(Input);
+	const float3 SkinnedLocalNormal = ResolveProjectedBrushLocalNormal(Input);
+
+	const float2 PaddedPaintUV = Input.PaintUV + Input.PaintUVPaddingDirection * PaintUVPadding;
+	Output.Position = float4(PaddedPaintUV.x * 2.0f - 1.0f, 1.0f - PaddedPaintUV.y * 2.0f, 0.0f, 1.0f);
+	Output.WorldPosition = mul(float4(SkinnedLocalPosition, 1.0f), LocalToWorld).xyz;
+	Output.WorldNormal = normalize(mul(float4(SkinnedLocalNormal, 0.0f), LocalToWorld).xyz);
+	return Output;
+}
+
+FRuntimeMeshPaintGPUBrushVisibilityVSOutput ProjectedVisibilityVS(FRuntimeMeshPaintGPUProjectedBrushVSInput Input)
+{
+	FRuntimeMeshPaintGPUBrushVisibilityVSOutput Output;
+
+	const float3 SkinnedLocalPosition = ResolveProjectedBrushLocalPosition(Input);
+	const float3 SkinnedLocalNormal = ResolveProjectedBrushLocalNormal(Input);
+	Output.WorldPosition = mul(float4(SkinnedLocalPosition, 1.0f), LocalToWorld).xyz;
+	Output.WorldNormal = normalize(mul(float4(SkinnedLocalNormal, 0.0f), LocalToWorld).xyz);
+
+	const float2 BrushLocalUV = GetBrushVisibilityLocalUV(Output.WorldPosition);
+	const float3 ToSurface = Output.WorldPosition - BrushRayStart;
+	const float RayT = dot(ToSurface, normalize(BrushRayDirection));
+	const float VisibilityDepth = GetBrushVisibilityDepthValue(Output.WorldPosition, RayT);
+	Output.Position = float4(BrushLocalUV.x, BrushLocalUV.y, GetBrushNormalizedVisibilityDepthValue(VisibilityDepth), 1.0f);
+	return Output;
+}
+
+float4 ProjectedVisibilityPS(FRuntimeMeshPaintGPUBrushVisibilityVSOutput Input) : SV_Target0
+{
+	const float3 ToSurface = Input.WorldPosition - BrushRayStart;
+	const float RayT = dot(ToSurface, normalize(BrushRayDirection));
+	const float RayRangeMask = RayT >= 0.0f && RayT <= BrushRayLength ? 1.0f : 0.0f;
+	const float VisibilityDepth = GetBrushVisibilityDepthValue(Input.WorldPosition, RayT);
+	const float DepthMask = GetBrushVisibilityDepthWindowMask(VisibilityDepth);
+	const float3 SafeWorldNormal = normalize(Input.WorldNormal);
+	const float NormalMask = GetBrushVisibilityNormalMask(Input.WorldPosition, SafeWorldNormal);
+	const float2 BrushLocalUV = GetBrushVisibilityLocalUV(Input.WorldPosition);
+	const float BrushCircleMask = dot(BrushLocalUV, BrushLocalUV) <= 1.0f ? 1.0f : 0.0f;
+	clip((RayRangeMask * DepthMask * BrushCircleMask * NormalMask) - 0.0001f);
+
+	const float Depth = GetBrushNormalizedVisibilityDepthValue(VisibilityDepth);
+	return float4(Depth, SafeWorldNormal * 0.5f + 0.5f);
+}
+
+FRuntimeMeshPaintGPUBrushPSOutput ProjectedMainPS(FRuntimeMeshPaintGPUProjectedBrushVSOutput Input)
+{
+	const float3 SafeWorldNormal = normalize(Input.WorldNormal);
+	const float3 ToSurface = Input.WorldPosition - BrushRayStart;
+	const float RayT = dot(ToSurface, BrushRayDirection);
+	const float RayRangeMask = RayT >= 0.0f && RayT <= BrushRayLength ? 1.0f : 0.0f;
+	const float VisibilityDepth = GetBrushVisibilityDepthValue(Input.WorldPosition, RayT);
+	const float DepthMask = GetBrushVisibilityDepthWindowMask(VisibilityDepth);
+	const float NormalMask = GetBrushPaintableNormalMask(Input.WorldPosition, SafeWorldNormal);
+	const float2 BrushLocalUV = GetBrushProjectedLocalUV(Input.WorldPosition);
+	const float BrushDistance = length(BrushLocalUV);
+	const float BrushFootprintMask = BrushDistance <= 1.0f ? 1.0f : 0.0f;
+	const float VisibilityMask = GetBrushVisibilityMask(Input.WorldPosition, RayT);
+	const float BrushMask = saturate(1.0f - BrushDistance) * BrushFootprintMask * NormalMask * VisibilityMask;
+	clip((BrushMask * RayRangeMask * DepthMask) - 0.0001f);
+
+	FRuntimeMeshPaintGPUBrushPSOutput Output;
+	Output.Color = float4(BrushColor.rgb, BrushMask);
+#if WRITE_MATERIAL_SETTINGS
+	Output.MaterialSettings = float4(MaterialSettingsColor.rg, BrushMask, BrushMask);
+#endif
+	return Output;
+}
+
+float4 ProjectedPreviewMainPS(FRuntimeMeshPaintGPUProjectedBrushVSOutput Input) : SV_Target0
+{
+	const float3 SafeWorldNormal = normalize(Input.WorldNormal);
+	const float3 ToSurface = Input.WorldPosition - BrushRayStart;
+	const float RayT = dot(ToSurface, BrushRayDirection);
+	const float RayRangeMask = RayT >= 0.0f && RayT <= BrushRayLength ? 1.0f : 0.0f;
+	const float VisibilityDepth = GetBrushVisibilityDepthValue(Input.WorldPosition, RayT);
+	const float DepthMask = GetBrushVisibilityDepthWindowMask(VisibilityDepth);
+	const float NormalMask = GetBrushPaintableNormalMask(Input.WorldPosition, SafeWorldNormal);
+	const float SafeRadius = max(BrushWorldRadius, 0.000001f);
+	const float2 BrushLocalUV = GetBrushProjectedLocalUV(Input.WorldPosition);
+	const float BrushDistance = length(BrushLocalUV);
+	const float BrushFootprintMask = BrushDistance <= 1.0f ? 1.0f : 0.0f;
+	const float SafeLineThickness = max(PreviewLineThickness, 0.1f);
+	const float NormalizedLineThickness = SafeLineThickness / SafeRadius;
+	const float EdgeDistance = abs(BrushDistance - 1.0f);
+	const float RingMask = 1.0f - smoothstep(NormalizedLineThickness * 0.5f, NormalizedLineThickness, EdgeDistance);
+	const float VisibilityMask = GetBrushVisibilityMask(Input.WorldPosition, RayT);
+	const float PreviewMask = RingMask * BrushFootprintMask * RayRangeMask * DepthMask * NormalMask * VisibilityMask;
+	clip(PreviewMask - 0.0001f);
+
+	return float4(PreviewColor.rgb, PreviewMask * PreviewColor.a);
+}

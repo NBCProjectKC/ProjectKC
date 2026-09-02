@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayEffectTypes.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
 #include "ProjectKC/AbilitySystem/Struct/KCGameplayEffectRecipeStruct.h"
 #include "KCApplyGameplayEffectFragment.generated.h"
@@ -16,6 +17,10 @@ public:
 	virtual bool DeclaresSetByCallerTag(FGameplayTag DataTag) const override;
 	virtual void AppendDeclaredSetByCallerTags(
 		FGameplayTagContainer& OutTags) const override;
+	virtual bool SupportsDeferredExecution() const override;
+	virtual bool PrepareDeferredExecution(
+		const FKCActionExecutionContext& Context,
+		FString& OutError) override;
 	virtual bool CanExecute(
 		const FKCActionExecutionContext& Context,
 		FString& OutError) const override;
@@ -31,4 +36,8 @@ public:
 	/** Infinite GE를 GA 종료 시 자동 회수할 때 사용한다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect")
 	bool bTrackUntilAbilityEnds = false;
+
+private:
+	/** 원본 Ability 종료 뒤에도 적용할 수 있도록 Runtime 복제본이 캡처한 Spec이다. */
+	FGameplayEffectSpecHandle DeferredEffectSpec;
 };

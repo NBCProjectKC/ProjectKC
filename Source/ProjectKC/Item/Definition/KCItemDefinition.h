@@ -10,6 +10,16 @@
 class UKCAbilityDefinition;
 class UTexture2D;
 
+/** 아이템의 게임플레이상 역할이다. 자세나 장착 방식과는 독립적이다. */
+UENUM(BlueprintType)
+enum class EKCItemCategory : uint8
+{
+	Unspecified UMETA(DisplayName = "Unspecified"),
+	Ingredient UMETA(DisplayName = "Ingredient"),
+	Tool UMETA(DisplayName = "Tool"),
+	Special UMETA(DisplayName = "Special")
+};
+
 /** 성공한 사용 뒤에도 원본 아이템 인스턴스를 유지할지 정한다. */
 UENUM(BlueprintType)
 enum class EKCItemUseLifecycle : uint8
@@ -41,6 +51,10 @@ public:
 		Category = "Item",
 		meta = (Categories = "Item.Id"))
 	FGameplayTag ItemId;
+
+	/** 냄비 투입, UI 분류 등에서 사용하는 의미상 아이템 종류다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	EKCItemCategory ItemCategory = EKCItemCategory::Unspecified;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	FText DisplayName;

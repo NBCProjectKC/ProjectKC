@@ -11,9 +11,13 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameplayEffect.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "ProjectKC/AbilitySystem/Attribute/KCCharacterAttributeSet.h"
 #include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Damage.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCDropHeldItemFragment.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCThrowProjectileFragment.h"
 #include "ProjectKC/AbilitySystem/Projectile/KCActionProjectile.h"
 #include "ProjectKC/AbilitySystem/Struct/KCSetByCallerValueStruct.h"
@@ -32,9 +36,6 @@ namespace KCProjectileTests
 	{
 		Fragment->LaunchConfig.ProjectileMesh =
 			NewObject<UStaticMesh>(AssetOuter);
-		Fragment->ExplosionConfig.EffectRecipe.EffectClass =
-			UGameplayEffect::StaticClass();
-		Fragment->ExplosionConfig.Knockback.bEnabled = false;
 	}
 
 	UKCItemDefinition* MakeSeaUrchinDefinition(UObject* Outer)
@@ -56,6 +57,10 @@ namespace KCProjectileTests
 		UKCThrowProjectileFragment* ThrowFragment =
 			NewObject<UKCThrowProjectileFragment>(Action);
 		ConfigureValidFragment(ThrowFragment, Definition);
+		ThrowFragment->LaunchConfig.bEnableCharge = true;
+		ThrowFragment->LaunchConfig.MinimumForwardSpeed = 400.0f;
+		ThrowFragment->LaunchConfig.MaximumChargeDuration = 1.0f;
+		ThrowFragment->LaunchConfig.bShowTrajectoryPreview = false;
 		ExecuteHook.Fragments.Add(ThrowFragment);
 		Action->ActionHooks.Add(MoveTemp(ExecuteHook));
 		Definition->UseAction = Action;
@@ -94,12 +99,12 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 		NewObject<UKCThrowProjectileFragment>();
 	FString Error;
 	TestFalse(
-		TEXT("외형과 폭발 GE가 없는 Throw Projectile 설정은 거부한다."),
+		TEXT("투사체 외형이 없는 Throw Projectile 설정은 거부한다."),
 		Fragment->Validate(Error));
 
 	KCProjectileTests::ConfigureValidFragment(Fragment, Fragment);
 	TestTrue(
-		TEXT("투사체 클래스·메시·폭발 GE를 갖춘 설정은 유효하다."),
+		TEXT("투사체 클래스·메시와 폭발 범위를 갖춘 설정은 유효하다."),
 		Fragment->Validate(Error));
 	TestTrue(
 		TEXT("Throw Projectile은 성공 여부가 소비를 확정하도록 기본 필수 Fragment다."),
@@ -108,6 +113,58 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("Throw Projectile은 소스에서 실행되는 Fragment다."),
 		Fragment->ApplicationScope,
 		EKCActionScope::Source);
+
+	Fragment->LaunchConfig.bEnableCharge = true;
+	Fragment->LaunchConfig.MinimumForwardSpeed =
+		Fragment->LaunchConfig.ForwardSpeed + 1.0f;
+	TestFalse(
+		TEXT("최대 속도보다 큰 충전 최소 속도는 거부한다."),
+		Fragment->Validate(Error));
+	Fragment->LaunchConfig.MinimumForwardSpeed = 400.0f;
+	Fragment->LaunchConfig.MaximumChargeDuration = 2.0f;
+	TestTrue(
+		TEXT("유효한 충전 속도와 시간은 허용한다."),
+		Fragment->Validate(Error));
+	TestEqual(
+		TEXT("최소 충전은 최소 전방 속도를 사용한다."),
+		Fragment->LaunchConfig.ResolveForwardSpeed(0.0f),
+		400.0f);
+	TestEqual(
+		TEXT("절반 충전은 전방 속도를 선형 보간한다."),
+		Fragment->LaunchConfig.ResolveForwardSpeed(
+			Fragment->LaunchConfig.CalculateChargeAlpha(1.0f)),
+		800.0f);
+	TestEqual(
+		TEXT("최대 시간을 넘긴 충전은 최대 전방 속도로 고정한다."),
+		Fragment->LaunchConfig.ResolveForwardSpeed(
+			Fragment->LaunchConfig.CalculateChargeAlpha(10.0f)),
+		Fragment->LaunchConfig.ForwardSpeed);
+
+	UKCApplyGameplayEffectFragment* UnsupportedDeferredFragment =
+		NewObject<UKCApplyGameplayEffectFragment>(Fragment);
+	UnsupportedDeferredFragment->EffectRecipe.EffectClass =
+		UGameplayEffect::StaticClass();
+	UnsupportedDeferredFragment->bTrackUntilAbilityEnds = true;
+	Fragment->ExplosionTargetFragments.Add(UnsupportedDeferredFragment);
+	TestFalse(
+		TEXT("GA 종료까지 추적하는 Effect Fragment는 폭발 지연 실행에서 거부한다."),
+		Fragment->Validate(Error));
+	UnsupportedDeferredFragment->bTrackUntilAbilityEnds = false;
+	TestTrue(
+		TEXT("일회성 Gameplay Effect Fragment는 폭발 지연 실행을 지원한다."),
+		Fragment->Validate(Error));
+
+	UKCDropHeldItemFragment* DropHeldItem =
+		NewObject<UKCDropHeldItemFragment>(Fragment);
+	DropHeldItem->ApplicationScope = EKCActionScope::Source;
+	Fragment->ExplosionTargetFragments.Add(DropHeldItem);
+	TestFalse(
+		TEXT("폭발 대상 Fragment는 Source Scope를 사용할 수 없다."),
+		Fragment->Validate(Error));
+	DropHeldItem->ApplicationScope = EKCActionScope::Target;
+	TestTrue(
+		TEXT("지연 실행 가능한 Target Fragment는 Throw Projectile 아래 중첩할 수 있다."),
+		Fragment->Validate(Error));
 
 	Fragment->ExplosionConfig.FuseDuration =
 		Fragment->ExplosionConfig.MaximumLifetime;
@@ -165,18 +222,61 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 		OtherPlayer->GetAbilitySystemComponent()->AddAttributeSetSubobject(
 			OtherPlayer->GetCharacterAttributes());
 
+		AKCWorldItemActor* OtherHeldItem =
+			TestWorld->SpawnActor<AKCWorldItemActor>();
+		UKCHeldItemComponent* OtherHeldItemComponent =
+			OtherPlayer->GetHeldItemComponent();
+		if (TestNotNull(
+				TEXT("폭발 Target Fragment가 드롭시킬 아이템을 스폰한다."),
+				OtherHeldItem) &&
+			TestTrue(
+				TEXT("폭발 대상 플레이어의 손 소켓을 설정한다."),
+				KCProjectileTests::ConfigureHolderHand(
+					OtherPlayer,
+					OtherHeldItemComponent)))
+		{
+			UKCItemDefinition* OtherHeldDefinition =
+				KCProjectileTests::MakeSeaUrchinDefinition(OtherHeldItem);
+			TestTrue(
+				TEXT("폭발 대상이 들 아이템 Definition을 초기화한다."),
+				OtherHeldItem->InitializeItem(OtherHeldDefinition));
+			TestTrue(
+				TEXT("폭발 대상 플레이어가 아이템을 든다."),
+				OtherHeldItemComponent->TryPickUp(OtherHeldItem));
+		}
+
 		FKCProjectileLaunchConfigStruct LaunchConfig;
 		LaunchConfig.ProjectileClass = AKCActionProjectile::StaticClass();
 		LaunchConfig.ProjectileMesh = NewObject<UStaticMesh>(TestWorld);
 
 		FKCProjectileExplosionConfigStruct ExplosionConfig;
-		ExplosionConfig.EffectRecipe.EffectClass = UKCGE_Damage::StaticClass();
+		ExplosionConfig.ExplosionRadius = 500.0f;
+
+		TArray<TObjectPtr<UKCActionFragment>> ExplosionTargetFragments;
+		UKCApplyGameplayEffectFragment* DamageFragment =
+			NewObject<UKCApplyGameplayEffectFragment>(TestWorld);
+		DamageFragment->ApplicationScope = EKCActionScope::Target;
+		DamageFragment->bRequired = true;
+		DamageFragment->EffectRecipe.EffectClass = UKCGE_Damage::StaticClass();
 		FKCSetByCallerValueStruct DamageValue;
 		DamageValue.DataTag = TAG_KC_Data_Damage_Flat;
 		DamageValue.Magnitude = -20.0f;
-		ExplosionConfig.EffectRecipe.SetByCallers.Add(DamageValue);
-		ExplosionConfig.ExplosionRadius = 500.0f;
-		ExplosionConfig.Knockback.bEnabled = false;
+		DamageFragment->EffectRecipe.SetByCallers.Add(DamageValue);
+		ExplosionTargetFragments.Add(DamageFragment);
+
+		UKCKnockbackFragment* KnockbackFragment =
+			NewObject<UKCKnockbackFragment>(TestWorld);
+		KnockbackFragment->ApplicationScope = EKCActionScope::Target;
+		KnockbackFragment->bRequired = true;
+		KnockbackFragment->HorizontalSpeed = 120.0f;
+		KnockbackFragment->VerticalSpeed = 80.0f;
+		ExplosionTargetFragments.Add(KnockbackFragment);
+
+		UKCDropHeldItemFragment* DropHeldItem =
+			NewObject<UKCDropHeldItemFragment>(TestWorld);
+		DropHeldItem->ApplicationScope = EKCActionScope::Target;
+		DropHeldItem->bRequired = true;
+		ExplosionTargetFragments.Add(DropHeldItem);
 
 		AKCActionProjectile* Projectile =
 			TestWorld->SpawnActor<AKCActionProjectile>(
@@ -192,6 +292,7 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				Projectile->InitializeProjectile(
 					LaunchConfig,
 					ExplosionConfig,
+					ExplosionTargetFragments,
 					SourcePlayer->GetAbilitySystemComponent(),
 					SourcePlayer,
 					SourcePlayer,
@@ -235,9 +336,15 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				SourcePlayer->GetCharacterAttributes()->GetHealth(),
 				SourceHealthBefore);
 			TestEqual(
-				TEXT("피아 구분 없이 반경 안의 다른 플레이어는 폭발 GE를 받는다."),
+				TEXT("중첩 Damage Fragment가 설정한 피해만 적용한다."),
 				OtherPlayer->GetCharacterAttributes()->GetHealth(),
 				OtherHealthBefore - 20.0f);
+			TestFalse(
+				TEXT("폭발 대상에게 중첩한 Drop Held Item Fragment가 실행된다."),
+				OtherHeldItemComponent->HasHeldItem());
+			TestTrue(
+				TEXT("드롭된 아이템 Actor는 소비되지 않고 World에 남는다."),
+				IsValid(OtherHeldItem));
 			TestFalse(
 				TEXT("폭발 결과 처리 뒤 투사체 Actor를 제거한다."),
 				IsValid(Projectile));
@@ -270,10 +377,34 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 			}
 
 			TestTrue(
-				TEXT("성게 사용은 Throw Projectile Fragment를 성공시킨다."),
+				TEXT("성게 Press는 충전 Action을 시작한다."),
 				HeldItemComponent->PressHeldItemUse());
+			TestFalse(
+				TEXT("충전 중에는 투사체 생성 성공과 소비를 확정하지 않는다."),
+				SeaUrchin->IsUseConsumptionPending());
+
+			int32 ProjectileCountWhileCharging = 0;
+			for (TActorIterator<AKCActionProjectile> It(TestWorld); It; ++It)
+			{
+				++ProjectileCountWhileCharging;
+			}
+			TestEqual(
+				TEXT("Press만으로는 충전 투사체를 생성하지 않는다."),
+				ProjectileCountWhileCharging,
+				ProjectileCountBefore);
+
+			const float ChargeStartWorldTime = TestWorld->GetTimeSeconds();
+			TestWorld->Tick(LEVELTICK_All, 0.5f);
+			const float ActualHeldDuration = static_cast<float>(
+				TestWorld->GetTimeSeconds() - ChargeStartWorldTime);
 			TestTrue(
-				TEXT("투사체 생성 성공은 성게 원본 소비를 예약한다."),
+				TEXT("테스트 World에서 충전 시간이 진행된다."),
+				ActualHeldDuration > 0.0f);
+			TestTrue(
+				TEXT("Release가 현재 충전량으로 투척을 실행한다."),
+				HeldItemComponent->ReleaseHeldItemUse());
+			TestTrue(
+				TEXT("Release의 투사체 생성 성공은 성게 원본 소비를 예약한다."),
 				SeaUrchin->IsUseConsumptionPending());
 
 			AKCActionProjectile* SpawnedProjectile = nullptr;
@@ -291,13 +422,37 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				TEXT("생성된 성게 투사체는 투척자를 무시한다."),
 				SpawnedProjectile &&
 					SpawnedProjectile->GetIgnoredSourceActor() == SourcePlayer);
+			if (SpawnedProjectile)
+			{
+				const FVector ChargedVelocity =
+					SpawnedProjectile->GetProjectileMovement()->Velocity;
+				const UKCSingleActionDefinition* SingleAction =
+					Cast<UKCSingleActionDefinition>(Definition->UseAction);
+				const UKCThrowProjectileFragment* ChargedThrow = SingleAction
+					? SingleAction->FindChargedThrowProjectileFragment()
+					: nullptr;
+				const float ExpectedForwardSpeed = ChargedThrow
+					? ChargedThrow->LaunchConfig.ResolveForwardSpeed(
+						ChargedThrow->LaunchConfig.CalculateChargeAlpha(
+							ActualHeldDuration))
+					: 0.0f;
+				TestEqual(
+					TEXT("실제 전방 속도는 서버 충전 시간으로 계산한 값과 같다."),
+					static_cast<float>(FVector::DotProduct(
+						ChargedVelocity,
+						SourcePlayer->GetActorForwardVector())),
+					ExpectedForwardSpeed,
+					5.0f);
+				TestTrue(
+					TEXT("입력을 유지한 만큼 최소 투척 속도보다 강해진다."),
+					ExpectedForwardSpeed > 400.0f);
+				TestTrue(
+					TEXT("충전 중에도 상향 속도는 350으로 유지한다."),
+					FMath::IsNearlyEqual(ChargedVelocity.Z, 350.0f, 1.0f));
+			}
 
-			TestWorld->Tick(LEVELTICK_All, 1.0f / 60.0f);
-			TestFalse(
-				TEXT("성공 사용 뒤 원본 성게 아이템은 다음 틱에 제거된다."),
-				IsValid(SeaUrchin));
 			TestTrue(
-				TEXT("원본 성게가 소비되어도 생성된 투사체는 유지된다."),
+				TEXT("원본 성게의 소비 예약 뒤에도 생성된 투사체는 유지된다."),
 				IsValid(SpawnedProjectile));
 		}
 	}

@@ -6,6 +6,7 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
+#include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "GameplayAbilitySpec.h"
@@ -482,6 +483,21 @@ uint32 UKCAbilitySystemComponent::BeginLocalActionMontagePrediction(
 	StopLocalActionMontagePrediction(true);
 	LocalActionAbilityHandle = AbilityHandle;
 	LocalActionRequestId = LastLocalActionRequestId;
+
+	const FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(AbilityHandle);
+	const UKCAbilityDefinition* Definition = nullptr;
+	if (Spec && GetDefinitionFromSource(
+		Spec->SourceObject.Get(), Definition))
+	{
+		const UKCSingleActionDefinition* SingleAction =
+			Cast<UKCSingleActionDefinition>(Definition);
+		if (SingleAction && SingleAction->ExecutesOnInputRelease())
+		{
+			// 충전 중에는 로컬 몽타주를 선재생하지 않는다. 서버가 Release를
+			// 승인한 뒤 실제 실행 시점에 ClientPlayActionMontage로 시작한다.
+			return LocalActionRequestId;
+		}
+	}
 
 	UAnimMontage* Montage = nullptr;
 	if (!ResolveLocalActionMontage(

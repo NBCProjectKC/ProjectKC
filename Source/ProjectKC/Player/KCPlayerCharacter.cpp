@@ -22,6 +22,8 @@
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
+#include "ProjectKC/Player/Component/KCProjectileTrajectoryPreviewComponent.h"
+#include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/UI/Interaction/Component/KCPlayerInteractionPromptComponent.h"
 #include "ProjectKC/UI/World/Player/Component/KCPlayerOverHeadComponent.h"
 #include "ProjectKC/UI/World/Player/Struct/KCPlayerDisplayInfoStruct.h"
@@ -161,6 +163,11 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
 	KnockbackComponent =
 		CreateDefaultSubobject<UKCKnockbackComponent>(TEXT("Knockback"));
+	ProjectileTrajectoryPreviewComponent =
+		CreateDefaultSubobject<UKCProjectileTrajectoryPreviewComponent>(
+			TEXT("ProjectileTrajectoryPreview"));
+	PlayerCustomizationComponent =
+		CreateDefaultSubobject<UKCPlayerCustomizationComponent>(TEXT("PlayerCustomization"));
 
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoomComponent"));
 	CameraBoomComponent->SetupAttachment(RootComponent);
@@ -247,6 +254,11 @@ bool AKCPlayerCharacter::BeginUseHeldItem()
 	if (bUseStarted)
 	{
 		InterruptEmote();
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->BeginPreview(
+				HeldItemComponent->GetHeldItem());
+		}
 	}
 	return bUseStarted;
 }
@@ -255,6 +267,10 @@ void AKCPlayerCharacter::EndUseHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
 	{
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->EndPreview();
+		}
 		HeldItemComponent->ReleaseHeldItemUse();
 	}
 }
@@ -274,6 +290,10 @@ void AKCPlayerCharacter::RequestDropHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
 	{
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->EndPreview();
+		}
 		HeldItemComponent->TryDropHeldItem();
 	}
 }
@@ -301,6 +321,17 @@ UKCHeldItemComponent* AKCPlayerCharacter::GetHeldItemComponent() const
 UKCKnockbackComponent* AKCPlayerCharacter::GetKnockbackComponent() const
 {
 	return KnockbackComponent;
+}
+
+UKCProjectileTrajectoryPreviewComponent*
+AKCPlayerCharacter::GetProjectileTrajectoryPreviewComponent() const
+{
+	return ProjectileTrajectoryPreviewComponent;
+}
+
+UKCPlayerCustomizationComponent* AKCPlayerCharacter::GetPlayerCustomizationComponent() const
+{
+	return PlayerCustomizationComponent;
 }
 
 UKCPlayerInteractionComponent* AKCPlayerCharacter::GetInteractionComponent() const
@@ -382,6 +413,10 @@ void AKCPlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -395,6 +430,10 @@ void AKCPlayerCharacter::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::OnRep_Controller()
@@ -402,6 +441,10 @@ void AKCPlayerCharacter::OnRep_Controller()
 	Super::OnRep_Controller();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::OnRep_Owner()
@@ -414,6 +457,10 @@ void AKCPlayerCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::PawnClientRestart()
@@ -421,6 +468,10 @@ void AKCPlayerCharacter::PawnClientRestart()
 	Super::PawnClientRestart();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
