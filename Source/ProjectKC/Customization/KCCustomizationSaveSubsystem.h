@@ -32,23 +32,21 @@ public:
 		bool& bOutUseDefaultAppearance,
 		EKCCustomizationSaveResult& OutResult);
 
+	/** 렌더 리소스를 만들지 않고 로컬 슬롯의 외형 종류만 확인합니다. */
+	bool GetSavedAppearanceMode(
+		bool& bOutSaveFound,
+		bool& bOutUseDefaultAppearance,
+		EKCCustomizationSaveResult& OutResult) const;
+
 	/** 렌더 타깃과 패치 기록을 초기 상태로 되돌립니다. 파일은 지우지 않습니다. */
 	UFUNCTION(BlueprintCallable, Category = "KC|Customization|Save")
 	bool ResetCustomization(
 		URuntimeMeshPaintTargetComponent* PaintTarget,
 		EKCCustomizationSaveResult& OutResult);
 
-	UFUNCTION(BlueprintPure, Category = "KC|Customization|Save")
+private:
 	bool DoesCustomizationSaveExist() const;
 
-	/** 로컬 저장 파일을 삭제합니다. 이미 없으면 성공으로 처리합니다. */
-	UFUNCTION(BlueprintCallable, Category = "KC|Customization|Save")
-	bool DeleteCustomizationSave(EKCCustomizationSaveResult& OutResult);
-
-	UFUNCTION(BlueprintPure, Category = "KC|Customization|Save")
-	FString GetCustomizationSlotName() const;
-
-private:
 	static const FString CustomizationSlotName;
 	static constexpr int32 CustomizationUserIndex = 0;
 };

@@ -20,6 +20,21 @@ uint32 KCCustomizationNetwork::ComputePayloadHash(const TArray<uint8>& Payload)
 		: FCrc::MemCrc32(Payload.GetData(), Payload.Num());
 }
 
+void KCCustomizationNetwork::NormalizePaintTargetIdentity(
+	FRuntimeMeshPaintPatchHistory& PaintHistory,
+	const FString& PaintTargetIdentity)
+{
+	if (PaintTargetIdentity.IsEmpty())
+	{
+		return;
+	}
+
+	for (FRuntimeMeshPaintPatchHistoryEntry& Entry : PaintHistory.Entries)
+	{
+		Entry.PaintTargetName = PaintTargetIdentity;
+	}
+}
+
 bool KCCustomizationNetwork::SerializePayload(
 	const FRuntimeMeshPaintPatchHistory& PaintHistory,
 	const bool bUseDefaultAppearance,
@@ -93,14 +108,19 @@ bool KCCustomizationNetwork::ValidateCustomizationData(
 		return false;
 	}
 
-	TSet<int32> SeenMeshTargetIndices;
+	TSet<int32> SeenMeshTexturePairs;
 	for (const FRuntimeMeshPaintPatchHistoryEntry& Entry : PaintHistory.Entries)
 	{
+		const bool bSupportedTextureType =
+			Entry.TextureType == ERuntimeMeshPaintPatchTextureType::Color ||
+			Entry.TextureType == ERuntimeMeshPaintPatchTextureType::MaterialSettings;
+		const int32 MeshTexturePair =
+			Entry.MeshTargetIndex * 2 + static_cast<int32>(Entry.TextureType);
 		if (!Entry.IsValidPatch() ||
 			Entry.MeshTargetIndex < 0 ||
 			Entry.MeshTargetIndex >= ExpectedMeshTargetNames.Num() ||
 			Entry.MeshTargetName != ExpectedMeshTargetNames[Entry.MeshTargetIndex] ||
-			Entry.TextureType != ERuntimeMeshPaintPatchTextureType::Color ||
+			!bSupportedTextureType ||
 			Entry.RTWidth != ExpectedRenderTargetSize ||
 			Entry.RTHeight != ExpectedRenderTargetSize ||
 			Entry.RTFormat != RTF_RGBA16f ||
@@ -109,12 +129,12 @@ bool KCCustomizationNetwork::ValidateCustomizationData(
 			Entry.Y < 0 ||
 			Entry.X + Entry.Width > Entry.RTWidth ||
 			Entry.Y + Entry.Height > Entry.RTHeight ||
-			SeenMeshTargetIndices.Contains(Entry.MeshTargetIndex))
+			SeenMeshTexturePairs.Contains(MeshTexturePair))
 		{
 			return false;
 		}
 
-		SeenMeshTargetIndices.Add(Entry.MeshTargetIndex);
+		SeenMeshTexturePairs.Add(MeshTexturePair);
 	}
 
 	return true;

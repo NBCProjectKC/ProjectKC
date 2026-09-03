@@ -5,14 +5,98 @@
 #include "Player/KCPlayerState.h"
 #include "Player/Component/KCPlayerCustomizationComponent.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogKCCustomizationNetwork, Log, All);
+
 UKCCustomizationNetworkComponent::UKCCustomizationNetworkComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 }
 
+void UKCCustomizationNetworkComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ResetTransientCustomizationData();
+	Super::EndPlay(EndPlayReason);
+}
+
+void UKCCustomizationNetworkComponent::ReleaseCustomizationTarget(
+	AKCPlayerState* TargetPlayerState,
+	UKCPlayerCustomizationComponent* TargetComponent)
+{
+	if (!TargetPlayerState || !TargetComponent)
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<UKCPlayerCustomizationComponent>* PendingTarget =
+		PendingCustomizationTargets.Find(TargetPlayerState);
+	if (!PendingTarget ||
+		(PendingTarget->IsValid() && PendingTarget->Get() != TargetComponent))
+	{
+		return;
+	}
+
+	PendingCustomizationTargets.Remove(TargetPlayerState);
+
+	// 수신 중인 데이터는 끝까지 받아 캐시에 남깁니다. 로비 표시 액터가
+	// 먼저 사라져도 이어서 생성된 플레이어 Pawn이 같은 데이터를 재사용합니다.
+	if (ActiveCustomizationRequestPlayerState.Get() == TargetPlayerState)
+	{
+		return;
+	}
+
+	// 아직 시작하지 않은 요청은 적용 대상이 없으므로 다음 바인딩 때 다시 요청합니다.
+	PendingCustomizationRevisions.Remove(TargetPlayerState);
+	TryStartNextCustomizationDownload();
+}
+
+void UKCCustomizationNetworkComponent::ForgetCustomizationData(
+	AKCPlayerState* TargetPlayerState)
+{
+	if (!TargetPlayerState)
+	{
+		return;
+	}
+
+	CustomizationCache.Remove(TargetPlayerState);
+	PendingCustomizationTargets.Remove(TargetPlayerState);
+	PendingCustomizationRevisions.Remove(TargetPlayerState);
+
+	if (ActiveCustomizationRequestPlayerState.Get() == TargetPlayerState)
+	{
+		const uint32 ActiveRevision = ActiveCustomizationRequestRevision;
+		ActiveCustomizationRequestPlayerState.Reset();
+		ActiveCustomizationRequestRevision = 0;
+		ActiveCustomizationDownload.Reset();
+		if (ActiveRevision != 0)
+		{
+			ServerCancelCustomizationDownload(TargetPlayerState, ActiveRevision);
+		}
+		TryStartNextCustomizationDownload();
+	}
+
+	if (ActiveServerCustomizationDownload.PlayerState.Get() == TargetPlayerState)
+	{
+		ActiveServerCustomizationDownload.Reset();
+	}
+}
+
+void UKCCustomizationNetworkComponent::ResetTransientCustomizationData()
+{
+	ActiveClientCustomizationUpload.Reset();
+	PendingClientCustomizationUpload.Reset();
+	ActiveCustomizationUpload.Reset();
+	ActiveServerCustomizationDownload.Reset();
+	ActiveCustomizationDownload.Reset();
+	ActiveCustomizationRequestPlayerState.Reset();
+	ActiveCustomizationRequestRevision = 0;
+	CustomizationCache.Empty();
+	PendingCustomizationTargets.Empty();
+	PendingCustomizationRevisions.Empty();
+}
+
 void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
-	const TArray<uint8>& Payload)
+	TArray<uint8>&& Payload)
 {
 	const APlayerController* OwnerController = GetOwningPlayerController();
 	if (!OwnerController ||
@@ -23,31 +107,37 @@ void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
 		return;
 	}
 
+	const uint32 ContentHash =
+		KCCustomizationNetwork::ComputePayloadHash(Payload);
+	const int32 TotalBytes = Payload.Num();
+	if (ActiveClientCustomizationUpload.UploadId != INDEX_NONE)
+	{
+		if (ActiveClientCustomizationUpload.ContentHash == ContentHash)
+		{
+			PendingClientCustomizationUpload.Reset();
+		}
+		else
+		{
+			PendingClientCustomizationUpload = MoveTemp(Payload);
+		}
+		return;
+	}
+
 	const int32 UploadId = NextCustomizationUploadId++;
 	if (NextCustomizationUploadId <= 0)
 	{
 		NextCustomizationUploadId = 1;
 	}
 
+	ActiveClientCustomizationUpload.Reset();
+	ActiveClientCustomizationUpload.UploadId = UploadId;
+	ActiveClientCustomizationUpload.ContentHash = ContentHash;
+	ActiveClientCustomizationUpload.Bytes = MoveTemp(Payload);
+
 	ServerBeginCustomizationUpload(
 		UploadId,
-		Payload.Num(),
-		KCCustomizationNetwork::ComputePayloadHash(Payload));
-
-	int32 ChunkIndex = 0;
-	for (int32 Offset = 0;
-		Offset < Payload.Num();
-		Offset += KCCustomizationNetwork::ChunkSizeBytes)
-	{
-		const int32 BytesThisChunk = FMath::Min(
-			KCCustomizationNetwork::ChunkSizeBytes,
-			Payload.Num() - Offset);
-		TArray<uint8> Chunk;
-		Chunk.Append(Payload.GetData() + Offset, BytesThisChunk);
-		ServerUploadCustomizationChunk(UploadId, ChunkIndex++, Chunk);
-	}
-
-	ServerCommitCustomizationUpload(UploadId);
+		TotalBytes,
+		ContentHash);
 }
 
 void UKCCustomizationNetworkComponent::RequestCustomizationPayload(
@@ -103,25 +193,23 @@ void UKCCustomizationNetworkComponent::RequestCustomizationPayload(
 
 	if (OwnerController->HasAuthority())
 	{
-		TArray<uint8> Payload;
-		if (TargetPlayerState->GetCustomizationPayload(
-			Descriptor.Revision,
-			Descriptor.ContentHash,
-			Payload))
+		if (const TArray<uint8>* Payload =
+			TargetPlayerState->FindCustomizationPayload(
+				Descriptor.Revision,
+				Descriptor.ContentHash))
 		{
-			ApplyReceivedCustomization(TargetPlayerState, Payload);
+			ApplyReceivedCustomization(TargetPlayerState, *Payload);
 		}
 		else
 		{
-			ResetCustomizationDownload(TargetPlayerState);
+			FinishCustomizationDownload(
+				TargetPlayerState,
+				Descriptor.Revision);
 		}
 		return;
 	}
 
-	ServerRequestCustomizationPayload(
-		TargetPlayerState,
-		Descriptor.Revision,
-		Descriptor.ContentHash);
+	TryStartNextCustomizationDownload();
 }
 
 void UKCCustomizationNetworkComponent::ServerBeginCustomizationUpload_Implementation(
@@ -134,6 +222,7 @@ void UKCCustomizationNetworkComponent::ServerBeginCustomizationUpload_Implementa
 		TotalBytes <= 0 ||
 		TotalBytes > KCCustomizationNetwork::MaxPayloadBytes)
 	{
+		ClientFinishCustomizationUpload(UploadId, false);
 		return;
 	}
 
@@ -141,6 +230,7 @@ void UKCCustomizationNetworkComponent::ServerBeginCustomizationUpload_Implementa
 	ActiveCustomizationUpload.ExpectedBytes = TotalBytes;
 	ActiveCustomizationUpload.ExpectedHash = ExpectedHash;
 	ActiveCustomizationUpload.Bytes.Reserve(TotalBytes);
+	ClientRequestCustomizationUploadChunk(UploadId, 0);
 }
 
 void UKCCustomizationNetworkComponent::ServerUploadCustomizationChunk_Implementation(
@@ -153,14 +243,18 @@ void UKCCustomizationNetworkComponent::ServerUploadCustomizationChunk_Implementa
 		ChunkBytes.IsEmpty() ||
 		ChunkBytes.Num() > KCCustomizationNetwork::ChunkSizeBytes ||
 		ActiveCustomizationUpload.Bytes.Num() + ChunkBytes.Num() >
-			ActiveCustomizationUpload.ExpectedBytes)
+		ActiveCustomizationUpload.ExpectedBytes)
 	{
 		ActiveCustomizationUpload.Reset();
+		ClientFinishCustomizationUpload(UploadId, false);
 		return;
 	}
 
 	ActiveCustomizationUpload.Bytes.Append(ChunkBytes);
 	++ActiveCustomizationUpload.NextChunkIndex;
+	ClientRequestCustomizationUploadChunk(
+		UploadId,
+		ActiveCustomizationUpload.NextChunkIndex);
 }
 
 void UKCCustomizationNetworkComponent::ServerCommitCustomizationUpload_Implementation(
@@ -171,21 +265,85 @@ void UKCCustomizationNetworkComponent::ServerCommitCustomizationUpload_Implement
 			ActiveCustomizationUpload.ExpectedBytes ||
 		KCCustomizationNetwork::ComputePayloadHash(
 			ActiveCustomizationUpload.Bytes) !=
-			ActiveCustomizationUpload.ExpectedHash)
+		ActiveCustomizationUpload.ExpectedHash)
 	{
 		ActiveCustomizationUpload.Reset();
+		ClientFinishCustomizationUpload(UploadId, false);
 		return;
 	}
 
 	TArray<uint8> CompletedPayload = MoveTemp(ActiveCustomizationUpload.Bytes);
 	ActiveCustomizationUpload.Reset();
+	bool bPublished = false;
 	if (APlayerController* OwnerController = GetOwningPlayerController())
 	{
 		if (AKCPlayerState* KCPlayerState =
 			OwnerController->GetPlayerState<AKCPlayerState>())
 		{
-			KCPlayerState->PublishCustomizationPayload(CompletedPayload);
+			bPublished = KCPlayerState->PublishCustomizationPayload(MoveTemp(CompletedPayload));
 		}
+	}
+	ClientFinishCustomizationUpload(UploadId, bPublished);
+}
+
+void UKCCustomizationNetworkComponent::ClientRequestCustomizationUploadChunk_Implementation(
+	const int32 UploadId,
+	const int32 ChunkIndex)
+{
+	if (ActiveClientCustomizationUpload.UploadId != UploadId ||
+		ActiveClientCustomizationUpload.NextChunkIndex != ChunkIndex)
+	{
+		return;
+	}
+
+	const int32 Offset = ChunkIndex * KCCustomizationNetwork::ChunkSizeBytes;
+	if (Offset >= ActiveClientCustomizationUpload.Bytes.Num())
+	{
+		ServerCommitCustomizationUpload(UploadId);
+		return;
+	}
+
+	const int32 BytesThisChunk = FMath::Min(
+		KCCustomizationNetwork::ChunkSizeBytes,
+		ActiveClientCustomizationUpload.Bytes.Num() - Offset);
+	TArray<uint8> Chunk;
+	Chunk.Append(
+		ActiveClientCustomizationUpload.Bytes.GetData() + Offset,
+		BytesThisChunk);
+	++ActiveClientCustomizationUpload.NextChunkIndex;
+	ServerUploadCustomizationChunk(UploadId, ChunkIndex, Chunk);
+}
+
+void UKCCustomizationNetworkComponent::ClientFinishCustomizationUpload_Implementation(
+	const int32 UploadId,
+	const bool bSucceeded)
+{
+	if (ActiveClientCustomizationUpload.UploadId != UploadId)
+	{
+		return;
+	}
+
+	if (bSucceeded)
+	{
+		UE_LOG(LogKCCustomizationNetwork, Log,
+			TEXT("Customization upload finished: Owner=%s, UploadId=%d"),
+			*GetNameSafe(GetOwner()),
+			UploadId);
+	}
+	else
+	{
+		UE_LOG(LogKCCustomizationNetwork, Warning,
+			TEXT("Customization upload failed: Owner=%s, UploadId=%d"),
+			*GetNameSafe(GetOwner()),
+			UploadId);
+	}
+	ActiveClientCustomizationUpload.Reset();
+
+	if (!PendingClientCustomizationUpload.IsEmpty())
+	{
+		TArray<uint8> PendingPayload =
+			MoveTemp(PendingClientCustomizationUpload);
+		UploadCustomizationPayload(MoveTemp(PendingPayload));
 	}
 }
 
@@ -194,41 +352,89 @@ void UKCCustomizationNetworkComponent::ServerRequestCustomizationPayload_Impleme
 	const uint32 Revision,
 	const uint32 ContentHash)
 {
-	TArray<uint8> Payload;
-	if (!TargetPlayerState ||
-		!TargetPlayerState->GetCustomizationPayload(Revision, ContentHash, Payload))
+	const TArray<uint8>* Payload = TargetPlayerState
+		? TargetPlayerState->FindCustomizationPayload(Revision, ContentHash)
+		: nullptr;
+	if (!Payload)
 	{
+		ClientAbortCustomizationDownload(TargetPlayerState, Revision);
 		return;
 	}
 
+	ActiveServerCustomizationDownload.Reset();
+	ActiveServerCustomizationDownload.PlayerState = TargetPlayerState;
+	ActiveServerCustomizationDownload.Revision = Revision;
+	ActiveServerCustomizationDownload.ContentHash = ContentHash;
+	ActiveServerCustomizationDownload.TotalBytes = Payload->Num();
+
 	const int32 TotalChunks = FMath::DivideAndRoundUp(
-		Payload.Num(),
+		ActiveServerCustomizationDownload.TotalBytes,
 		KCCustomizationNetwork::ChunkSizeBytes);
 	ClientBeginCustomizationDownload(
 		TargetPlayerState,
 		Revision,
 		ContentHash,
-		Payload.Num(),
+		ActiveServerCustomizationDownload.TotalBytes,
 		TotalChunks);
+}
 
-	int32 ChunkIndex = 0;
-	for (int32 Offset = 0;
-		Offset < Payload.Num();
-		Offset += KCCustomizationNetwork::ChunkSizeBytes)
+void UKCCustomizationNetworkComponent::ServerAcknowledgeCustomizationDownloadChunk_Implementation(
+	AKCPlayerState* TargetPlayerState,
+	const uint32 Revision,
+	const int32 NextChunkIndex)
+{
+	if (ActiveServerCustomizationDownload.PlayerState.Get() != TargetPlayerState ||
+		ActiveServerCustomizationDownload.Revision != Revision ||
+		ActiveServerCustomizationDownload.NextChunkIndex != NextChunkIndex)
 	{
-		const int32 BytesThisChunk = FMath::Min(
-			KCCustomizationNetwork::ChunkSizeBytes,
-			Payload.Num() - Offset);
-		TArray<uint8> Chunk;
-		Chunk.Append(Payload.GetData() + Offset, BytesThisChunk);
-		ClientReceiveCustomizationChunk(
-			TargetPlayerState,
-			Revision,
-			ChunkIndex++,
-			Chunk);
+		ActiveServerCustomizationDownload.Reset();
+		ClientAbortCustomizationDownload(TargetPlayerState, Revision);
+		return;
 	}
 
-	ClientCompleteCustomizationDownload(TargetPlayerState, Revision);
+	const TArray<uint8>* Payload = TargetPlayerState
+		? TargetPlayerState->FindCustomizationPayload(Revision, ActiveServerCustomizationDownload.ContentHash)
+		: nullptr;
+	if (!Payload || Payload->Num() != ActiveServerCustomizationDownload.TotalBytes)
+	{
+		ActiveServerCustomizationDownload.Reset();
+		ClientAbortCustomizationDownload(TargetPlayerState, Revision);
+		return;
+	}
+
+	const int32 Offset =
+		NextChunkIndex * KCCustomizationNetwork::ChunkSizeBytes;
+	if (Offset >= Payload->Num())
+	{
+		ActiveServerCustomizationDownload.Reset();
+		ClientCompleteCustomizationDownload(TargetPlayerState, Revision);
+		return;
+	}
+
+	const int32 BytesThisChunk = FMath::Min(
+		KCCustomizationNetwork::ChunkSizeBytes,
+		Payload->Num() - Offset);
+	TArray<uint8> Chunk;
+	Chunk.Append(
+		Payload->GetData() + Offset,
+		BytesThisChunk);
+	++ActiveServerCustomizationDownload.NextChunkIndex;
+	ClientReceiveCustomizationChunk(
+		TargetPlayerState,
+		Revision,
+		NextChunkIndex,
+		Chunk);
+}
+
+void UKCCustomizationNetworkComponent::ServerCancelCustomizationDownload_Implementation(
+	AKCPlayerState* TargetPlayerState,
+	const uint32 Revision)
+{
+	if (ActiveServerCustomizationDownload.PlayerState.Get() == TargetPlayerState &&
+		ActiveServerCustomizationDownload.Revision == Revision)
+	{
+		ActiveServerCustomizationDownload.Reset();
+	}
 }
 
 void UKCCustomizationNetworkComponent::ClientBeginCustomizationDownload_Implementation(
@@ -239,7 +445,9 @@ void UKCCustomizationNetworkComponent::ClientBeginCustomizationDownload_Implemen
 	const int32 TotalChunks)
 {
 	ActiveCustomizationDownload.Reset();
-	if (!TargetPlayerState ||
+	if (ActiveCustomizationRequestPlayerState.Get() != TargetPlayerState ||
+		ActiveCustomizationRequestRevision != Revision ||
+		!TargetPlayerState ||
 		Revision == 0 ||
 		TotalBytes <= 0 ||
 		TotalBytes > KCCustomizationNetwork::MaxPayloadBytes ||
@@ -247,7 +455,8 @@ void UKCCustomizationNetworkComponent::ClientBeginCustomizationDownload_Implemen
 			TotalBytes,
 			KCCustomizationNetwork::ChunkSizeBytes))
 	{
-		ResetCustomizationDownload(TargetPlayerState);
+		ServerCancelCustomizationDownload(TargetPlayerState, Revision);
+		FinishCustomizationDownload(TargetPlayerState, Revision);
 		return;
 	}
 
@@ -257,6 +466,10 @@ void UKCCustomizationNetworkComponent::ClientBeginCustomizationDownload_Implemen
 	ActiveCustomizationDownload.ExpectedBytes = TotalBytes;
 	ActiveCustomizationDownload.ExpectedChunks = TotalChunks;
 	ActiveCustomizationDownload.Bytes.Reserve(TotalBytes);
+	ServerAcknowledgeCustomizationDownloadChunk(
+		TargetPlayerState,
+		Revision,
+		0);
 }
 
 void UKCCustomizationNetworkComponent::ClientReceiveCustomizationChunk_Implementation(
@@ -274,12 +487,17 @@ void UKCCustomizationNetworkComponent::ClientReceiveCustomizationChunk_Implement
 			ActiveCustomizationDownload.ExpectedBytes)
 	{
 		ActiveCustomizationDownload.Reset();
-		ResetCustomizationDownload(TargetPlayerState);
+		ServerCancelCustomizationDownload(TargetPlayerState, Revision);
+		FinishCustomizationDownload(TargetPlayerState, Revision);
 		return;
 	}
 
 	ActiveCustomizationDownload.Bytes.Append(ChunkBytes);
 	++ActiveCustomizationDownload.NextChunkIndex;
+	ServerAcknowledgeCustomizationDownloadChunk(
+		TargetPlayerState,
+		Revision,
+		ActiveCustomizationDownload.NextChunkIndex);
 }
 
 void UKCCustomizationNetworkComponent::ClientCompleteCustomizationDownload_Implementation(
@@ -297,16 +515,26 @@ void UKCCustomizationNetworkComponent::ClientCompleteCustomizationDownload_Imple
 			ActiveCustomizationDownload.ExpectedHash)
 	{
 		ActiveCustomizationDownload.Reset();
-		ResetCustomizationDownload(TargetPlayerState);
+		FinishCustomizationDownload(TargetPlayerState, Revision);
 		return;
 	}
 
 	TArray<uint8> CompletedPayload = MoveTemp(ActiveCustomizationDownload.Bytes);
 	ActiveCustomizationDownload.Reset();
-	if (!ApplyReceivedCustomization(TargetPlayerState, CompletedPayload))
+	ApplyReceivedCustomization(TargetPlayerState, CompletedPayload);
+	FinishCustomizationDownload(TargetPlayerState, Revision);
+}
+
+void UKCCustomizationNetworkComponent::ClientAbortCustomizationDownload_Implementation(
+	AKCPlayerState* TargetPlayerState,
+	const uint32 Revision)
+{
+	if (ActiveCustomizationDownload.PlayerState.Get() == TargetPlayerState &&
+		ActiveCustomizationDownload.Revision == Revision)
 	{
-		ResetCustomizationDownload(TargetPlayerState);
+		ActiveCustomizationDownload.Reset();
 	}
+	FinishCustomizationDownload(TargetPlayerState, Revision);
 }
 
 APlayerController* UKCCustomizationNetworkComponent::GetOwningPlayerController() const
@@ -348,7 +576,7 @@ bool UKCCustomizationNetworkComponent::ApplyReceivedCustomization(
 	CachedData.Revision = Descriptor.Revision;
 	CachedData.ContentHash = Descriptor.ContentHash;
 	CachedData.bUseDefaultAppearance = bUseDefaultAppearance;
-	CachedData.PaintHistory = PaintHistory;
+	CachedData.PaintHistory = MoveTemp(PaintHistory);
 
 	UKCPlayerCustomizationComponent* TargetComponent = nullptr;
 	if (const TWeakObjectPtr<UKCPlayerCustomizationComponent>* PendingTarget =
@@ -364,7 +592,7 @@ bool UKCCustomizationNetworkComponent::ApplyReceivedCustomization(
 	PendingCustomizationTargets.Remove(TargetPlayerState);
 	PendingCustomizationRevisions.Remove(TargetPlayerState);
 	return TargetComponent && TargetComponent->ApplyNetworkCustomizationData(
-		PaintHistory,
+		CachedData.PaintHistory,
 		bUseDefaultAppearance,
 		Descriptor);
 }
@@ -379,12 +607,81 @@ UKCCustomizationNetworkComponent::ResolveCustomizationComponent(
 		: nullptr;
 }
 
-void UKCCustomizationNetworkComponent::ResetCustomizationDownload(
-	AKCPlayerState* TargetPlayerState)
+void UKCCustomizationNetworkComponent::TryStartNextCustomizationDownload()
 {
-	if (TargetPlayerState)
+	if (ActiveCustomizationRequestRevision != 0)
+	{
+		return;
+	}
+
+	APlayerController* OwnerController = GetOwningPlayerController();
+	if (!OwnerController ||
+		!OwnerController->IsLocalController() ||
+		OwnerController->HasAuthority())
+	{
+		return;
+	}
+
+	TArray<TWeakObjectPtr<AKCPlayerState>> PendingPlayerStates;
+	PendingCustomizationRevisions.GetKeys(PendingPlayerStates);
+	for (const TWeakObjectPtr<AKCPlayerState>& PlayerStatePtr : PendingPlayerStates)
+	{
+		AKCPlayerState* PlayerState = PlayerStatePtr.Get();
+		const uint32* PendingRevision =
+			PendingCustomizationRevisions.Find(PlayerStatePtr);
+		UKCPlayerCustomizationComponent* TargetComponent = nullptr;
+		if (const TWeakObjectPtr<UKCPlayerCustomizationComponent>* TargetPtr =
+			PendingCustomizationTargets.Find(PlayerStatePtr))
+		{
+			TargetComponent = TargetPtr->Get();
+		}
+
+		if (!PlayerState || !PendingRevision || !TargetComponent)
+		{
+			PendingCustomizationTargets.Remove(PlayerStatePtr);
+			PendingCustomizationRevisions.Remove(PlayerStatePtr);
+			continue;
+		}
+
+		const FKCCustomizationDescriptor& Descriptor =
+			PlayerState->GetCustomizationDescriptor();
+		if (!Descriptor.IsPublished() ||
+			Descriptor.Revision != *PendingRevision ||
+			Descriptor.bUseDefaultAppearance)
+		{
+			PendingCustomizationTargets.Remove(PlayerStatePtr);
+			PendingCustomizationRevisions.Remove(PlayerStatePtr);
+			continue;
+		}
+
+		ActiveCustomizationRequestPlayerState = PlayerState;
+		ActiveCustomizationRequestRevision = Descriptor.Revision;
+		ServerRequestCustomizationPayload(
+			PlayerState,
+			Descriptor.Revision,
+			Descriptor.ContentHash);
+		return;
+	}
+}
+
+void UKCCustomizationNetworkComponent::FinishCustomizationDownload(
+	AKCPlayerState* TargetPlayerState,
+	const uint32 Revision)
+{
+	if (ActiveCustomizationRequestPlayerState.Get() == TargetPlayerState &&
+		ActiveCustomizationRequestRevision == Revision)
+	{
+		ActiveCustomizationRequestPlayerState.Reset();
+		ActiveCustomizationRequestRevision = 0;
+	}
+
+	if (const uint32* PendingRevision =
+		PendingCustomizationRevisions.Find(TargetPlayerState);
+		PendingRevision && *PendingRevision == Revision)
 	{
 		PendingCustomizationTargets.Remove(TargetPlayerState);
 		PendingCustomizationRevisions.Remove(TargetPlayerState);
 	}
+
+	TryStartNextCustomizationDownload();
 }

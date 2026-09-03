@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
 #include "Player/KCPlayerState.h"
+#include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCPlayerCustomization, Log, All);
@@ -23,7 +24,10 @@ namespace
 	const FName AvatarBodyName(TEXT("AvatarBody"));
 	const FName LegacyEyeName(TEXT("Eyes_Basic_Male_01"));
 	const FName PaintedColorParameterName(TEXT("PaintedColorTexture"));
-	constexpr int32 CustomizationRenderTargetSize = 512;
+	// 정상 편집 종료 때 4개 메시 스냅샷으로 다시 압축하며, 이 값들은
+	// 압축 실패/비정상 종료 경로에서 무제한 누적을 막는 최후 상한입니다.
+	constexpr int32 CustomizationMaxPatchHistoryEntries = 16;
+	constexpr int32 CustomizationMaxPatchHistoryBytes = 16 * 1024 * 1024;
 }
 
 UKCPlayerCustomizationComponent::UKCPlayerCustomizationComponent()
@@ -81,6 +85,14 @@ void UKCPlayerCustomizationComponent::InitializeForPawn()
 	AKCPlayerState* PlayerState = OwnerPawn
 		? OwnerPawn->GetPlayerState<AKCPlayerState>()
 		: nullptr;
+	if (bPresentationBinding && !PlayerState)
+	{
+		// 비소유 로비 표시 캐릭터에는 Pawn PlayerState가 없습니다. 상속된
+		// Pawn 수명주기 콜백이 명시적인 로비 바인딩을 지우지 않게 합니다.
+		return;
+	}
+	bPresentationBinding = false;
+
 	APlayerController* LocalPlayerController =
 		OwnerPawn && OwnerPawn->IsLocallyControlled()
 			? Cast<APlayerController>(OwnerPawn->GetController())
@@ -92,6 +104,8 @@ void UKCPlayerCustomizationComponent::InitializeForPresentation(
 	AKCPlayerState* InPlayerState,
 	APlayerController* LocalPlayerController)
 {
+	bPresentationBinding = true;
+
 	if (LocalPlayerController &&
 		(!LocalPlayerController->IsLocalController() ||
 		 LocalPlayerController->PlayerState != InPlayerState))
@@ -106,6 +120,13 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 	AKCPlayerState* InPlayerState,
 	APlayerController* LocalPlayerController)
 {
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		UnbindCustomizationPlayerState();
+		DestroyRuntimeAppearance();
+		return;
+	}
+
 	const bool bPlayerStateChanged =
 		BoundCustomizationPlayerState.Get() != InPlayerState;
 	if (bPlayerStateChanged)
@@ -115,14 +136,11 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 		bCurrentUseDefaultAppearance = true;
 		AppliedCustomizationRevision = 0;
 		AppliedCustomizationHash = 0;
-		if (IsRuntimeAppearanceReady())
-		{
-			ApplyCustomizationData(FRuntimeMeshPaintPatchHistory(), true);
-		}
+		ApplyCustomizationData(FRuntimeMeshPaintPatchHistory(), true);
 	}
 
 	PresentationLocalPlayerController = LocalPlayerController;
-	if (!CreateRuntimeAppearance())
+	if (!CreateRuntimeVisuals())
 	{
 		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
 		return;
@@ -138,16 +156,15 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 	{
 		TryUploadLocalCustomization();
 	}
+
+	if (!bPresentationBinding && InPlayerState)
+	{
+		QueueListenServerAppearanceRefresh();
+	}
 }
 
 bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
 {
-	if (!CreateRuntimeAppearance())
-	{
-		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
-		return false;
-	}
-
 	const UWorld* World = GetWorld();
 	UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	UKCCustomizationSaveSubsystem* SaveSubsystem = GameInstance
@@ -161,6 +178,32 @@ bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
 
 	bool bSaveFound = false;
 	bool bUseDefaultAppearance = true;
+	if (!SaveSubsystem->GetSavedAppearanceMode(
+		bSaveFound,
+		bUseDefaultAppearance,
+		LastApplyResult))
+	{
+		return false;
+	}
+
+	if (bUseDefaultAppearance)
+	{
+		const bool bSucceeded = ApplyCustomizationData(
+			FRuntimeMeshPaintPatchHistory(), true);
+		bLocalSaveApplied = bSucceeded;
+		if (bSucceeded)
+		{
+			TryUploadLocalCustomization();
+		}
+		return bSucceeded;
+	}
+
+	if (!CreateRuntimeAppearance())
+	{
+		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
 	const bool bSucceeded = SaveSubsystem->LoadCustomization(
 		RuntimePaintTarget,
 		bSaveFound,
@@ -188,24 +231,24 @@ bool UKCPlayerCustomizationComponent::ApplyCustomizationData(
 	const FRuntimeMeshPaintPatchHistory& PaintHistory,
 	const bool bUseDefaultAppearance)
 {
+	if (bUseDefaultAppearance)
+	{
+		if (!CreateRuntimeVisuals())
+		{
+			LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
+			return false;
+		}
+
+		ReleaseRuntimePaintTarget();
+		bCurrentUseDefaultAppearance = true;
+		LastApplyResult = EKCCustomizationSaveResult::Success;
+		return true;
+	}
+
 	if (!CreateRuntimeAppearance())
 	{
 		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
 		return false;
-	}
-
-	if (bUseDefaultAppearance)
-	{
-		RuntimePaintTarget->ClearPaintPatchHistory();
-		const bool bReset = RuntimePaintTarget->InitializeRuntimePaintTarget();
-		LastApplyResult = bReset
-			? EKCCustomizationSaveResult::Success
-			: EKCCustomizationSaveResult::ApplyFailed;
-		if (bReset)
-		{
-			bCurrentUseDefaultAppearance = true;
-		}
-		return bReset;
 	}
 
 	const bool bApplied = RuntimePaintTarget->ImportPaintPatchHistory(
@@ -237,6 +280,12 @@ bool UKCPlayerCustomizationComponent::ApplyNetworkCustomizationData(
 
 	AppliedCustomizationRevision = Descriptor.Revision;
 	AppliedCustomizationHash = Descriptor.ContentHash;
+	UE_LOG(LogKCPlayerCustomization, Log,
+		TEXT("Network customization applied: Owner=%s, NetMode=%d, Revision=%u, Hash=%u"),
+		*GetNameSafe(GetOwner()),
+		static_cast<int32>(GetNetMode()),
+		Descriptor.Revision,
+		Descriptor.ContentHash);
 	return true;
 }
 
@@ -249,9 +298,145 @@ bool UKCPlayerCustomizationComponent::IsRuntimeAppearanceReady() const
 		IsValid(RuntimePaintTarget);
 }
 
+bool UKCPlayerCustomizationComponent::BeginLocalCustomizationEditing()
+{
+	if (bLocalCustomizationEditing)
+	{
+		return true;
+	}
+
+	if (!CreateRuntimeAppearance() || !RuntimePaintTarget)
+	{
+		return false;
+	}
+
+	RuntimePaintTarget->bRecordPaintPatchHistory = true;
+	for (UStaticMeshComponent* PaintMesh : {
+		EyesPaintMesh.Get(),
+		EyesPaintMesh_R.Get(),
+		ApronPaintMesh.Get(),
+		ChefHatPaintMesh.Get() })
+	{
+		if (!PaintMesh)
+		{
+			continue;
+		}
+
+		PaintMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		PaintMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+		PaintMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	}
+
+	bLocalCustomizationEditing = true;
+	return true;
+}
+
+void UKCPlayerCustomizationComponent::EndLocalCustomizationEditing()
+{
+	if (!bLocalCustomizationEditing)
+	{
+		return;
+	}
+
+	if (RuntimePaintTarget)
+	{
+		RuntimePaintTarget->FlushPendingPaintPatchCaptures();
+		RuntimePaintTarget->bRecordPaintPatchHistory = false;
+		if (!CompactLocalPaintHistory())
+		{
+			UE_LOG(LogKCPlayerCustomization, Warning,
+				TEXT("Unable to compact local paint history for Owner=%s"),
+				*GetNameSafe(GetOwner()));
+		}
+	}
+
+	for (UStaticMeshComponent* PaintMesh : {
+		EyesPaintMesh.Get(),
+		EyesPaintMesh_R.Get(),
+		ApronPaintMesh.Get(),
+		ChefHatPaintMesh.Get() })
+	{
+		if (PaintMesh)
+		{
+			PaintMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+	}
+
+	bLocalCustomizationEditing = false;
+}
+
 bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 {
 	if (IsRuntimeAppearanceReady())
+	{
+		return true;
+	}
+
+	if (GetNetMode() == NM_DedicatedServer || !CreateRuntimeVisuals())
+	{
+		return false;
+	}
+
+	AActor* Owner = GetOwner();
+	RuntimePaintTarget = NewObject<URuntimeMeshPaintTargetComponent>(
+		Owner,
+		TEXT("PaintTarget_PlayerCustomization"));
+	if (!RuntimePaintTarget)
+	{
+		return false;
+	}
+
+	RuntimePaintTarget->RuntimeRenderTargetWidth =
+		KCCustomizationNetwork::ExpectedRenderTargetSize;
+	RuntimePaintTarget->RuntimeRenderTargetHeight =
+		KCCustomizationNetwork::ExpectedRenderTargetSize;
+	RuntimePaintTarget->RuntimeRenderTargetFormat = RTF_RGBA16f;
+	RuntimePaintTarget->PaintedColorTextureParameterName = PaintedColorParameterName;
+	RuntimePaintTarget->bCreatePaintedMaterialSettingsRenderTarget = false;
+	RuntimePaintTarget->bRecordPaintPatchHistory = false;
+	RuntimePaintTarget->MaxPatchHistoryEntries = CustomizationMaxPatchHistoryEntries;
+	RuntimePaintTarget->MaxPatchHistoryBytes = CustomizationMaxPatchHistoryBytes;
+	RuntimePaintTarget->bReplicateRuntimePaint = false;
+	Owner->AddInstanceComponent(RuntimePaintTarget);
+	RuntimePaintTarget->RegisterComponent();
+
+	TArray<UMeshComponent*> PaintMeshes;
+	PaintMeshes.Reserve(4);
+	PaintMeshes.Add(EyesPaintMesh);
+	PaintMeshes.Add(EyesPaintMesh_R);
+	PaintMeshes.Add(ApronPaintMesh);
+	PaintMeshes.Add(ChefHatPaintMesh);
+	RuntimePaintTarget->SetMeshTargets(PaintMeshes);
+	return IsRuntimeAppearanceReady();
+}
+
+bool UKCPlayerCustomizationComponent::CompactLocalPaintHistory()
+{
+	if (!RuntimePaintTarget ||
+		RuntimePaintTarget->GetPaintPatchHistoryEntryCount() == 0)
+	{
+		return true;
+	}
+
+	FRuntimeMeshPaintPatchHistory CompactedHistory;
+	if (!RuntimePaintTarget->CompactPaintPatchHistory(CompactedHistory))
+	{
+		return false;
+	}
+
+	// 기존 RT를 지우거나 다시 만들지 않고 현재 결과를 압축된 기준 기록으로 교체합니다.
+	return RuntimePaintTarget->ImportPaintPatchHistory(
+		CompactedHistory,
+		false,
+		true);
+}
+
+bool UKCPlayerCustomizationComponent::CreateRuntimeVisuals()
+{
+	if (IsValid(EyesPaintMesh) &&
+		IsValid(EyesPaintMesh_R) &&
+		IsValid(ApronPaintMesh) &&
+		IsValid(ChefHatPaintMesh))
 	{
 		return true;
 	}
@@ -261,7 +446,7 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 	if (!Owner || !AvatarBody || !EyeMesh || !ApronMesh || !ChefHatMesh || !PaintMaterial)
 	{
 		UE_LOG(LogKCPlayerCustomization, Error,
-			TEXT("Unable to create customization appearance for '%s': Body=%s Eye=%s Apron=%s Hat=%s Material=%s"),
+			TEXT("Unable to create customization visuals for '%s': Body=%s Eye=%s Apron=%s Hat=%s Material=%s"),
 			*GetNameSafe(Owner),
 			*GetNameSafe(AvatarBody),
 			*GetNameSafe(EyeMesh),
@@ -285,35 +470,30 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 		return false;
 	}
 
-	RuntimePaintTarget = NewObject<URuntimeMeshPaintTargetComponent>(
-		Owner,
-		TEXT("PaintTarget_PlayerCustomization"));
+	HideLegacyEyeMesh();
+	return true;
+}
+
+void UKCPlayerCustomizationComponent::ReleaseRuntimePaintTarget()
+{
 	if (!RuntimePaintTarget)
 	{
-		DestroyRuntimeAppearance();
-		return false;
+		return;
 	}
 
-	RuntimePaintTarget->RuntimeRenderTargetWidth = CustomizationRenderTargetSize;
-	RuntimePaintTarget->RuntimeRenderTargetHeight = CustomizationRenderTargetSize;
-	RuntimePaintTarget->RuntimeRenderTargetFormat = RTF_RGBA16f;
-	RuntimePaintTarget->PaintedColorTextureParameterName = PaintedColorParameterName;
-	RuntimePaintTarget->bCreatePaintedMaterialSettingsRenderTarget = false;
-	RuntimePaintTarget->bRecordPaintPatchHistory = false;
-	RuntimePaintTarget->bReplicateRuntimePaint = false;
-	Owner->AddInstanceComponent(RuntimePaintTarget);
-	RuntimePaintTarget->RegisterComponent();
-
-	TArray<UMeshComponent*> PaintMeshes;
-	PaintMeshes.Reserve(4);
-	PaintMeshes.Add(EyesPaintMesh);
-	PaintMeshes.Add(EyesPaintMesh_R);
-	PaintMeshes.Add(ApronPaintMesh);
-	PaintMeshes.Add(ChefHatPaintMesh);
-	RuntimePaintTarget->SetMeshTargets(PaintMeshes);
-
-	HideLegacyEyeMesh();
-	return IsRuntimeAppearanceReady();
+	RuntimePaintTarget->DestroyComponent();
+	RuntimePaintTarget = nullptr;
+	for (UStaticMeshComponent* PaintMesh : {
+		EyesPaintMesh.Get(),
+		EyesPaintMesh_R.Get(),
+		ApronPaintMesh.Get(),
+		ChefHatPaintMesh.Get() })
+	{
+		if (PaintMesh)
+		{
+			PaintMesh->SetMaterial(0, PaintMaterial);
+		}
+	}
 }
 
 UStaticMeshComponent* UKCPlayerCustomizationComponent::CreatePaintMeshComponent(
@@ -424,6 +604,20 @@ void UKCPlayerCustomizationComponent::UnbindCustomizationPlayerState()
 	if (AKCPlayerState* PlayerState = BoundCustomizationPlayerState.Get())
 	{
 		PlayerState->OnCustomizationDescriptorChanged.RemoveAll(this);
+
+		APlayerController* LocalPlayerController = ResolveLocalPlayerController();
+		if (!LocalPlayerController)
+		{
+			LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+		}
+		if (LocalPlayerController && LocalPlayerController->IsLocalController())
+		{
+			if (UKCCustomizationNetworkComponent* NetworkComponent =
+				LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>())
+			{
+				NetworkComponent->ReleaseCustomizationTarget(PlayerState, this);
+			}
+		}
 	}
 	BoundCustomizationPlayerState.Reset();
 }
@@ -440,6 +634,65 @@ APlayerController* UKCPlayerCustomizationComponent::ResolveLocalPlayerController
 	return OwnerPawn && OwnerPawn->IsLocallyControlled()
 		? Cast<APlayerController>(OwnerPawn->GetController())
 		: nullptr;
+}
+
+void UKCPlayerCustomizationComponent::QueueListenServerAppearanceRefresh()
+{
+	if (GetNetMode() != NM_ListenServer || bListenServerAppearanceRefreshQueued)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	bListenServerAppearanceRefreshQueued = true;
+	World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateUObject(
+			this,
+			&ThisClass::RefreshListenServerAppearance));
+}
+
+void UKCPlayerCustomizationComponent::RefreshListenServerAppearance()
+{
+	bListenServerAppearanceRefreshQueued = false;
+	if (GetNetMode() != NM_ListenServer || bPresentationBinding)
+	{
+		return;
+	}
+
+	AKCPlayerState* PlayerState = BoundCustomizationPlayerState.Get();
+	if (!PlayerState)
+	{
+		return;
+	}
+
+	const FKCCustomizationDescriptor& Descriptor =
+		PlayerState->GetCustomizationDescriptor();
+	if (!Descriptor.IsPublished() ||
+		Descriptor.bUseDefaultAppearance ||
+		Descriptor.TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion)
+	{
+		return;
+	}
+
+	APlayerController* LocalPlayerController = ResolveLocalPlayerController();
+	if (!LocalPlayerController)
+	{
+		LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	}
+	UKCCustomizationNetworkComponent* NetworkComponent = LocalPlayerController
+		? LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>()
+		: nullptr;
+	if (NetworkComponent)
+	{
+		// Listen Server는 Seamless Travel 완료 프레임에 동기 적용될 수 있습니다.
+		// 렌더러가 새 월드를 등록한 다음 틱에 캐시/서버 Payload를 한 번 재적용합니다.
+		NetworkComponent->RequestCustomizationPayload(PlayerState, this);
+	}
 }
 
 void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
@@ -464,7 +717,18 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 	if (!bCurrentUseDefaultAppearance &&
 		(!RuntimePaintTarget || !RuntimePaintTarget->CompactPaintPatchHistory(PaintHistory)))
 	{
+		UE_LOG(LogKCPlayerCustomization, Warning,
+			TEXT("Customization upload skipped: failed to compact paint history for Owner=%s"),
+			*GetNameSafe(GetOwner()));
 		return;
+	}
+	if (RuntimePaintTarget)
+	{
+		// 액터 인스턴스 이름을 네트워크 페이로드에서 제거해 동일한
+		// 외형이 로비 재입장마다 다른 해시를 만들지 않게 합니다.
+		KCCustomizationNetwork::NormalizePaintTargetIdentity(
+			PaintHistory,
+			RuntimePaintTarget->GetName());
 	}
 
 	TArray<uint8> Payload;
@@ -473,11 +737,16 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 		bCurrentUseDefaultAppearance,
 		Payload))
 	{
+		UE_LOG(LogKCPlayerCustomization, Warning,
+			TEXT("Customization upload rejected: Owner=%s, Entries=%d, Default=%s"),
+			*GetNameSafe(GetOwner()),
+			PaintHistory.Entries.Num(),
+			bCurrentUseDefaultAppearance ? TEXT("true") : TEXT("false"));
 		return;
 	}
 
 	AppliedCustomizationHash = KCCustomizationNetwork::ComputePayloadHash(Payload);
-	NetworkComponent->UploadCustomizationPayload(Payload);
+	NetworkComponent->UploadCustomizationPayload(MoveTemp(Payload));
 }
 
 void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
@@ -523,11 +792,9 @@ void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
 
 void UKCPlayerCustomizationComponent::DestroyRuntimeAppearance()
 {
-	if (RuntimePaintTarget)
-	{
-		RuntimePaintTarget->DestroyComponent();
-		RuntimePaintTarget = nullptr;
-	}
+	bLocalCustomizationEditing = false;
+
+	ReleaseRuntimePaintTarget();
 
 	for (TObjectPtr<UStaticMeshComponent>* Component : {
 		&EyesPaintMesh,

@@ -11,6 +11,7 @@
 
 class UButton;
 class UTextBlock;
+class UKCCustomizationWidget;
 class UKCFriendListWidget;
 class UWidgetAnimation;
 
@@ -35,6 +36,9 @@ public:
 	/** @brief PlayerState에 안전하게 바인딩을 시도합니다. 바인딩 성공 시 true 반환 */
 	bool TryBindPlayerState();
 
+	/** 커스터마이징 위젯이 닫힐 때 로비 UI를 복원합니다. */
+	void NotifyCustomizationWidgetClosed(UKCCustomizationWidget* ClosedWidget);
+
 protected:
 	//~UUserWidget interface
 	virtual void NativeConstruct() override;
@@ -53,6 +57,10 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UButton> Button_StartGame;
 
+	/** 이름만 맞춰 배치하면 C++에서 자동으로 커스터마이징 UI를 엽니다. */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UButton> Button_Customization;
+
 	/** @brief 준비 버튼 내부의 텍스트 블록 바인딩 */
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UTextBlock> Text_Ready;
@@ -69,6 +77,13 @@ protected:
 	UPROPERTY(Transient, meta = (BindWidgetAnimOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UWidgetAnimation> MatchStartAnim;
 
+	/** 비워두면 기본 경로의 WBP_Customization을 자동 탐색합니다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization")
+	TSubclassOf<UKCCustomizationWidget> CustomizationWidgetClass;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Lobby|Customization")
+	TObjectPtr<UKCCustomizationWidget> CustomizationWidgetInstance;
+
 	/** @brief 소셜 버튼 클릭 핸들러 */
 	UFUNCTION()
 	virtual void OnSocialsClicked();
@@ -80,6 +95,9 @@ protected:
 	/** @brief 게임 시작 버튼 클릭 핸들러 */
 	UFUNCTION()
 	virtual void OnStartGameClicked();
+
+	UFUNCTION()
+	virtual void OnCustomizationClicked();
 
 	/** @brief 플레이어 레디 상태 변경 시 UI 텍스트를 갱신하는 콜백 핸들러 */
 	UFUNCTION()

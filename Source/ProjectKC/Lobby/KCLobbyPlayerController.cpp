@@ -5,21 +5,36 @@
 
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Customization/KCCustomizationNetworkComponent.h"
+#include "ProjectKC/Customization/KCCustomizationSaveSubsystem.h"
 #include "ProjectKC/Lobby/KCLobbyCharacter.h"
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
+#include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
+#include "Camera/CameraComponent.h"
+#include "Camera/CameraActor.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
+#include "InputCoreTypes.h"
+#include "Painting/PaintingModeControllerComponent.h"
+#include "Painting/RuntimeMeshPaintTargetComponent.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
 	CustomizationNetworkComponent = CreateDefaultSubobject<UKCCustomizationNetworkComponent>(
 		TEXT("CustomizationNetwork"));
+	CustomizationPaintingController = CreateDefaultSubobject<UPaintingModeControllerComponent>(
+		TEXT("CustomizationPaintingController"));
+	CustomizationPaintingController->ControlMode =
+		EPaintingModeControllerControlMode::Simple;
+	CustomizationPaintingController->bAutoRegister = false;
+	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
+	CustomizationPaintingController->ColorPickerWidgetZOrder = 30;
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
@@ -32,8 +47,48 @@ void AKCLobbyPlayerController::BeginPlay()
 	RefreshLobbyCustomizationPresentations();
 }
 
+void AKCLobbyPlayerController::PlayerTick(const float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+	if (!bCustomizationEditing || !CustomizationCameraActor)
+	{
+		return;
+	}
+
+	if (IsInputKeyDown(EKeys::RightMouseButton))
+	{
+		float MouseDeltaX = 0.0f;
+		float MouseDeltaY = 0.0f;
+		GetInputMouseDelta(MouseDeltaX, MouseDeltaY);
+		OrbitCustomizationCamera(MouseDeltaX, MouseDeltaY);
+	}
+
+	const float MouseWheelDelta =
+		GetInputAnalogKeyState(EKeys::MouseWheelAxis);
+	if (!FMath::IsNearlyZero(MouseWheelDelta))
+	{
+		ZoomCustomizationCamera(MouseWheelDelta);
+	}
+}
+
+void AKCLobbyPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CloseCustomizationEditingSession();
+	if (CustomizationNetworkComponent)
+	{
+		CustomizationNetworkComponent->ResetTransientCustomizationData();
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
 void AKCLobbyPlayerController::PostSeamlessTravel()
 {
+	CloseCustomizationEditingSession();
+	if (CustomizationNetworkComponent)
+	{
+		CustomizationNetworkComponent->ResetTransientCustomizationData();
+	}
 	Super::PostSeamlessTravel();
 	SetupLobbyUI();
 	RefreshLobbyCustomizationPresentations();
@@ -49,6 +104,416 @@ void AKCLobbyPlayerController::OnRep_PlayerState()
 	}
 
 	RefreshLobbyCustomizationPresentations();
+}
+
+bool AKCLobbyPlayerController::BeginCustomizationEditing()
+{
+	if (bCustomizationEditing)
+	{
+		return true;
+	}
+
+	if (!IsLocalPlayerController() ||
+		UKCLevelTypeLibrary::GetLevelTypeFromWorld(GetWorld()) !=
+			EKCLevelType::LobbyLevel ||
+		!CustomizationPaintingController)
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	AKCLobbyCharacter* TargetCharacter = ResolveLocalCustomizationCharacter();
+	UKCPlayerCustomizationComponent* TargetComponent = TargetCharacter
+		? TargetCharacter->GetPlayerCustomizationComponent()
+		: nullptr;
+	if (!TargetComponent || !TargetComponent->BeginLocalCustomizationEditing())
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	URuntimeMeshPaintTargetComponent* PaintTarget =
+		TargetComponent->GetRuntimePaintTarget();
+	UKCCustomizationSaveSubsystem* SaveSubsystem =
+		GetCustomizationSaveSubsystem();
+	if (!PaintTarget || !SaveSubsystem)
+	{
+		TargetComponent->EndLocalCustomizationEditing();
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	bool bSaveFound = false;
+	bool bUseDefaultAppearance = true;
+	if (!SaveSubsystem->LoadCustomization(
+		PaintTarget,
+		bSaveFound,
+		bUseDefaultAppearance,
+		LastCustomizationEditingResult))
+	{
+		TargetComponent->EndLocalCustomizationEditing();
+		return false;
+	}
+
+	CustomizationEditingComponent = TargetComponent;
+	CustomizationEditingPaintTarget = PaintTarget;
+	if (!OpenCustomizationCamera(TargetCharacter))
+	{
+		CloseCustomizationEditingSession();
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::ApplyFailed;
+		return false;
+	}
+
+	CustomizationPaintingController->SetPaintTargetComponent(PaintTarget);
+	if (!CustomizationPaintingController->EnterPaintingMode())
+	{
+		CloseCustomizationEditingSession();
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::ApplyFailed;
+		return false;
+	}
+
+	bCustomizationEditing = true;
+	UE_LOG(LogKCLobby, Log,
+		TEXT("[KCLobbyPlayerController] Customization editing started: Target=%s, SaveFound=%s"),
+		*GetNameSafe(PaintTarget),
+		bSaveFound ? TEXT("true") : TEXT("false"));
+	return true;
+}
+
+bool AKCLobbyPlayerController::SaveCustomizationEditing()
+{
+	if (!bCustomizationEditing ||
+		!CustomizationEditingComponent ||
+		!CustomizationEditingPaintTarget ||
+		!CustomizationPaintingController)
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	CustomizationPaintingController->ExitPaintingMode();
+	CustomizationEditingPaintTarget->FlushPendingPaintPatchCaptures();
+	const bool bUseDefaultAppearance =
+		CustomizationEditingPaintTarget->GetPaintPatchHistoryEntryCount() == 0;
+	UKCCustomizationSaveSubsystem* SaveSubsystem =
+		GetCustomizationSaveSubsystem();
+	if (!SaveSubsystem || !SaveSubsystem->SaveCustomization(
+		CustomizationEditingPaintTarget,
+		bUseDefaultAppearance,
+		LastCustomizationEditingResult))
+	{
+		if (!CustomizationPaintingController->EnterPaintingMode())
+		{
+			CloseCustomizationEditingSession();
+		}
+		return false;
+	}
+
+	UKCPlayerCustomizationComponent* SavedComponent =
+		CustomizationEditingComponent;
+	CloseCustomizationEditingSession();
+	const bool bApplied =
+		SavedComponent && SavedComponent->ApplyLocalSavedCustomization();
+	if (!bApplied && SavedComponent)
+	{
+		LastCustomizationEditingResult = SavedComponent->LastApplyResult;
+	}
+
+	UE_LOG(LogKCLobby, Log,
+		TEXT("[KCLobbyPlayerController] Customization editing saved: Applied=%s, Default=%s"),
+		bApplied ? TEXT("true") : TEXT("false"),
+		bUseDefaultAppearance ? TEXT("true") : TEXT("false"));
+	return bApplied;
+}
+
+bool AKCLobbyPlayerController::ResetCustomizationEditing()
+{
+	if (!bCustomizationEditing ||
+		!CustomizationEditingPaintTarget ||
+		!CustomizationPaintingController)
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	CustomizationPaintingController->ExitPaintingMode();
+	UKCCustomizationSaveSubsystem* SaveSubsystem =
+		GetCustomizationSaveSubsystem();
+	const bool bReset = SaveSubsystem && SaveSubsystem->ResetCustomization(
+		CustomizationEditingPaintTarget,
+		LastCustomizationEditingResult);
+	if (!bReset)
+	{
+		if (!CustomizationPaintingController->EnterPaintingMode())
+		{
+			CloseCustomizationEditingSession();
+		}
+		return false;
+	}
+
+	if (!CustomizationPaintingController->EnterPaintingMode())
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::ApplyFailed;
+		CloseCustomizationEditingSession();
+		return false;
+	}
+
+	return true;
+}
+
+bool AKCLobbyPlayerController::CancelCustomizationEditing()
+{
+	if (!bCustomizationEditing || !CustomizationEditingPaintTarget)
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	CustomizationPaintingController->ExitPaintingMode();
+	bool bSaveFound = false;
+	bool bUseDefaultAppearance = true;
+	UKCCustomizationSaveSubsystem* SaveSubsystem =
+		GetCustomizationSaveSubsystem();
+	const bool bRestored = SaveSubsystem && SaveSubsystem->LoadCustomization(
+		CustomizationEditingPaintTarget,
+		bSaveFound,
+		bUseDefaultAppearance,
+		LastCustomizationEditingResult);
+	CloseCustomizationEditingSession();
+	return bRestored;
+}
+
+void AKCLobbyPlayerController::OrbitCustomizationCamera(
+	const float DeltaYaw,
+	const float DeltaPitch)
+{
+	if (!bCustomizationEditing || !CustomizationCameraActor)
+	{
+		return;
+	}
+
+	CustomizationCameraYaw += DeltaYaw * CustomizationCameraOrbitSensitivity;
+	const float SafeMinimumPitch = FMath::Min(
+		CustomizationCameraMinimumPitch,
+		CustomizationCameraMaximumPitch);
+	const float SafeMaximumPitch = FMath::Max(
+		CustomizationCameraMinimumPitch,
+		CustomizationCameraMaximumPitch);
+	CustomizationCameraPitch = FMath::Clamp(
+		CustomizationCameraPitch +
+			DeltaPitch * CustomizationCameraOrbitSensitivity,
+		SafeMinimumPitch,
+		SafeMaximumPitch);
+	UpdateCustomizationCameraTransform();
+}
+
+void AKCLobbyPlayerController::ZoomCustomizationCamera(const float ZoomDelta)
+{
+	if (!bCustomizationEditing || !CustomizationCameraActor)
+	{
+		return;
+	}
+
+	const float SafeMinimumDistance = FMath::Min(
+		CustomizationCameraMinimumDistance,
+		CustomizationCameraMaximumDistance);
+	const float SafeMaximumDistance = FMath::Max(
+		CustomizationCameraMinimumDistance,
+		CustomizationCameraMaximumDistance);
+	CustomizationCameraDistance = FMath::Clamp(
+		CustomizationCameraDistance -
+			ZoomDelta * CustomizationCameraZoomSensitivity,
+		SafeMinimumDistance,
+		SafeMaximumDistance);
+	UpdateCustomizationCameraTransform();
+}
+
+void AKCLobbyPlayerController::ResetCustomizationCamera()
+{
+	if (!CustomizationCameraActor || !CustomizationCameraTarget)
+	{
+		return;
+	}
+
+	CustomizationCameraYaw =
+		CustomizationCameraTarget->GetActorRotation().Yaw + 180.0f;
+	CustomizationCameraPitch = FMath::Clamp(
+		CustomizationCameraInitialPitch,
+		FMath::Min(
+			CustomizationCameraMinimumPitch,
+			CustomizationCameraMaximumPitch),
+		FMath::Max(
+			CustomizationCameraMinimumPitch,
+			CustomizationCameraMaximumPitch));
+	CustomizationCameraDistance = FMath::Clamp(
+		CustomizationCameraInitialDistance,
+		FMath::Min(
+			CustomizationCameraMinimumDistance,
+			CustomizationCameraMaximumDistance),
+		FMath::Max(
+			CustomizationCameraMinimumDistance,
+			CustomizationCameraMaximumDistance));
+	UpdateCustomizationCameraTransform();
+}
+
+AKCLobbyCharacter*
+AKCLobbyPlayerController::ResolveLocalCustomizationCharacter() const
+{
+	if (!PlayerState)
+	{
+		return nullptr;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	for (TActorIterator<AKCLobbyCharacter> CharacterIterator(World);
+		CharacterIterator;
+		++CharacterIterator)
+	{
+		if (CharacterIterator->GetPlayerInfo().PlayerState.Get() == PlayerState)
+		{
+			return *CharacterIterator;
+		}
+	}
+
+	return nullptr;
+}
+
+UKCCustomizationSaveSubsystem*
+AKCLobbyPlayerController::GetCustomizationSaveSubsystem() const
+{
+	const UWorld* World = GetWorld();
+	UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	return GameInstance
+		? GameInstance->GetSubsystem<UKCCustomizationSaveSubsystem>()
+		: nullptr;
+}
+
+bool AKCLobbyPlayerController::OpenCustomizationCamera(
+	AKCLobbyCharacter* TargetCharacter)
+{
+	if (!IsLocalPlayerController() || !TargetCharacter)
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	PreviousCustomizationViewTarget = GetViewTarget();
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.ObjectFlags = RF_Transient;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	CustomizationCameraActor = World->SpawnActor<ACameraActor>(
+		ACameraActor::StaticClass(),
+		FTransform::Identity,
+		SpawnParameters);
+	if (!CustomizationCameraActor)
+	{
+		PreviousCustomizationViewTarget = nullptr;
+		return false;
+	}
+
+	CustomizationCameraActor->SetReplicates(false);
+	CustomizationCameraActor->SetActorEnableCollision(false);
+	if (UCameraComponent* CameraComponent =
+		CustomizationCameraActor->GetCameraComponent())
+	{
+		CameraComponent->SetFieldOfView(CustomizationCameraFieldOfView);
+	}
+
+	CustomizationCameraTarget = TargetCharacter;
+	ResetCustomizationCamera();
+	SetViewTargetWithBlend(
+		CustomizationCameraActor,
+		CustomizationCameraBlendTime,
+		EViewTargetBlendFunction::VTBlend_EaseInOut);
+	return true;
+}
+
+void AKCLobbyPlayerController::UpdateCustomizationCameraTransform()
+{
+	if (!CustomizationCameraActor || !CustomizationCameraTarget)
+	{
+		return;
+	}
+
+	FVector BoundsOrigin = CustomizationCameraTarget->GetActorLocation();
+	TArray<UStaticMeshComponent*> StaticMeshComponents;
+	CustomizationCameraTarget->GetComponents(StaticMeshComponents);
+	for (const UStaticMeshComponent* StaticMeshComponent : StaticMeshComponents)
+	{
+		if (StaticMeshComponent &&
+			StaticMeshComponent->GetFName() == TEXT("AvatarBody"))
+		{
+			BoundsOrigin = StaticMeshComponent->Bounds.Origin;
+			break;
+		}
+	}
+	const FVector FocusLocation =
+		BoundsOrigin + CustomizationCameraFocusOffset;
+	const FRotator ViewRotation(
+		CustomizationCameraPitch,
+		CustomizationCameraYaw,
+		0.0f);
+	const FVector CameraLocation =
+		FocusLocation - ViewRotation.Vector() * CustomizationCameraDistance;
+	CustomizationCameraActor->SetActorLocationAndRotation(
+		CameraLocation,
+		(FocusLocation - CameraLocation).Rotation());
+}
+
+void AKCLobbyPlayerController::CloseCustomizationCamera()
+{
+	if (IsLocalPlayerController() && PreviousCustomizationViewTarget)
+	{
+		SetViewTarget(PreviousCustomizationViewTarget);
+	}
+
+	if (CustomizationCameraActor)
+	{
+		CustomizationCameraActor->Destroy();
+	}
+
+	CustomizationCameraActor = nullptr;
+	CustomizationCameraTarget = nullptr;
+	PreviousCustomizationViewTarget = nullptr;
+}
+
+void AKCLobbyPlayerController::CloseCustomizationEditingSession()
+{
+	if (CustomizationPaintingController)
+	{
+		CustomizationPaintingController->ExitPaintingMode();
+		CustomizationPaintingController->ClearPaintTargetComponents();
+	}
+	if (CustomizationEditingComponent)
+	{
+		CustomizationEditingComponent->EndLocalCustomizationEditing();
+	}
+	CloseCustomizationCamera();
+
+	CustomizationEditingComponent = nullptr;
+	CustomizationEditingPaintTarget = nullptr;
+	bCustomizationEditing = false;
 }
 
 void AKCLobbyPlayerController::RefreshLobbyCustomizationPresentations()
