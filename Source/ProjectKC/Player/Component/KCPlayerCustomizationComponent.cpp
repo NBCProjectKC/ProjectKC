@@ -24,6 +24,10 @@ namespace
 	const FName LegacyEyeName(TEXT("Eyes_Basic_Male_01"));
 	const FName PaintedColorParameterName(TEXT("PaintedColorTexture"));
 	constexpr int32 CustomizationRenderTargetSize = 512;
+	// 정상 편집 종료 때 4개 메시 스냅샷으로 다시 압축하며, 이 값들은
+	// 압축 실패/비정상 종료 경로에서 무제한 누적을 막는 최후 상한입니다.
+	constexpr int32 CustomizationMaxPatchHistoryEntries = 16;
+	constexpr int32 CustomizationMaxPatchHistoryBytes = 16 * 1024 * 1024;
 }
 
 UKCPlayerCustomizationComponent::UKCPlayerCustomizationComponent()
@@ -317,6 +321,12 @@ void UKCPlayerCustomizationComponent::EndLocalCustomizationEditing()
 	{
 		RuntimePaintTarget->FlushPendingPaintPatchCaptures();
 		RuntimePaintTarget->bRecordPaintPatchHistory = false;
+		if (!CompactLocalPaintHistory())
+		{
+			UE_LOG(LogKCPlayerCustomization, Warning,
+				TEXT("Unable to compact local paint history for Owner=%s"),
+				*GetNameSafe(GetOwner()));
+		}
 	}
 
 	for (UStaticMeshComponent* PaintMesh : {
@@ -361,6 +371,8 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 	RuntimePaintTarget->PaintedColorTextureParameterName = PaintedColorParameterName;
 	RuntimePaintTarget->bCreatePaintedMaterialSettingsRenderTarget = false;
 	RuntimePaintTarget->bRecordPaintPatchHistory = false;
+	RuntimePaintTarget->MaxPatchHistoryEntries = CustomizationMaxPatchHistoryEntries;
+	RuntimePaintTarget->MaxPatchHistoryBytes = CustomizationMaxPatchHistoryBytes;
 	RuntimePaintTarget->bReplicateRuntimePaint = false;
 	Owner->AddInstanceComponent(RuntimePaintTarget);
 	RuntimePaintTarget->RegisterComponent();
@@ -373,6 +385,27 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 	PaintMeshes.Add(ChefHatPaintMesh);
 	RuntimePaintTarget->SetMeshTargets(PaintMeshes);
 	return IsRuntimeAppearanceReady();
+}
+
+bool UKCPlayerCustomizationComponent::CompactLocalPaintHistory()
+{
+	if (!RuntimePaintTarget ||
+		RuntimePaintTarget->GetPaintPatchHistoryEntryCount() == 0)
+	{
+		return true;
+	}
+
+	FRuntimeMeshPaintPatchHistory CompactedHistory;
+	if (!RuntimePaintTarget->CompactPaintPatchHistory(CompactedHistory))
+	{
+		return false;
+	}
+
+	// 기존 RT를 지우거나 다시 만들지 않고 현재 결과를 압축된 기준 기록으로 교체합니다.
+	return RuntimePaintTarget->ImportPaintPatchHistory(
+		CompactedHistory,
+		false,
+		true);
 }
 
 bool UKCPlayerCustomizationComponent::CreateRuntimeVisuals()

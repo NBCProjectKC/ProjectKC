@@ -102,6 +102,7 @@ protected:
 private:
 	bool CreateRuntimeVisuals();
 	bool CreateRuntimeAppearance();
+	bool CompactLocalPaintHistory();
 	void ReleaseRuntimePaintTarget();
 	UStaticMeshComponent* CreatePaintMeshComponent(
 		FName ComponentName,
