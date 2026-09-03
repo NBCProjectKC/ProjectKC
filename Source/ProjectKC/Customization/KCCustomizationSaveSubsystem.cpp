@@ -1,9 +1,31 @@
 #include "Customization/KCCustomizationSaveSubsystem.h"
 
+#include "Customization/KCCustomizationNetworkTypes.h"
+#include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCCustomizationSave, Log, All);
+
+namespace
+{
+	FString MakeRuntimePaintTargetIdentity(
+		const URuntimeMeshPaintTargetComponent* PaintTarget)
+	{
+		if (!PaintTarget)
+		{
+			return FString();
+		}
+
+		const AActor* Owner = PaintTarget->GetOwner();
+		return Owner
+			? FString::Printf(
+				TEXT("%s.%s"),
+				*Owner->GetName(),
+				*PaintTarget->GetName())
+			: PaintTarget->GetName();
+	}
+}
 
 const FString UKCCustomizationSaveSubsystem::CustomizationSlotName = TEXT("KC_Customization_Local");
 
@@ -33,6 +55,9 @@ bool UKCCustomizationSaveSubsystem::SaveCustomization(
 		UE_LOG(LogKCCustomizationSave, Warning, TEXT("Save rejected because the paint target has no patch history."));
 		return false;
 	}
+	KCCustomizationNetwork::NormalizePaintTargetIdentity(
+		SaveData->PaintHistory,
+		PaintTarget->GetName());
 
 	if (!UGameplayStatics::SaveGameToSlot(SaveData, CustomizationSlotName, CustomizationUserIndex))
 	{
@@ -94,6 +119,13 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 	{
 		return ResetCustomization(PaintTarget, OutResult);
 	}
+
+	// PaintTargetName에는 생성 당시 액터 인스턴스 이름이 포함됩니다.
+	// 현재 인스턴스 이름으로 맞춰야 이후 추가 페인트가 같은 압축 그룹에
+	// 합쳐지고 메시/텍스 종류별 중복 패치가 생기지 않습니다.
+	KCCustomizationNetwork::NormalizePaintTargetIdentity(
+		SaveData->PaintHistory,
+		MakeRuntimePaintTargetIdentity(PaintTarget));
 
 	if (!PaintTarget->ImportPaintPatchHistory(SaveData->PaintHistory, true, true))
 	{

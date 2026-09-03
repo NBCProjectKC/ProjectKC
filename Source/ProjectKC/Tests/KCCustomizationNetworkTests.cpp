@@ -299,6 +299,43 @@ bool FKCCustomizationNetworkControllerComponentsTest::RunTest(const FString& Par
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FKCCustomizationNetworkTargetIdentityNormalizationTest,
+	"ProjectKC.Customization.Network.TargetIdentityNormalization",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FKCCustomizationNetworkTargetIdentityNormalizationTest::RunTest(
+	const FString& Parameters)
+{
+	FRuntimeMeshPaintPatchHistory History = MakeValidPaintHistory();
+	FRuntimeMeshPaintPatchHistoryEntry SecondEntry = MakeValidPaintEntry(
+		3,
+		ERuntimeMeshPaintPatchTextureType::Color,
+		2);
+	History.Entries[0].PaintTargetName =
+		TEXT("BP_Lobby_PlayerCharacter_C_0.PaintTarget_PlayerCustomization");
+	SecondEntry.PaintTargetName =
+		TEXT("BP_Lobby_PlayerCharacter_C_1.PaintTarget_PlayerCustomization");
+	History.Entries.Add(MoveTemp(SecondEntry));
+
+	const FString StableIdentity = TEXT("PaintTarget_PlayerCustomization");
+	KCCustomizationNetwork::NormalizePaintTargetIdentity(
+		History,
+		StableIdentity);
+
+	for (const FRuntimeMeshPaintPatchHistoryEntry& Entry : History.Entries)
+	{
+		TestEqual(
+			TEXT("액터 인스턴스와 무관한 PaintTarget 식별자를 사용한다."),
+			Entry.PaintTargetName,
+			StableIdentity);
+	}
+	TestTrue(
+		TEXT("정규화된 패치 데이터가 네트워크 검증을 통과한다."),
+		KCCustomizationNetwork::ValidateCustomizationData(History, false));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FKCCustomizationNetworkTransportContractTest,
 	"ProjectKC.Customization.Network.TransportContract",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

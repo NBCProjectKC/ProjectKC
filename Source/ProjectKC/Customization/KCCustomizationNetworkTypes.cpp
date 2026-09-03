@@ -20,6 +20,21 @@ uint32 KCCustomizationNetwork::ComputePayloadHash(const TArray<uint8>& Payload)
 		: FCrc::MemCrc32(Payload.GetData(), Payload.Num());
 }
 
+void KCCustomizationNetwork::NormalizePaintTargetIdentity(
+	FRuntimeMeshPaintPatchHistory& PaintHistory,
+	const FString& PaintTargetIdentity)
+{
+	if (PaintTargetIdentity.IsEmpty())
+	{
+		return;
+	}
+
+	for (FRuntimeMeshPaintPatchHistoryEntry& Entry : PaintHistory.Entries)
+	{
+		Entry.PaintTargetName = PaintTargetIdentity;
+	}
+}
+
 bool KCCustomizationNetwork::SerializePayload(
 	const FRuntimeMeshPaintPatchHistory& PaintHistory,
 	const bool bUseDefaultAppearance,

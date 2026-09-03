@@ -46,6 +46,14 @@ namespace KCCustomizationNetwork
 
 	PROJECTKC_API uint32 ComputePayloadHash(const TArray<uint8>& Payload);
 
+	/**
+	 * 런타임 액터 인스턴스 이름 때문에 동일한 메시 패치가 서로 다른
+	 * 압축 그룹으로 분리되지 않도록 PaintTargetName을 통일합니다.
+	 */
+	PROJECTKC_API void NormalizePaintTargetIdentity(
+		FRuntimeMeshPaintPatchHistory& PaintHistory,
+		const FString& PaintTargetIdentity);
+
 	PROJECTKC_API bool SerializePayload(
 		const FRuntimeMeshPaintPatchHistory& PaintHistory,
 		bool bUseDefaultAppearance,

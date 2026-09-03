@@ -530,6 +530,14 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 			*GetNameSafe(GetOwner()));
 		return;
 	}
+	if (RuntimePaintTarget)
+	{
+		// 액터 인스턴스 이름을 네트워크 페이로드에서 제거해 동일한
+		// 외형이 로비 재입장마다 다른 해시를 만들지 않게 합니다.
+		KCCustomizationNetwork::NormalizePaintTargetIdentity(
+			PaintHistory,
+			RuntimePaintTarget->GetName());
+	}
 
 	TArray<uint8> Payload;
 	if (!KCCustomizationNetwork::SerializePayload(
