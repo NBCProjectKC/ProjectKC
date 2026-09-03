@@ -32,6 +32,12 @@ public:
 		bool& bOutUseDefaultAppearance,
 		EKCCustomizationSaveResult& OutResult);
 
+	/** 렌더 리소스를 만들지 않고 로컬 슬롯의 외형 종류만 확인합니다. */
+	bool GetSavedAppearanceMode(
+		bool& bOutSaveFound,
+		bool& bOutUseDefaultAppearance,
+		EKCCustomizationSaveResult& OutResult) const;
+
 	/** 렌더 타깃과 패치 기록을 초기 상태로 되돌립니다. 파일은 지우지 않습니다. */
 	UFUNCTION(BlueprintCallable, Category = "KC|Customization|Save")
 	bool ResetCustomization(

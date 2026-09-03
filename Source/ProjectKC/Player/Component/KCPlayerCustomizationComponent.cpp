@@ -106,6 +106,13 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 	AKCPlayerState* InPlayerState,
 	APlayerController* LocalPlayerController)
 {
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		UnbindCustomizationPlayerState();
+		DestroyRuntimeAppearance();
+		return;
+	}
+
 	const bool bPlayerStateChanged =
 		BoundCustomizationPlayerState.Get() != InPlayerState;
 	if (bPlayerStateChanged)
@@ -115,14 +122,11 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 		bCurrentUseDefaultAppearance = true;
 		AppliedCustomizationRevision = 0;
 		AppliedCustomizationHash = 0;
-		if (IsRuntimeAppearanceReady())
-		{
-			ApplyCustomizationData(FRuntimeMeshPaintPatchHistory(), true);
-		}
+		ApplyCustomizationData(FRuntimeMeshPaintPatchHistory(), true);
 	}
 
 	PresentationLocalPlayerController = LocalPlayerController;
-	if (!CreateRuntimeAppearance())
+	if (!CreateRuntimeVisuals())
 	{
 		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
 		return;
@@ -142,12 +146,6 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 
 bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
 {
-	if (!CreateRuntimeAppearance())
-	{
-		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
-		return false;
-	}
-
 	const UWorld* World = GetWorld();
 	UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	UKCCustomizationSaveSubsystem* SaveSubsystem = GameInstance
@@ -161,6 +159,32 @@ bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
 
 	bool bSaveFound = false;
 	bool bUseDefaultAppearance = true;
+	if (!SaveSubsystem->GetSavedAppearanceMode(
+		bSaveFound,
+		bUseDefaultAppearance,
+		LastApplyResult))
+	{
+		return false;
+	}
+
+	if (bUseDefaultAppearance)
+	{
+		const bool bSucceeded = ApplyCustomizationData(
+			FRuntimeMeshPaintPatchHistory(), true);
+		bLocalSaveApplied = bSucceeded;
+		if (bSucceeded)
+		{
+			TryUploadLocalCustomization();
+		}
+		return bSucceeded;
+	}
+
+	if (!CreateRuntimeAppearance())
+	{
+		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
 	const bool bSucceeded = SaveSubsystem->LoadCustomization(
 		RuntimePaintTarget,
 		bSaveFound,
@@ -188,24 +212,24 @@ bool UKCPlayerCustomizationComponent::ApplyCustomizationData(
 	const FRuntimeMeshPaintPatchHistory& PaintHistory,
 	const bool bUseDefaultAppearance)
 {
+	if (bUseDefaultAppearance)
+	{
+		if (!CreateRuntimeVisuals())
+		{
+			LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
+			return false;
+		}
+
+		ReleaseRuntimePaintTarget();
+		bCurrentUseDefaultAppearance = true;
+		LastApplyResult = EKCCustomizationSaveResult::Success;
+		return true;
+	}
+
 	if (!CreateRuntimeAppearance())
 	{
 		LastApplyResult = EKCCustomizationSaveResult::InvalidPaintTarget;
 		return false;
-	}
-
-	if (bUseDefaultAppearance)
-	{
-		RuntimePaintTarget->ClearPaintPatchHistory();
-		const bool bReset = RuntimePaintTarget->InitializeRuntimePaintTarget();
-		LastApplyResult = bReset
-			? EKCCustomizationSaveResult::Success
-			: EKCCustomizationSaveResult::ApplyFailed;
-		if (bReset)
-		{
-			bCurrentUseDefaultAppearance = true;
-		}
-		return bReset;
 	}
 
 	const bool bApplied = RuntimePaintTarget->ImportPaintPatchHistory(
@@ -317,12 +341,56 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 		return true;
 	}
 
+	if (GetNetMode() == NM_DedicatedServer || !CreateRuntimeVisuals())
+	{
+		return false;
+	}
+
+	AActor* Owner = GetOwner();
+	RuntimePaintTarget = NewObject<URuntimeMeshPaintTargetComponent>(
+		Owner,
+		TEXT("PaintTarget_PlayerCustomization"));
+	if (!RuntimePaintTarget)
+	{
+		return false;
+	}
+
+	RuntimePaintTarget->RuntimeRenderTargetWidth = CustomizationRenderTargetSize;
+	RuntimePaintTarget->RuntimeRenderTargetHeight = CustomizationRenderTargetSize;
+	RuntimePaintTarget->RuntimeRenderTargetFormat = RTF_RGBA16f;
+	RuntimePaintTarget->PaintedColorTextureParameterName = PaintedColorParameterName;
+	RuntimePaintTarget->bCreatePaintedMaterialSettingsRenderTarget = false;
+	RuntimePaintTarget->bRecordPaintPatchHistory = false;
+	RuntimePaintTarget->bReplicateRuntimePaint = false;
+	Owner->AddInstanceComponent(RuntimePaintTarget);
+	RuntimePaintTarget->RegisterComponent();
+
+	TArray<UMeshComponent*> PaintMeshes;
+	PaintMeshes.Reserve(4);
+	PaintMeshes.Add(EyesPaintMesh);
+	PaintMeshes.Add(EyesPaintMesh_R);
+	PaintMeshes.Add(ApronPaintMesh);
+	PaintMeshes.Add(ChefHatPaintMesh);
+	RuntimePaintTarget->SetMeshTargets(PaintMeshes);
+	return IsRuntimeAppearanceReady();
+}
+
+bool UKCPlayerCustomizationComponent::CreateRuntimeVisuals()
+{
+	if (IsValid(EyesPaintMesh) &&
+		IsValid(EyesPaintMesh_R) &&
+		IsValid(ApronPaintMesh) &&
+		IsValid(ChefHatPaintMesh))
+	{
+		return true;
+	}
+
 	AActor* Owner = GetOwner();
 	UStaticMeshComponent* AvatarBody = FindAvatarBody();
 	if (!Owner || !AvatarBody || !EyeMesh || !ApronMesh || !ChefHatMesh || !PaintMaterial)
 	{
 		UE_LOG(LogKCPlayerCustomization, Error,
-			TEXT("Unable to create customization appearance for '%s': Body=%s Eye=%s Apron=%s Hat=%s Material=%s"),
+			TEXT("Unable to create customization visuals for '%s': Body=%s Eye=%s Apron=%s Hat=%s Material=%s"),
 			*GetNameSafe(Owner),
 			*GetNameSafe(AvatarBody),
 			*GetNameSafe(EyeMesh),
@@ -346,35 +414,30 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 		return false;
 	}
 
-	RuntimePaintTarget = NewObject<URuntimeMeshPaintTargetComponent>(
-		Owner,
-		TEXT("PaintTarget_PlayerCustomization"));
+	HideLegacyEyeMesh();
+	return true;
+}
+
+void UKCPlayerCustomizationComponent::ReleaseRuntimePaintTarget()
+{
 	if (!RuntimePaintTarget)
 	{
-		DestroyRuntimeAppearance();
-		return false;
+		return;
 	}
 
-	RuntimePaintTarget->RuntimeRenderTargetWidth = CustomizationRenderTargetSize;
-	RuntimePaintTarget->RuntimeRenderTargetHeight = CustomizationRenderTargetSize;
-	RuntimePaintTarget->RuntimeRenderTargetFormat = RTF_RGBA16f;
-	RuntimePaintTarget->PaintedColorTextureParameterName = PaintedColorParameterName;
-	RuntimePaintTarget->bCreatePaintedMaterialSettingsRenderTarget = false;
-	RuntimePaintTarget->bRecordPaintPatchHistory = false;
-	RuntimePaintTarget->bReplicateRuntimePaint = false;
-	Owner->AddInstanceComponent(RuntimePaintTarget);
-	RuntimePaintTarget->RegisterComponent();
-
-	TArray<UMeshComponent*> PaintMeshes;
-	PaintMeshes.Reserve(4);
-	PaintMeshes.Add(EyesPaintMesh);
-	PaintMeshes.Add(EyesPaintMesh_R);
-	PaintMeshes.Add(ApronPaintMesh);
-	PaintMeshes.Add(ChefHatPaintMesh);
-	RuntimePaintTarget->SetMeshTargets(PaintMeshes);
-
-	HideLegacyEyeMesh();
-	return IsRuntimeAppearanceReady();
+	RuntimePaintTarget->DestroyComponent();
+	RuntimePaintTarget = nullptr;
+	for (UStaticMeshComponent* PaintMesh : {
+		EyesPaintMesh.Get(),
+		EyesPaintMesh_R.Get(),
+		ApronPaintMesh.Get(),
+		ChefHatPaintMesh.Get() })
+	{
+		if (PaintMesh)
+		{
+			PaintMesh->SetMaterial(0, PaintMaterial);
+		}
+	}
 }
 
 UStaticMeshComponent* UKCPlayerCustomizationComponent::CreatePaintMeshComponent(
@@ -602,11 +665,7 @@ void UKCPlayerCustomizationComponent::DestroyRuntimeAppearance()
 {
 	bLocalCustomizationEditing = false;
 
-	if (RuntimePaintTarget)
-	{
-		RuntimePaintTarget->DestroyComponent();
-		RuntimePaintTarget = nullptr;
-	}
+	ReleaseRuntimePaintTarget();
 
 	for (TObjectPtr<UStaticMeshComponent>* Component : {
 		&EyesPaintMesh,

@@ -140,6 +140,40 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 	return true;
 }
 
+bool UKCCustomizationSaveSubsystem::GetSavedAppearanceMode(
+	bool& bOutSaveFound,
+	bool& bOutUseDefaultAppearance,
+	EKCCustomizationSaveResult& OutResult) const
+{
+	bOutSaveFound = false;
+	bOutUseDefaultAppearance = true;
+	OutResult = EKCCustomizationSaveResult::NoSaveFound;
+	if (!DoesCustomizationSaveExist())
+	{
+		return true;
+	}
+
+	UKCCustomizationSaveGame* SaveData = Cast<UKCCustomizationSaveGame>(
+		UGameplayStatics::LoadGameFromSlot(CustomizationSlotName, CustomizationUserIndex));
+	if (!SaveData)
+	{
+		OutResult = EKCCustomizationSaveResult::LoadFailed;
+		return false;
+	}
+
+	if (SaveData->SaveVersion != UKCCustomizationSaveGame::CurrentSaveVersion ||
+		SaveData->TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion)
+	{
+		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
+		return false;
+	}
+
+	bOutSaveFound = true;
+	bOutUseDefaultAppearance = SaveData->bUseDefaultAppearance;
+	OutResult = EKCCustomizationSaveResult::Success;
+	return true;
+}
+
 bool UKCCustomizationSaveSubsystem::ResetCustomization(
 	URuntimeMeshPaintTargetComponent* PaintTarget,
 	EKCCustomizationSaveResult& OutResult)

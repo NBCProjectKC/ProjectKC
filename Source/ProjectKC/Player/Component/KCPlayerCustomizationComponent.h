@@ -100,7 +100,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	bool CreateRuntimeVisuals();
 	bool CreateRuntimeAppearance();
+	void ReleaseRuntimePaintTarget();
 	UStaticMeshComponent* CreatePaintMeshComponent(
 		FName ComponentName,
 		UStaticMesh* Mesh,
