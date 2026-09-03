@@ -51,6 +51,15 @@ bool UKCAbilityDefinition::Validate(FString& OutError) const
 		return false;
 	}
 
+	FString CooldownError;
+	if (!ActionCooldown.Validate(CooldownError))
+	{
+		OutError = FString::Printf(
+			TEXT("ActionCooldown이 유효하지 않습니다: %s"),
+			*CooldownError);
+		return false;
+	}
+
 	if (!ActionTargeting)
 	{
 		OutError = TEXT("ActionTargeting이 비어 있습니다. 대상 수집 방식을 지정해야 합니다.");

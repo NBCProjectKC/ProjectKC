@@ -39,6 +39,23 @@ protected:
 		const FGameplayTagContainer* TargetTags = nullptr,
 		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
+	/**
+	 * Definition이 정한 쿨다운 태그를 소유자가 이미 들고 있으면 활성화를 막는다.
+	 *
+	 * GA 클래스 하나를 모든 아이템이 공유하므로 CDO의 CooldownGameplayEffectClass에
+	 * 고정하지 않고 매번 Spec의 SourceObject에서 Definition을 해석한다.
+	 */
+	virtual bool CheckCooldown(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
+	/** CommitAbility 시점에 서버가 쿨다운 GE를 소유자에게 적용한다. */
+	virtual void ApplyCooldown(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,

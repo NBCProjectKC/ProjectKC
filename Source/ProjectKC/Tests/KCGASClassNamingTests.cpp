@@ -44,8 +44,12 @@ bool FKCGASClassNamingConventionTest::RunTest(const FString& Parameters)
 		}
 	}
 
-	TestEqual(TEXT("ProjectKC 네이티브 GA 클래스 수"), AbilityClassCount, 4);
-	TestEqual(TEXT("ProjectKC 네이티브 GE 클래스 수"), EffectClassCount, 3);
+	// 개수를 고정해 두면 새 GA/GE를 추가할 때 이 테스트가 반드시 한 번 눈에 띈다.
+	// GA: Base, ActionRuntimeBase, Action, ChannelAction, PlayerDash
+	// GE: Damage, CookingProgressIncrease, CookingProgressDecrease, StaminaRegen,
+	//     DashCost, DashCooldown, ActionCooldown
+	TestEqual(TEXT("ProjectKC 네이티브 GA 클래스 수"), AbilityClassCount, 5);
+	TestEqual(TEXT("ProjectKC 네이티브 GE 클래스 수"), EffectClassCount, 7);
 	return true;
 }
 

@@ -20,5 +20,8 @@ PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_KC_Data_Damage_Flat);
 PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_KC_Data_Cooking_Progress_Increase);
 PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_KC_Data_Cooking_Progress_Decrease);
 
+/** 공용 Action 쿨다운 GE가 지속시간을 받는 SetByCaller 태그다. */
+PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_KC_Data_Cooldown_Duration);
+
 /** 금속 재질의 공격 아이템이 적중했을 때 사용하는 표현 Cue다. */
 PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_KC_GameplayCue_Impact_Metal);
