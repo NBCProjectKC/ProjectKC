@@ -23,6 +23,13 @@ namespace
 			SaveData->TargetSchemaVersion < UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
 	}
 
+	bool HasValidCustomizationPayload(const UKCCustomizationSaveGame* SaveData)
+	{
+		return SaveData && KCCustomizationNetwork::ValidateCustomizationData(
+			SaveData->PaintHistory,
+			SaveData->bUseDefaultAppearance);
+	}
+
 	FString MakeRuntimePaintTargetIdentity(
 		const URuntimeMeshPaintTargetComponent* PaintTarget)
 	{
@@ -149,19 +156,24 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 		return false;
 	}
 
+	if (!HasValidCustomizationPayload(SaveData))
+	{
+		UE_LOG(LogKCCustomizationSave, Log,
+			TEXT("Ignoring incompatible customization payload in slot '%s'."),
+			*CustomizationSlotName);
+		const bool bResetSucceeded = ResetCustomization(PaintTarget, OutResult);
+		if (bResetSucceeded)
+		{
+			OutResult = EKCCustomizationSaveResult::NoSaveFound;
+		}
+		return bResetSucceeded;
+	}
+
 	bOutSaveFound = true;
 	bOutUseDefaultAppearance = SaveData->bUseDefaultAppearance;
 	if (bOutUseDefaultAppearance)
 	{
 		return ResetCustomization(PaintTarget, OutResult);
-	}
-
-	if (!KCCustomizationNetwork::ValidateCustomizationData(
-		SaveData->PaintHistory,
-		false))
-	{
-		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
-		return false;
 	}
 
 	// PaintTargetName에는 생성 당시 액터 인스턴스 이름이 포함됩니다.
@@ -214,6 +226,13 @@ bool UKCCustomizationSaveSubsystem::GetSavedAppearanceMode(
 
 		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
 		return false;
+	}
+	if (!HasValidCustomizationPayload(SaveData))
+	{
+		UE_LOG(LogKCCustomizationSave, Log,
+			TEXT("Ignoring incompatible customization payload in slot '%s'."),
+			*CustomizationSlotName);
+		return true;
 	}
 
 	bOutSaveFound = true;
