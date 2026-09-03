@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "ProjectKC/Item/Struct/KCItemPresentationStruct.h"
 #include "KCPlayerAnimInstance.generated.h"
 
 /** 플레이어 전신 애니메이션과 후처리 IK 사이의 런타임 상태를 전달한다. */
@@ -19,8 +20,13 @@ public:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Animation")
 	bool bAllowGroundIK = true;
 
+	/** 현재 든 아이템이 요청한 자세다. AnimBP에서 Blend Poses by Enum 등에 사용한다. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Animation|Held Item")
+	EKCHeldPose HeldPose = EKCHeldPose::Default;
+
 private:
 	void RefreshPostProcessIKState();
+	void RefreshHeldPoseState();
 
 	bool bEmoteActive = false;
 };

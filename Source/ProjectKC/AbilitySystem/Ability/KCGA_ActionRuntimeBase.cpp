@@ -58,6 +58,7 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	bFinishingAction = false;
+	bActionExecutionStarted = false;
 	bDurabilityConsumedThisActivation = false;
 	bUseConsumptionPendingThisActivation = false;
 	StopActiveDurabilityDrain(false);
@@ -143,29 +144,10 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 		}
 	}
 
-	// 명중 횟수와 무관하게 한 번의 활성화에 Cost/Cooldown을 한 번만 확정한다.
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (!ShouldDeferActionExecutionStart())
 	{
-		FinishAction(true, false);
-		return;
+		BeginActionExecution();
 	}
-
-	TryConsumeActiveItemDurability(EKCItemDurabilityConsumeMode::OnUse);
-	StartActiveDurabilityDrain();
-
-	if (TraceWindowTargeting)
-	{
-		ActiveTraceTask = UKCAbilityTask_ActionTraceWindow::Create(
-			this, TraceWindowTargeting);
-		if (!ActiveTraceTask)
-		{
-			FinishAction(true, false);
-			return;
-		}
-		ActiveTraceTask->ReadyForActivation();
-	}
-
-	ExecuteSourceHook(TAG_KC_ActionHook_OnStart);
 }
 
 void UKCGA_ActionRuntimeBase::EndAbility(
@@ -185,6 +167,7 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	ActivationTarget = nullptr;
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
+	bActionExecutionStarted = false;
 	// Ability 종료 중에는 GAS가 Task 배열을 순회해 직접 정리한다.
 	ActiveTraceTask = nullptr;
 	ActiveSourceItem = nullptr;
@@ -209,7 +192,7 @@ void UKCGA_ActionRuntimeBase::ExecutePulse()
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
 	const UKCInstantActionTargeting* Targeting = Cast<UKCInstantActionTargeting>(
 		Definition ? Definition->ActionTargeting : nullptr);
-	if (!Targeting || !TryBeginExecutionWindow())
+	if (!bActionExecutionStarted || !Targeting || !TryBeginExecutionWindow())
 	{
 		return;
 	}
@@ -217,6 +200,64 @@ void UKCGA_ActionRuntimeBase::ExecutePulse()
 	TArray<FKCActionTarget> Targets;
 	Targeting->GatherTargets(BuildTargetingContext(), Targets);
 	ExecuteTargets(Targets);
+}
+
+bool UKCGA_ActionRuntimeBase::ShouldDeferActionExecutionStart() const
+{
+	return false;
+}
+
+bool UKCGA_ActionRuntimeBase::BeginActionExecution()
+{
+	if (bActionExecutionStarted)
+	{
+		return true;
+	}
+
+	if (IsFinishingAction() || !IsActive())
+	{
+		return false;
+	}
+
+	const FGameplayAbilitySpecHandle Handle = GetCurrentAbilitySpecHandle();
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const FGameplayAbilityActivationInfo ActivationInfo =
+		GetCurrentActivationInfo();
+	if (!ActorInfo ||
+		!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		FinishAction(true, false);
+		return false;
+	}
+
+	bActionExecutionStarted = true;
+	TryConsumeActiveItemDurability(EKCItemDurabilityConsumeMode::OnUse);
+	StartActiveDurabilityDrain();
+
+	const UKCAbilityDefinition* Definition = GetActiveDefinition();
+	const UKCTraceWindowTargeting* TraceWindowTargeting =
+		Cast<UKCTraceWindowTargeting>(
+			Definition ? Definition->ActionTargeting : nullptr);
+	if (TraceWindowTargeting)
+	{
+		ActiveTraceTask = UKCAbilityTask_ActionTraceWindow::Create(
+			this,
+			TraceWindowTargeting);
+		if (!ActiveTraceTask)
+		{
+			FinishAction(true, false);
+			return false;
+		}
+		ActiveTraceTask->ReadyForActivation();
+	}
+
+	ExecuteSourceHook(TAG_KC_ActionHook_OnStart);
+	return true;
+}
+
+bool UKCGA_ActionRuntimeBase::HasActionExecutionStarted() const
+{
+	return bActionExecutionStarted;
 }
 
 FKCActionTargetingContext UKCGA_ActionRuntimeBase::BuildTargetingContext() const

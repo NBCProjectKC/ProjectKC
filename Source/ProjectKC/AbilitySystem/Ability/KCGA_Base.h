@@ -63,6 +63,8 @@ protected:
 		const FHitResult* HitResult = nullptr);
 
 	const UKCAbilityDefinition* GetActiveDefinition() const;
+	void SetExecutionChargeAlpha(float ChargeAlpha);
+	float GetExecutionChargeAlpha() const;
 
 private:
 	struct FKCTrackedActiveEffect
@@ -86,4 +88,5 @@ private:
 	TArray<FKCTrackedActiveEffect> TrackedActiveEffects;
 	FGameplayTagContainer SupportedActionHooks;
 	FGameplayTagContainer RequiredActionHooks;
+	float ExecutionChargeAlpha = 1.0f;
 };

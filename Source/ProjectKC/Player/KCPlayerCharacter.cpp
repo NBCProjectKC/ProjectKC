@@ -22,6 +22,7 @@
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
+#include "ProjectKC/Player/Component/KCProjectileTrajectoryPreviewComponent.h"
 #include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/UI/Interaction/Component/KCPlayerInteractionPromptComponent.h"
 #include "ProjectKC/UI/World/Player/Component/KCPlayerOverHeadComponent.h"
@@ -162,6 +163,9 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
 	KnockbackComponent =
 		CreateDefaultSubobject<UKCKnockbackComponent>(TEXT("Knockback"));
+	ProjectileTrajectoryPreviewComponent =
+		CreateDefaultSubobject<UKCProjectileTrajectoryPreviewComponent>(
+			TEXT("ProjectileTrajectoryPreview"));
 	PlayerCustomizationComponent =
 		CreateDefaultSubobject<UKCPlayerCustomizationComponent>(TEXT("PlayerCustomization"));
 
@@ -250,6 +254,11 @@ bool AKCPlayerCharacter::BeginUseHeldItem()
 	if (bUseStarted)
 	{
 		InterruptEmote();
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->BeginPreview(
+				HeldItemComponent->GetHeldItem());
+		}
 	}
 	return bUseStarted;
 }
@@ -258,6 +267,10 @@ void AKCPlayerCharacter::EndUseHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
 	{
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->EndPreview();
+		}
 		HeldItemComponent->ReleaseHeldItemUse();
 	}
 }
@@ -277,6 +290,10 @@ void AKCPlayerCharacter::RequestDropHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
 	{
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->EndPreview();
+		}
 		HeldItemComponent->TryDropHeldItem();
 	}
 }
@@ -304,6 +321,12 @@ UKCHeldItemComponent* AKCPlayerCharacter::GetHeldItemComponent() const
 UKCKnockbackComponent* AKCPlayerCharacter::GetKnockbackComponent() const
 {
 	return KnockbackComponent;
+}
+
+UKCProjectileTrajectoryPreviewComponent*
+AKCPlayerCharacter::GetProjectileTrajectoryPreviewComponent() const
+{
+	return ProjectileTrajectoryPreviewComponent;
 }
 
 UKCPlayerCustomizationComponent* AKCPlayerCharacter::GetPlayerCustomizationComponent() const

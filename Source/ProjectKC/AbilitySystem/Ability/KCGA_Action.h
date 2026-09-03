@@ -34,11 +34,20 @@ protected:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
+	virtual void InputReleased(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo) override;
 
 	virtual bool TryBeginExecutionWindow() override;
+	virtual bool ShouldDeferActionExecutionStart() const override;
 
 private:
+	void BeginExecutionSequence();
+
 	bool bExecuteAttempted = false;
+	bool bWaitingForInputRelease = false;
+	double ChargeStartTimeSeconds = 0.0;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UKCAbilityTask_PlayActionMontage> ActiveMontageTask;

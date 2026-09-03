@@ -66,11 +66,7 @@ bool UKCHeldItemComponent::DropHeldItemUsingSettings(
 bool UKCHeldItemComponent::TryPickUp(AKCWorldItemActor* Item)
 {
 	AActor* Holder = GetOwner();
-	if (!Holder || !Holder->HasAuthority() || IsValid(HeldItem) ||
-		!IsValid(Item) || !Item->CanBePickedUp() ||
-		MaxPickupDistance <= 0.0f ||
-		FVector::DistSquared(Holder->GetActorLocation(), Item->GetActorLocation()) >
-			FMath::Square(MaxPickupDistance))
+	if (!Holder || !Holder->HasAuthority() || !CanPickUpItem(Item))
 	{
 		return false;
 	}
@@ -91,6 +87,18 @@ bool UKCHeldItemComponent::TryPickUp(AKCWorldItemActor* Item)
 	Holder->ForceNetUpdate();
 	BroadcastHeldItemChanged();
 	return true;
+}
+
+bool UKCHeldItemComponent::CanPickUpItem(const AKCWorldItemActor* Item) const
+{
+	const AActor* Holder = GetOwner();
+	return Holder &&
+		!IsValid(HeldItem) &&
+		IsValid(Item) &&
+		Item->CanBePickedUp() &&
+		MaxPickupDistance > 0.0f &&
+		FVector::DistSquared(Holder->GetActorLocation(), Item->GetActorLocation()) <=
+			FMath::Square(MaxPickupDistance);
 }
 
 bool UKCHeldItemComponent::DropHeldItem(

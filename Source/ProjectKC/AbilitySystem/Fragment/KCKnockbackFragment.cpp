@@ -29,6 +29,11 @@ bool UKCKnockbackFragment::Validate(FString& OutError) const
 	return true;
 }
 
+bool UKCKnockbackFragment::SupportsDeferredExecution() const
+{
+	return true;
+}
+
 bool UKCKnockbackFragment::CanExecute(
 	const FKCActionExecutionContext& Context,
 	FString& OutError) const
