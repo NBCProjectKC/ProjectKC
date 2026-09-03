@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
 #include "Player/KCPlayerState.h"
+#include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCPlayerCustomization, Log, All);
@@ -155,6 +156,11 @@ void UKCPlayerCustomizationComponent::InitializeForPlayerState(
 	{
 		TryUploadLocalCustomization();
 	}
+
+	if (!bPresentationBinding && InPlayerState)
+	{
+		QueueListenServerAppearanceRefresh();
+	}
 }
 
 bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
@@ -274,6 +280,12 @@ bool UKCPlayerCustomizationComponent::ApplyNetworkCustomizationData(
 
 	AppliedCustomizationRevision = Descriptor.Revision;
 	AppliedCustomizationHash = Descriptor.ContentHash;
+	UE_LOG(LogKCPlayerCustomization, Log,
+		TEXT("Network customization applied: Owner=%s, NetMode=%d, Revision=%u, Hash=%u"),
+		*GetNameSafe(GetOwner()),
+		static_cast<int32>(GetNetMode()),
+		Descriptor.Revision,
+		Descriptor.ContentHash);
 	return true;
 }
 
@@ -622,6 +634,65 @@ APlayerController* UKCPlayerCustomizationComponent::ResolveLocalPlayerController
 	return OwnerPawn && OwnerPawn->IsLocallyControlled()
 		? Cast<APlayerController>(OwnerPawn->GetController())
 		: nullptr;
+}
+
+void UKCPlayerCustomizationComponent::QueueListenServerAppearanceRefresh()
+{
+	if (GetNetMode() != NM_ListenServer || bListenServerAppearanceRefreshQueued)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	bListenServerAppearanceRefreshQueued = true;
+	World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateUObject(
+			this,
+			&ThisClass::RefreshListenServerAppearance));
+}
+
+void UKCPlayerCustomizationComponent::RefreshListenServerAppearance()
+{
+	bListenServerAppearanceRefreshQueued = false;
+	if (GetNetMode() != NM_ListenServer || bPresentationBinding)
+	{
+		return;
+	}
+
+	AKCPlayerState* PlayerState = BoundCustomizationPlayerState.Get();
+	if (!PlayerState)
+	{
+		return;
+	}
+
+	const FKCCustomizationDescriptor& Descriptor =
+		PlayerState->GetCustomizationDescriptor();
+	if (!Descriptor.IsPublished() ||
+		Descriptor.bUseDefaultAppearance ||
+		Descriptor.TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion)
+	{
+		return;
+	}
+
+	APlayerController* LocalPlayerController = ResolveLocalPlayerController();
+	if (!LocalPlayerController)
+	{
+		LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	}
+	UKCCustomizationNetworkComponent* NetworkComponent = LocalPlayerController
+		? LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>()
+		: nullptr;
+	if (NetworkComponent)
+	{
+		// Listen Server는 Seamless Travel 완료 프레임에 동기 적용될 수 있습니다.
+		// 렌더러가 새 월드를 등록한 다음 틱에 캐시/서버 Payload를 한 번 재적용합니다.
+		NetworkComponent->RequestCustomizationPayload(PlayerState, this);
+	}
 }
 
 void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()

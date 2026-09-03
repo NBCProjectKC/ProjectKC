@@ -118,6 +118,8 @@ private:
 	void BindCustomizationPlayerState(AKCPlayerState* InPlayerState);
 	void UnbindCustomizationPlayerState();
 	APlayerController* ResolveLocalPlayerController() const;
+	void QueueListenServerAppearanceRefresh();
+	void RefreshListenServerAppearance();
 	void TryUploadLocalCustomization();
 	void HandleCustomizationDescriptorChanged(const FKCCustomizationDescriptor& Descriptor);
 
@@ -140,6 +142,7 @@ private:
 	bool bLocalCustomizationEditing = false;
 	bool bCurrentUseDefaultAppearance = true;
 	bool bPresentationBinding = false;
+	bool bListenServerAppearanceRefreshQueued = false;
 	uint32 AppliedCustomizationRevision = 0;
 	uint32 AppliedCustomizationHash = 0;
 	TWeakObjectPtr<AKCPlayerState> BoundCustomizationPlayerState;
