@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/NetSerialization.h"
 #include "GameFramework/Actor.h"
 #include "GameplayAbilitySpecHandle.h"
 #include "ProjectKC/Interaction/Interface/KCInteractableInterface.h"
@@ -32,6 +33,17 @@ struct PROJECTKC_API FKCWorldItemRuntimeState
 
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Item")
 	TObjectPtr<AActor> Holder;
+
+	/**
+	 * 서버가 손에서 내려놓은 지점이다. 클라이언트는 물리를 켜기 전에 여기로 옮긴다.
+	 * 물리 바디의 ReplicatedMovement는 위치를 즉시 지정하지 않고 보정 목표만 주므로,
+	 * 이 값이 없으면 클라이언트가 손 위치에서 낙하한 뒤 뒤늦게 끌려간다.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "KC|Item")
+	FVector_NetQuantize100 DropLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "KC|Item")
+	FRotator DropRotation = FRotator::ZeroRotator;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
@@ -207,6 +219,10 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_UseConsumptionPending)
 	bool bUseConsumptionPending = false;
+
+	/** 클라이언트가 마지막으로 처리한 복제 상태다. 내려놓는 순간만 골라낸다. */
+	EKCWorldItemState LastObservedState = EKCWorldItemState::World;
+	bool bHasObservedState = false;
 
 	bool bDefinitionValid = false;
 	bool bBreakDestructionScheduled = false;

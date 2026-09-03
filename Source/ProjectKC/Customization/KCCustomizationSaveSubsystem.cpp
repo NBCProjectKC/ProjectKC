@@ -1,9 +1,52 @@
 #include "Customization/KCCustomizationSaveSubsystem.h"
 
+#include "Customization/KCCustomizationNetworkTypes.h"
+#include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCCustomizationSave, Log, All);
+
+namespace
+{
+	bool IsCurrentSaveData(const UKCCustomizationSaveGame* SaveData)
+	{
+		return SaveData &&
+			SaveData->SaveVersion == UKCCustomizationSaveGame::CurrentSaveVersion &&
+			SaveData->TargetSchemaVersion == UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
+	}
+
+	bool IsObsoleteSaveData(const UKCCustomizationSaveGame* SaveData)
+	{
+		return SaveData &&
+			SaveData->SaveVersion < UKCCustomizationSaveGame::CurrentSaveVersion &&
+			SaveData->TargetSchemaVersion < UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
+	}
+
+	bool HasValidCustomizationPayload(const UKCCustomizationSaveGame* SaveData)
+	{
+		return SaveData && KCCustomizationNetwork::ValidateCustomizationData(
+			SaveData->PaintHistory,
+			SaveData->bUseDefaultAppearance);
+	}
+
+	FString MakeRuntimePaintTargetIdentity(
+		const URuntimeMeshPaintTargetComponent* PaintTarget)
+	{
+		if (!PaintTarget)
+		{
+			return FString();
+		}
+
+		const AActor* Owner = PaintTarget->GetOwner();
+		return Owner
+			? FString::Printf(
+				TEXT("%s.%s"),
+				*Owner->GetName(),
+				*PaintTarget->GetName())
+			: PaintTarget->GetName();
+	}
+}
 
 const FString UKCCustomizationSaveSubsystem::CustomizationSlotName = TEXT("KC_Customization_Local");
 
@@ -15,6 +58,15 @@ bool UKCCustomizationSaveSubsystem::SaveCustomization(
 	OutResult = EKCCustomizationSaveResult::InvalidPaintTarget;
 	if (!IsValid(PaintTarget))
 	{
+		return false;
+	}
+	if (PaintTarget->RuntimeRenderTargetWidth !=
+			KCCustomizationNetwork::ExpectedRenderTargetSize ||
+		PaintTarget->RuntimeRenderTargetHeight !=
+			KCCustomizationNetwork::ExpectedRenderTargetSize ||
+		PaintTarget->RuntimeRenderTargetFormat != RTF_RGBA16f)
+	{
+		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
 		return false;
 	}
 
@@ -33,6 +85,9 @@ bool UKCCustomizationSaveSubsystem::SaveCustomization(
 		UE_LOG(LogKCCustomizationSave, Warning, TEXT("Save rejected because the paint target has no patch history."));
 		return false;
 	}
+	KCCustomizationNetwork::NormalizePaintTargetIdentity(
+		SaveData->PaintHistory,
+		PaintTarget->GetName());
 
 	if (!UGameplayStatics::SaveGameToSlot(SaveData, CustomizationSlotName, CustomizationUserIndex))
 	{
@@ -73,7 +128,6 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 		return bResetSucceeded;
 	}
 
-	bOutSaveFound = true;
 	UKCCustomizationSaveGame* SaveData = Cast<UKCCustomizationSaveGame>(
 		UGameplayStatics::LoadGameFromSlot(CustomizationSlotName, CustomizationUserIndex));
 	if (!SaveData)
@@ -82,18 +136,52 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 		return false;
 	}
 
-	if (SaveData->SaveVersion != UKCCustomizationSaveGame::CurrentSaveVersion ||
-		SaveData->TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion)
+	if (!IsCurrentSaveData(SaveData))
 	{
+		if (IsObsoleteSaveData(SaveData))
+		{
+			UE_LOG(LogKCCustomizationSave, Log,
+				TEXT("Ignoring obsolete customization save version %d/schema %d."),
+				SaveData->SaveVersion,
+				SaveData->TargetSchemaVersion);
+			const bool bResetSucceeded = ResetCustomization(PaintTarget, OutResult);
+			if (bResetSucceeded)
+			{
+				OutResult = EKCCustomizationSaveResult::NoSaveFound;
+			}
+			return bResetSucceeded;
+		}
+
 		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
 		return false;
 	}
 
+	if (!HasValidCustomizationPayload(SaveData))
+	{
+		UE_LOG(LogKCCustomizationSave, Log,
+			TEXT("Ignoring incompatible customization payload in slot '%s'."),
+			*CustomizationSlotName);
+		const bool bResetSucceeded = ResetCustomization(PaintTarget, OutResult);
+		if (bResetSucceeded)
+		{
+			OutResult = EKCCustomizationSaveResult::NoSaveFound;
+		}
+		return bResetSucceeded;
+	}
+
+	bOutSaveFound = true;
 	bOutUseDefaultAppearance = SaveData->bUseDefaultAppearance;
 	if (bOutUseDefaultAppearance)
 	{
 		return ResetCustomization(PaintTarget, OutResult);
 	}
+
+	// PaintTargetName에는 생성 당시 액터 인스턴스 이름이 포함됩니다.
+	// 현재 인스턴스 이름으로 맞춰야 이후 추가 페인트가 같은 압축 그룹에
+	// 합쳐지고 메시/텍스 종류별 중복 패치가 생기지 않습니다.
+	KCCustomizationNetwork::NormalizePaintTargetIdentity(
+		SaveData->PaintHistory,
+		MakeRuntimePaintTargetIdentity(PaintTarget));
 
 	if (!PaintTarget->ImportPaintPatchHistory(SaveData->PaintHistory, true, true))
 	{
@@ -105,6 +193,51 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 	UE_LOG(LogKCCustomizationSave, Log, TEXT("Loaded local customization from slot '%s' (%d entries)."),
 		*CustomizationSlotName,
 		SaveData->PaintHistory.Entries.Num());
+	return true;
+}
+
+bool UKCCustomizationSaveSubsystem::GetSavedAppearanceMode(
+	bool& bOutSaveFound,
+	bool& bOutUseDefaultAppearance,
+	EKCCustomizationSaveResult& OutResult) const
+{
+	bOutSaveFound = false;
+	bOutUseDefaultAppearance = true;
+	OutResult = EKCCustomizationSaveResult::NoSaveFound;
+	if (!DoesCustomizationSaveExist())
+	{
+		return true;
+	}
+
+	UKCCustomizationSaveGame* SaveData = Cast<UKCCustomizationSaveGame>(
+		UGameplayStatics::LoadGameFromSlot(CustomizationSlotName, CustomizationUserIndex));
+	if (!SaveData)
+	{
+		OutResult = EKCCustomizationSaveResult::LoadFailed;
+		return false;
+	}
+
+	if (!IsCurrentSaveData(SaveData))
+	{
+		if (IsObsoleteSaveData(SaveData))
+		{
+			return true;
+		}
+
+		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
+		return false;
+	}
+	if (!HasValidCustomizationPayload(SaveData))
+	{
+		UE_LOG(LogKCCustomizationSave, Log,
+			TEXT("Ignoring incompatible customization payload in slot '%s'."),
+			*CustomizationSlotName);
+		return true;
+	}
+
+	bOutSaveFound = true;
+	bOutUseDefaultAppearance = SaveData->bUseDefaultAppearance;
+	OutResult = EKCCustomizationSaveResult::Success;
 	return true;
 }
 
@@ -132,27 +265,4 @@ bool UKCCustomizationSaveSubsystem::ResetCustomization(
 bool UKCCustomizationSaveSubsystem::DoesCustomizationSaveExist() const
 {
 	return UGameplayStatics::DoesSaveGameExist(CustomizationSlotName, CustomizationUserIndex);
-}
-
-bool UKCCustomizationSaveSubsystem::DeleteCustomizationSave(EKCCustomizationSaveResult& OutResult)
-{
-	if (!DoesCustomizationSaveExist())
-	{
-		OutResult = EKCCustomizationSaveResult::Success;
-		return true;
-	}
-
-	if (!UGameplayStatics::DeleteGameInSlot(CustomizationSlotName, CustomizationUserIndex))
-	{
-		OutResult = EKCCustomizationSaveResult::SaveFailed;
-		return false;
-	}
-
-	OutResult = EKCCustomizationSaveResult::Success;
-	return true;
-}
-
-FString UKCCustomizationSaveSubsystem::GetCustomizationSlotName() const
-{
-	return CustomizationSlotName;
 }

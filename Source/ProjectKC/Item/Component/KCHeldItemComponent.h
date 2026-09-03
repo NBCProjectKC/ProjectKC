@@ -39,6 +39,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool TryPickUp(AKCWorldItemActor* Item);
 
+	UFUNCTION(BlueprintPure, Category = "KC|Item")
+	bool CanPickUpItem(const AKCWorldItemActor* Item) const;
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool DropHeldItem(
 		const FTransform& DropTransform,

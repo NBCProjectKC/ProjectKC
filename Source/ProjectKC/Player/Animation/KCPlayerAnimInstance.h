@@ -5,6 +5,8 @@
 #include "ProjectKC/Item/Struct/KCItemPresentationStruct.h"
 #include "KCPlayerAnimInstance.generated.h"
 
+class UKCHeldItemComponent;
+
 /** 플레이어 전신 애니메이션과 후처리 IK 사이의 런타임 상태를 전달한다. */
 UCLASS(Transient, Blueprintable)
 class PROJECTKC_API UKCPlayerAnimInstance : public UAnimInstance
@@ -27,6 +29,12 @@ public:
 private:
 	void RefreshPostProcessIKState();
 	void RefreshHeldPoseState();
+
+	/** Holder 컴포넌트는 Pawn의 기본 SubObject다. Pawn이 바뀔 때만 다시 찾는다. */
+	const UKCHeldItemComponent* ResolveHeldItemComponent();
+
+	TWeakObjectPtr<const APawn> CachedPawnOwner;
+	TWeakObjectPtr<const UKCHeldItemComponent> CachedHeldItemComponent;
 
 	bool bEmoteActive = false;
 };

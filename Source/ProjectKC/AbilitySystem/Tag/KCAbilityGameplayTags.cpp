@@ -20,6 +20,7 @@ UE_DEFINE_GAMEPLAY_TAG(
 UE_DEFINE_GAMEPLAY_TAG(
 	TAG_KC_Data_Cooking_Progress_Decrease,
 	"Data.Cooking.Progress.Decrease");
+UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Data_Cooldown_Duration, "Data.Cooldown.Duration");
 
 UE_DEFINE_GAMEPLAY_TAG(
 	TAG_KC_GameplayCue_Impact_Metal,

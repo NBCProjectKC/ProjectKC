@@ -34,10 +34,7 @@ void UKCPlayerAnimInstance::RefreshPostProcessIKState()
 void UKCPlayerAnimInstance::RefreshHeldPoseState()
 {
 	HeldPose = EKCHeldPose::Default;
-	const APawn* PawnOwner = TryGetPawnOwner();
-	const UKCHeldItemComponent* HeldItemComponent = PawnOwner
-		? PawnOwner->FindComponentByClass<UKCHeldItemComponent>()
-		: nullptr;
+	const UKCHeldItemComponent* HeldItemComponent = ResolveHeldItemComponent();
 	const AKCWorldItemActor* HeldItem = HeldItemComponent
 		? HeldItemComponent->GetHeldItem()
 		: nullptr;
@@ -48,4 +45,19 @@ void UKCPlayerAnimInstance::RefreshHeldPoseState()
 	{
 		HeldPose = ItemDefinition->Presentation.HeldPose;
 	}
+}
+
+const UKCHeldItemComponent* UKCPlayerAnimInstance::ResolveHeldItemComponent()
+{
+	const APawn* PawnOwner = TryGetPawnOwner();
+	if (CachedPawnOwner.Get() == PawnOwner)
+	{
+		return CachedHeldItemComponent.Get();
+	}
+
+	CachedPawnOwner = PawnOwner;
+	CachedHeldItemComponent = PawnOwner
+		? PawnOwner->FindComponentByClass<UKCHeldItemComponent>()
+		: nullptr;
+	return CachedHeldItemComponent.Get();
 }

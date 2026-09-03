@@ -4,6 +4,7 @@
  */
 
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
+#include "ProjectKC/Lobby/UI/KCCustomizationWidget.h"
 #include "ProjectKC/Lobby/UI/KCFriendListWidget.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Player/KCPlayerState.h"
@@ -41,6 +42,12 @@ void UKCLobbyWidget::NativeConstruct()
 		Button_StartGame->SetIsEnabled(false);
 	}
 
+	if (Button_Customization)
+	{
+		Button_Customization->OnClicked.AddUniqueDynamic(
+			this, &UKCLobbyWidget::OnCustomizationClicked);
+	}
+
 	// 1. 즉시 PlayerState 바인딩 시도
 	if (!TryBindPlayerState())
 	{
@@ -74,8 +81,28 @@ void UKCLobbyWidget::NativeDestruct()
 	{
 		World->GetTimerManager().ClearTimer(PlayerStateBindRetryTimerHandle);
 	}
+	if (Button_Customization)
+	{
+		Button_Customization->OnClicked.RemoveDynamic(
+			this, &UKCLobbyWidget::OnCustomizationClicked);
+	}
+	if (CustomizationWidgetInstance)
+	{
+		CustomizationWidgetInstance->RequestCancelAndClose();
+		CustomizationWidgetInstance = nullptr;
+	}
 
 	Super::NativeDestruct();
+}
+
+void UKCLobbyWidget::NotifyCustomizationWidgetClosed(
+	UKCCustomizationWidget* ClosedWidget)
+{
+	if (CustomizationWidgetInstance == ClosedWidget)
+	{
+		CustomizationWidgetInstance = nullptr;
+	}
+	SetVisibility(ESlateVisibility::Visible);
 }
 
 bool UKCLobbyWidget::TryBindPlayerState()
@@ -110,6 +137,11 @@ bool UKCLobbyWidget::TryBindPlayerState()
 
 void UKCLobbyWidget::PlayMatchStartAnim()
 {
+	if (CustomizationWidgetInstance)
+	{
+		CustomizationWidgetInstance->RequestCancelAndClose();
+	}
+
 	if (MatchStartAnim)
 	{
 		PlayAnimation(MatchStartAnim);
@@ -162,8 +194,62 @@ void UKCLobbyWidget::OnStartGameClicked()
 	}
 }
 
+void UKCLobbyWidget::OnCustomizationClicked()
+{
+	if (CustomizationWidgetInstance &&
+		CustomizationWidgetInstance->IsInViewport())
+	{
+		return;
+	}
+
+	AKCLobbyPlayerController* LobbyPlayerController =
+		Cast<AKCLobbyPlayerController>(GetOwningPlayer());
+	if (!LobbyPlayerController ||
+		!LobbyPlayerController->BeginCustomizationEditing())
+	{
+		UE_LOG(LogKCLobby, Warning,
+			TEXT("[KCLobbyWidget] Failed to begin customization editing."));
+		return;
+	}
+
+	if (!CustomizationWidgetClass)
+	{
+		CustomizationWidgetClass = StaticLoadClass(
+			UKCCustomizationWidget::StaticClass(),
+			nullptr,
+			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Customization.WBP_Customization_C"));
+	}
+	if (!CustomizationWidgetClass)
+	{
+		LobbyPlayerController->CancelCustomizationEditing();
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyWidget] WBP_Customization was not found. Create it at the default path or set CustomizationWidgetClass."));
+		return;
+	}
+
+	CustomizationWidgetInstance =
+		CreateWidget<UKCCustomizationWidget>(
+			LobbyPlayerController,
+			CustomizationWidgetClass);
+	if (!CustomizationWidgetInstance)
+	{
+		LobbyPlayerController->CancelCustomizationEditing();
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyWidget] Failed to create WBP_Customization."));
+		return;
+	}
+
+	CustomizationWidgetInstance->InitializeLobbyWidget(this);
+	CustomizationWidgetInstance->AddToViewport(20);
+	SetVisibility(ESlateVisibility::Collapsed);
+}
+
 void UKCLobbyWidget::OnReadyStatusUpdated(bool bIsReady)
 {
+	if (Button_Customization)
+	{
+		Button_Customization->SetIsEnabled(!bIsReady);
+	}
 	if (Text_Ready)
 	{
 		// 준비 완료 시: CANCEL READY (준비 취소), 미준비 시: READY (준비하기)

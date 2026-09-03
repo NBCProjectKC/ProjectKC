@@ -1,14 +1,17 @@
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "GameFramework/Actor.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Effect/KCGE_ActionCooldown.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
 #include "ProjectKC/AbilitySystem/Struct/KCGameplayEffectRecipeStruct.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCActionHook, Log, All);
 
@@ -68,6 +71,81 @@ bool UKCGA_Base::CanActivateAbility(
 		SourceTags,
 		TargetTags,
 		OptionalRelevantTags);
+}
+
+bool UKCGA_Base::CheckCooldown(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	// CDO에 CooldownGameplayEffectClass를 둔 파생 GA도 계속 동작하게 둔다.
+	if (!Super::CheckCooldown(Handle, ActorInfo, OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	const UKCAbilityDefinition* Definition = nullptr;
+	if (!ResolveDefinitionForSpec(Handle, ActorInfo, Definition) ||
+		!Definition->ActionCooldown.IsEnabled())
+	{
+		return true;
+	}
+
+	const UAbilitySystemComponent* AbilitySystem =
+		ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	if (!AbilitySystem ||
+		!AbilitySystem->HasMatchingGameplayTag(
+			Definition->ActionCooldown.CooldownTag))
+	{
+		return true;
+	}
+
+	const FGameplayTag& FailCooldownTag =
+		UAbilitySystemGlobals::Get().ActivateFailCooldownTag;
+	if (OptionalRelevantTags && FailCooldownTag.IsValid())
+	{
+		OptionalRelevantTags->AddTag(FailCooldownTag);
+	}
+	return false;
+}
+
+void UKCGA_Base::ApplyCooldown(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	Super::ApplyCooldown(Handle, ActorInfo, ActivationInfo);
+
+	const UKCAbilityDefinition* Definition = nullptr;
+	if (!ResolveDefinitionForSpec(Handle, ActorInfo, Definition) ||
+		!Definition->ActionCooldown.IsEnabled())
+	{
+		return;
+	}
+
+	FGameplayEffectSpecHandle CooldownSpec = MakeOutgoingGameplayEffectSpec(
+		Handle,
+		ActorInfo,
+		ActivationInfo,
+		UKCGE_ActionCooldown::StaticClass(),
+		GetAbilityLevel(Handle, ActorInfo));
+	if (!CooldownSpec.IsValid())
+	{
+		return;
+	}
+
+	// 점유할 슬롯과 지속시간을 Spec에 실어 보낸다. 그래서 Action마다 GE 에셋을
+	// 따로 만들지 않아도 된다.
+	CooldownSpec.Data->DynamicGrantedTags.AddTag(
+		Definition->ActionCooldown.CooldownTag);
+	CooldownSpec.Data->SetSetByCallerMagnitude(
+		TAG_KC_Data_Cooldown_Duration,
+		Definition->ActionCooldown.Duration);
+	ApplyGameplayEffectSpecToOwner(
+		Handle,
+		ActorInfo,
+		ActivationInfo,
+		CooldownSpec);
 }
 
 void UKCGA_Base::ActivateAbility(
