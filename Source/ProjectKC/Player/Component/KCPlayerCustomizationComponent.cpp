@@ -10,7 +10,6 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
@@ -24,17 +23,10 @@ namespace
 	const FName AvatarBodyName(TEXT("AvatarBody"));
 	const FName LegacyEyeName(TEXT("Eyes_Basic_Male_01"));
 	const FName PaintedColorParameterName(TEXT("PaintedColorTexture"));
-	constexpr int32 CustomizationRenderTargetSize = 512;
 	// 정상 편집 종료 때 4개 메시 스냅샷으로 다시 압축하며, 이 값들은
 	// 압축 실패/비정상 종료 경로에서 무제한 누적을 막는 최후 상한입니다.
 	constexpr int32 CustomizationMaxPatchHistoryEntries = 16;
 	constexpr int32 CustomizationMaxPatchHistoryBytes = 16 * 1024 * 1024;
-
-	TAutoConsoleVariable<int32> CVarKCCustomizationPreviewRenderTargetSize(
-		TEXT("kc.Customization.PreviewRenderTargetSize"),
-		CustomizationRenderTargetSize,
-		TEXT("Local customization A/B preview size. Supported values: 512 (normal), 256 (preview-only)."),
-		ECVF_Default);
 }
 
 UKCPlayerCustomizationComponent::UKCPlayerCustomizationComponent()
@@ -178,17 +170,6 @@ bool UKCPlayerCustomizationComponent::ApplyLocalSavedCustomization()
 		return false;
 	}
 
-	if (IsRenderTargetPreviewMode())
-	{
-		const bool bSucceeded = ApplyCustomizationData(
-			FRuntimeMeshPaintPatchHistory(), true);
-		bLocalSaveApplied = bSucceeded;
-		LastApplyResult = bSucceeded
-			? EKCCustomizationSaveResult::Success
-			: EKCCustomizationSaveResult::ApplyFailed;
-		return bSucceeded;
-	}
-
 	if (bUseDefaultAppearance)
 	{
 		const bool bSucceeded = ApplyCustomizationData(
@@ -295,11 +276,6 @@ bool UKCPlayerCustomizationComponent::IsRuntimeAppearanceReady() const
 		IsValid(RuntimePaintTarget);
 }
 
-bool UKCPlayerCustomizationComponent::IsRenderTargetPreviewMode() const
-{
-	return GetDesiredRenderTargetSize() != CustomizationRenderTargetSize;
-}
-
 bool UKCPlayerCustomizationComponent::BeginLocalCustomizationEditing()
 {
 	if (bLocalCustomizationEditing)
@@ -369,14 +345,6 @@ void UKCPlayerCustomizationComponent::EndLocalCustomizationEditing()
 
 bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 {
-	const int32 DesiredRenderTargetSize = GetDesiredRenderTargetSize();
-	if (RuntimePaintTarget &&
-		(RuntimePaintTarget->RuntimeRenderTargetWidth != DesiredRenderTargetSize ||
-		 RuntimePaintTarget->RuntimeRenderTargetHeight != DesiredRenderTargetSize))
-	{
-		ReleaseRuntimePaintTarget();
-	}
-
 	if (IsRuntimeAppearanceReady())
 	{
 		return true;
@@ -396,8 +364,10 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 		return false;
 	}
 
-	RuntimePaintTarget->RuntimeRenderTargetWidth = DesiredRenderTargetSize;
-	RuntimePaintTarget->RuntimeRenderTargetHeight = DesiredRenderTargetSize;
+	RuntimePaintTarget->RuntimeRenderTargetWidth =
+		KCCustomizationNetwork::ExpectedRenderTargetSize;
+	RuntimePaintTarget->RuntimeRenderTargetHeight =
+		KCCustomizationNetwork::ExpectedRenderTargetSize;
 	RuntimePaintTarget->RuntimeRenderTargetFormat = RTF_RGBA16f;
 	RuntimePaintTarget->PaintedColorTextureParameterName = PaintedColorParameterName;
 	RuntimePaintTarget->bCreatePaintedMaterialSettingsRenderTarget = false;
@@ -416,18 +386,6 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 	PaintMeshes.Add(ChefHatPaintMesh);
 	RuntimePaintTarget->SetMeshTargets(PaintMeshes);
 	return IsRuntimeAppearanceReady();
-}
-
-int32 UKCPlayerCustomizationComponent::GetDesiredRenderTargetSize() const
-{
-	if (!ResolveLocalPlayerController())
-	{
-		return CustomizationRenderTargetSize;
-	}
-
-	return CVarKCCustomizationPreviewRenderTargetSize.GetValueOnGameThread() == 256
-		? 256
-		: CustomizationRenderTargetSize;
 }
 
 bool UKCPlayerCustomizationComponent::CompactLocalPaintHistory()
@@ -661,8 +619,7 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 	APlayerController* PlayerController = ResolveLocalPlayerController();
 	if (!PlayerController ||
 		!PlayerController->IsLocalController() ||
-		!bLocalSaveApplied ||
-		IsRenderTargetPreviewMode())
+		!bLocalSaveApplied)
 	{
 		return;
 	}
@@ -716,8 +673,7 @@ void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
 {
 	if (!Descriptor.IsPublished() ||
 		Descriptor.TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion ||
-		Descriptor.Revision == AppliedCustomizationRevision ||
-		IsRenderTargetPreviewMode())
+		Descriptor.Revision == AppliedCustomizationRevision)
 	{
 		return;
 	}

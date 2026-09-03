@@ -193,9 +193,9 @@ bool FKCCustomizationNetworkValidationTest::RunTest(const FString& Parameters)
 		KCCustomizationNetwork::ValidateCustomizationData(InvalidHistory, false));
 
 	InvalidHistory = MakeValidPaintHistory();
-	InvalidHistory.Entries[0].RTWidth = 1024;
+	InvalidHistory.Entries[0].RTWidth = 512;
 	TestFalse(
-		TEXT("스키마와 다른 렌더 타깃 크기는 거부한다."),
+		TEXT("이전 512 렌더 타깃 데이터는 거부한다."),
 		KCCustomizationNetwork::ValidateCustomizationData(InvalidHistory, false));
 
 	TestFalse(

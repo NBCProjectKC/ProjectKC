@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "Customization/KCCustomizationSaveGame.h"
+#include "Customization/KCCustomizationNetworkTypes.h"
 #include "Customization/KCCustomizationWorldSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -28,8 +29,8 @@ bool FKCCustomizationSaveSerializationTest::RunTest(const FString& Parameters)
 	Entry.SequenceId = 7;
 	Entry.Width = 1;
 	Entry.Height = 1;
-	Entry.RTWidth = 512;
-	Entry.RTHeight = 512;
+	Entry.RTWidth = KCCustomizationNetwork::ExpectedRenderTargetSize;
+	Entry.RTHeight = KCCustomizationNetwork::ExpectedRenderTargetSize;
 	Entry.UncompressedByteCount = sizeof(FColor);
 	Entry.PixelBytes = { 1, 2, 3, 4 };
 

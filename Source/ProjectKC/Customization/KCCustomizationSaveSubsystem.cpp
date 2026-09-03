@@ -9,6 +9,20 @@ DEFINE_LOG_CATEGORY_STATIC(LogKCCustomizationSave, Log, All);
 
 namespace
 {
+	bool IsCurrentSaveData(const UKCCustomizationSaveGame* SaveData)
+	{
+		return SaveData &&
+			SaveData->SaveVersion == UKCCustomizationSaveGame::CurrentSaveVersion &&
+			SaveData->TargetSchemaVersion == UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
+	}
+
+	bool IsObsoleteSaveData(const UKCCustomizationSaveGame* SaveData)
+	{
+		return SaveData &&
+			SaveData->SaveVersion < UKCCustomizationSaveGame::CurrentSaveVersion &&
+			SaveData->TargetSchemaVersion < UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
+	}
+
 	FString MakeRuntimePaintTargetIdentity(
 		const URuntimeMeshPaintTargetComponent* PaintTarget)
 	{
@@ -107,7 +121,6 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 		return bResetSucceeded;
 	}
 
-	bOutSaveFound = true;
 	UKCCustomizationSaveGame* SaveData = Cast<UKCCustomizationSaveGame>(
 		UGameplayStatics::LoadGameFromSlot(CustomizationSlotName, CustomizationUserIndex));
 	if (!SaveData)
@@ -116,17 +129,39 @@ bool UKCCustomizationSaveSubsystem::LoadCustomization(
 		return false;
 	}
 
-	if (SaveData->SaveVersion != UKCCustomizationSaveGame::CurrentSaveVersion ||
-		SaveData->TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion)
+	if (!IsCurrentSaveData(SaveData))
 	{
+		if (IsObsoleteSaveData(SaveData))
+		{
+			UE_LOG(LogKCCustomizationSave, Log,
+				TEXT("Ignoring obsolete customization save version %d/schema %d."),
+				SaveData->SaveVersion,
+				SaveData->TargetSchemaVersion);
+			const bool bResetSucceeded = ResetCustomization(PaintTarget, OutResult);
+			if (bResetSucceeded)
+			{
+				OutResult = EKCCustomizationSaveResult::NoSaveFound;
+			}
+			return bResetSucceeded;
+		}
+
 		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
 		return false;
 	}
 
+	bOutSaveFound = true;
 	bOutUseDefaultAppearance = SaveData->bUseDefaultAppearance;
 	if (bOutUseDefaultAppearance)
 	{
 		return ResetCustomization(PaintTarget, OutResult);
+	}
+
+	if (!KCCustomizationNetwork::ValidateCustomizationData(
+		SaveData->PaintHistory,
+		false))
+	{
+		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
+		return false;
 	}
 
 	// PaintTargetName에는 생성 당시 액터 인스턴스 이름이 포함됩니다.
@@ -170,9 +205,13 @@ bool UKCCustomizationSaveSubsystem::GetSavedAppearanceMode(
 		return false;
 	}
 
-	if (SaveData->SaveVersion != UKCCustomizationSaveGame::CurrentSaveVersion ||
-		SaveData->TargetSchemaVersion != UKCCustomizationSaveGame::CurrentTargetSchemaVersion)
+	if (!IsCurrentSaveData(SaveData))
 	{
+		if (IsObsoleteSaveData(SaveData))
+		{
+			return true;
+		}
+
 		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
 		return false;
 	}
