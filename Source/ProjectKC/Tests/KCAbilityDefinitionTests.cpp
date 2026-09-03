@@ -12,6 +12,7 @@
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCChannelActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
+#include "ProjectKC/AbilitySystem/Effect/KCGE_ActionCooldown.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
@@ -423,6 +424,93 @@ bool FKCActionActivationPolicyTest::RunTest(const FString& Parameters)
 				RetriggerProperty->GetPropertyValue_InContainer(Ability));
 		}
 	}
+
+	return true;
+}
+
+/**
+ * 몽타주도 Channel 수명주기도 없는 Action은 쿨다운이 유일한 발사 간격이다.
+ * 그래서 '반쪽만 저작된 쿨다운'이 조용히 무시되면 연타 제한이 통째로 사라진다.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FKCActionCooldownTest,
+	"ProjectKC.GAS.Action.Cooldown",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FKCActionCooldownTest::RunTest(const FString& Parameters)
+{
+	using namespace KCAbilityDefinitionTests;
+	FString Error;
+
+	// ── 공용 쿨다운 GE의 형태 ──────────────────────────────
+	const UKCGE_ActionCooldown* CooldownEffect =
+		GetDefault<UKCGE_ActionCooldown>();
+	TestTrue(
+		TEXT("Action 쿨다운 GE는 시간이 지나면 스스로 풀린다."),
+		CooldownEffect->DurationPolicy ==
+			EGameplayEffectDurationType::HasDuration);
+	TestTrue(
+		TEXT("지속시간은 Definition이 SetByCaller로 넣는다."),
+		CooldownEffect->DurationMagnitude.GetMagnitudeCalculationType() ==
+			EGameplayEffectMagnitudeCalculation::SetByCaller);
+	TestTrue(
+		TEXT("지속시간 SetByCaller 태그는 GA가 채우는 태그와 같다."),
+		CooldownEffect->DurationMagnitude.GetSetByCallerFloat().DataTag ==
+			TAG_KC_Data_Cooldown_Duration);
+
+	// ── 저작 데이터 검증 ───────────────────────────────────
+	FKCActionCooldownStruct Cooldown;
+	TestTrue(
+		TEXT("비어 있는 쿨다운은 유효하다. 쿨다운은 선택 사항이다."),
+		Cooldown.Validate(Error));
+	TestFalse(
+		TEXT("비어 있는 쿨다운은 적용 대상이 아니다."),
+		Cooldown.IsEnabled());
+
+	Cooldown.Duration = 0.4f;
+	TestFalse(
+		TEXT("점유할 태그가 없는 Duration은 거부한다. 무시하면 연타가 열린다."),
+		Cooldown.Validate(Error));
+
+	Cooldown.CooldownTag = TAG_KC_Cooldown_Ability_Dash;
+	TestTrue(
+		TEXT("태그와 시간을 모두 채우면 유효하다."),
+		Cooldown.Validate(Error));
+	TestTrue(TEXT("그때 비로소 적용 대상이 된다."), Cooldown.IsEnabled());
+
+	Cooldown.Duration = 0.0f;
+	TestFalse(
+		TEXT("시간이 0인 태그도 거부한다."),
+		Cooldown.Validate(Error));
+
+	Cooldown.Duration = -0.4f;
+	TestFalse(TEXT("음수 Duration은 거부한다."), Cooldown.Validate(Error));
+
+	Cooldown.Duration = std::numeric_limits<float>::quiet_NaN();
+	TestFalse(TEXT("NaN Duration은 거부한다."), Cooldown.Validate(Error));
+
+	// ── Definition 통합 ───────────────────────────────────
+	UKCSingleActionDefinition* Definition =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	TestTrue(
+		TEXT("쿨다운을 쓰지 않는 Definition은 그대로 유효하다."),
+		Definition->ValidateWithActionContract(Error));
+
+	Definition->ActionCooldown.Duration = 0.4f;
+	TestFalse(
+		TEXT("반쪽만 저작된 쿨다운은 Definition 검증에서 막힌다."),
+		Definition->ValidateWithActionContract(Error));
+
+	Definition->ActionCooldown.CooldownTag = TAG_KC_Cooldown_Ability_Dash;
+	TestTrue(
+		TEXT("태그를 채우면 다시 유효하다."),
+		Definition->ValidateWithActionContract(Error));
+
+	// 전기 뱀장어가 참조할 슬롯 태그가 실제로 등록되어 있어야 저작할 수 있다.
+	TestTrue(
+		TEXT("Cooldown.Item.ElectricEel 태그가 등록되어 있다."),
+		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
+			TEXT("Cooldown.Item.ElectricEel")).IsValid());
 
 	return true;
 }

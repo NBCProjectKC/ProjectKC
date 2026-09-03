@@ -13,6 +13,7 @@
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
 #include "Sound/SoundBase.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCActionProjectile, Log, All);
 
@@ -51,6 +52,10 @@ AKCActionProjectile::AKCActionProjectile()
 	ProjectileMovementComponent->ProjectileGravityScale = 1.0f;
 	ProjectileMovementComponent->InitialSpeed = 0.0f;
 	ProjectileMovementComponent->MaxSpeed = 0.0f;
+	// 서버 업데이트 사이를 메꾸기 위한 기본값이다. BP 파생 클래스에서 조정할 수 있고,
+	// 실제 보간 대상 연결은 클라이언트 BeginPlay에서 한다.
+	ProjectileMovementComponent->bInterpMovement = true;
+	ProjectileMovementComponent->bInterpRotation = true;
 }
 
 void AKCActionProjectile::BeginPlay()
@@ -60,7 +65,10 @@ void AKCActionProjectile::BeginPlay()
 	// 서버 위치 복제를 단일 진실로 사용하고 Simulated Proxy는 충돌 판정을 하지 않는다.
 	if (!HasAuthority())
 	{
-		ProjectileMovementComponent->SetComponentTickEnabled(false);
+		// 시뮬레이션만 멈춘다. 컴포넌트 틱까지 끄면 보간이 돌지 못해
+		// 서버 업데이트가 도착할 때마다 위치가 그대로 튄다.
+		ProjectileMovementComponent->bSimulationEnabled = false;
+		ProjectileMovementComponent->SetInterpolatedComponent(ProjectileMeshComponent);
 		RefreshSourceMovementIgnore(
 			GetOwner(),
 			GetInstigator() ? GetInstigator() : Cast<APawn>(GetOwner()));
@@ -91,6 +99,24 @@ void AKCActionProjectile::OnRep_Instigator()
 	RefreshSourceMovementIgnore(
 		GetOwner(),
 		GetInstigator() ? GetInstigator() : Cast<APawn>(GetOwner()));
+}
+
+void AKCActionProjectile::PostNetReceiveLocationAndRotation()
+{
+	// 기본 구현은 SetActorLocationAndRotation()으로 즉시 대입하므로 업데이트마다 튄다.
+	// 보간 대상이 연결된 클라이언트에서는 목표만 갱신하고 메시가 따라오게 한다.
+	if (!ProjectileMovementComponent ||
+		!ProjectileMovementComponent->bInterpMovement ||
+		!ProjectileMovementComponent->GetInterpolatedComponent())
+	{
+		Super::PostNetReceiveLocationAndRotation();
+		return;
+	}
+
+	const FRepMovement& LocalRepMovement = GetReplicatedMovement();
+	ProjectileMovementComponent->MoveInterpolationTarget(
+		FRepMovement::RebaseOntoLocalOrigin(LocalRepMovement.Location, this),
+		LocalRepMovement.Rotation);
 }
 
 bool AKCActionProjectile::InitializeProjectile(

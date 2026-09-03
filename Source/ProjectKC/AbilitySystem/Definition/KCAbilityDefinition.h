@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ProjectKC/AbilitySystem/Struct/KCActionCooldownStruct.h"
 #include "ProjectKC/AbilitySystem/Struct/KCActionHookStruct.h"
 #include "ProjectKC/AbilitySystem/Struct/KCActionMontageConfigStruct.h"
 #include "UObject/Object.h"
@@ -41,6 +42,13 @@ public:
 		Category = "Action",
 		meta = (ShowOnlyInnerProperties))
 	FKCActionMontageConfigStruct ActionMontage;
+
+	/**
+	 * 재사용 대기시간이다. 비워 두면 입력이 들어오는 대로 실행한다.
+	 * 몽타주도 Channel 수명주기도 없는 Action은 이 값이 유일한 발사 간격이다.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
+	FKCActionCooldownStruct ActionCooldown;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action")
 	TArray<FKCActionHookStruct> ActionHooks;
