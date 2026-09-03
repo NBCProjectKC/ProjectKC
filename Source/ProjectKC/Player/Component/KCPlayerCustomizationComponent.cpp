@@ -631,7 +631,7 @@ void UKCPlayerCustomizationComponent::TryUploadLocalCustomization()
 	}
 
 	AppliedCustomizationHash = KCCustomizationNetwork::ComputePayloadHash(Payload);
-	NetworkComponent->UploadCustomizationPayload(Payload);
+	NetworkComponent->UploadCustomizationPayload(MoveTemp(Payload));
 }
 
 void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(

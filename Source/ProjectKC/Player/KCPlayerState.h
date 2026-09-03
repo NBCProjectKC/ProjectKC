@@ -81,13 +81,18 @@ public:
 	void ToggleReady();
 
 	/** 검증된 외형 페이로드를 서버 권위 상태로 게시합니다. */
-	bool PublishCustomizationPayload(const TArray<uint8>& InPayload);
+	bool PublishCustomizationPayload(TArray<uint8>&& InPayload);
 
 	/** 요청한 Revision/Hash와 일치하는 서버 전용 외형 페이로드를 반환합니다. */
 	bool GetCustomizationPayload(
 		uint32 ExpectedRevision,
 		uint32 ExpectedHash,
 		TArray<uint8>& OutPayload) const;
+
+	/** 서버 청크 전송용 읽기 전용 Payload입니다. 호출 중 Revision/Hash를 다시 검증해야 합니다. */
+	const TArray<uint8>* FindCustomizationPayload(
+		uint32 ExpectedRevision,
+		uint32 ExpectedHash) const;
 
 	const FKCCustomizationDescriptor& GetCustomizationDescriptor() const
 	{

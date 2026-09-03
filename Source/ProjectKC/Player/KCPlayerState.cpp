@@ -61,7 +61,7 @@ void AKCPlayerState::OverrideWith(APlayerState* PlayerState)
 	}
 }
 
-bool AKCPlayerState::PublishCustomizationPayload(const TArray<uint8>& InPayload)
+bool AKCPlayerState::PublishCustomizationPayload(TArray<uint8>&& InPayload)
 {
 	if (!HasAuthority())
 	{
@@ -87,7 +87,7 @@ bool AKCPlayerState::PublishCustomizationPayload(const TArray<uint8>& InPayload)
 		return true;
 	}
 
-	CustomizationPayload = InPayload;
+	CustomizationPayload = MoveTemp(InPayload);
 	CustomizationDescriptor.ContentHash = ContentHash;
 	CustomizationDescriptor.TargetSchemaVersion = UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
 	CustomizationDescriptor.bUseDefaultAppearance = bUseDefaultAppearance;
@@ -108,17 +108,32 @@ bool AKCPlayerState::GetCustomizationPayload(
 	TArray<uint8>& OutPayload) const
 {
 	OutPayload.Reset();
+	const TArray<uint8>* Payload = FindCustomizationPayload(
+		ExpectedRevision,
+		ExpectedHash);
+	if (!Payload)
+	{
+		return false;
+	}
+
+	OutPayload = *Payload;
+	return true;
+}
+
+const TArray<uint8>* AKCPlayerState::FindCustomizationPayload(
+	const uint32 ExpectedRevision,
+	const uint32 ExpectedHash) const
+{
 	if (!HasAuthority() ||
 		!CustomizationDescriptor.IsPublished() ||
 		CustomizationDescriptor.Revision != ExpectedRevision ||
 		CustomizationDescriptor.ContentHash != ExpectedHash ||
 		CustomizationPayload.IsEmpty())
 	{
-		return false;
+		return nullptr;
 	}
 
-	OutPayload = CustomizationPayload;
-	return true;
+	return &CustomizationPayload;
 }
 
 void AKCPlayerState::SetSlotIndex(int32 InSlotIndex)

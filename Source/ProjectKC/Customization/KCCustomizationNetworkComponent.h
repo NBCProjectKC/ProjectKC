@@ -34,8 +34,8 @@ struct FKCServerCustomizationDownload
 	TWeakObjectPtr<AKCPlayerState> PlayerState;
 	uint32 Revision = 0;
 	uint32 ContentHash = 0;
+	int32 TotalBytes = 0;
 	int32 NextChunkIndex = 0;
-	TArray<uint8> Bytes;
 
 	void Reset() { *this = FKCServerCustomizationDownload(); }
 };
@@ -75,7 +75,7 @@ public:
 	UKCCustomizationNetworkComponent();
 
 	/** 로컬 외형 페이로드를 서버로 분할 업로드합니다. */
-	void UploadCustomizationPayload(const TArray<uint8>& Payload);
+	void UploadCustomizationPayload(TArray<uint8>&& Payload);
 
 	/** 특정 PlayerState의 최신 외형을 요청하고 대상 컴포넌트에 적용합니다. */
 	void RequestCustomizationPayload(

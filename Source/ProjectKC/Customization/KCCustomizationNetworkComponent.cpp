@@ -65,7 +65,7 @@ void UKCCustomizationNetworkComponent::ResetTransientCustomizationData()
 }
 
 void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
-	const TArray<uint8>& Payload)
+	TArray<uint8>&& Payload)
 {
 	const APlayerController* OwnerController = GetOwningPlayerController();
 	if (!OwnerController ||
@@ -78,6 +78,7 @@ void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
 
 	const uint32 ContentHash =
 		KCCustomizationNetwork::ComputePayloadHash(Payload);
+	const int32 TotalBytes = Payload.Num();
 	if (ActiveClientCustomizationUpload.UploadId != INDEX_NONE)
 	{
 		if (ActiveClientCustomizationUpload.ContentHash == ContentHash)
@@ -86,7 +87,7 @@ void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
 		}
 		else
 		{
-			PendingClientCustomizationUpload = Payload;
+			PendingClientCustomizationUpload = MoveTemp(Payload);
 		}
 		return;
 	}
@@ -100,11 +101,11 @@ void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
 	ActiveClientCustomizationUpload.Reset();
 	ActiveClientCustomizationUpload.UploadId = UploadId;
 	ActiveClientCustomizationUpload.ContentHash = ContentHash;
-	ActiveClientCustomizationUpload.Bytes = Payload;
+	ActiveClientCustomizationUpload.Bytes = MoveTemp(Payload);
 
 	ServerBeginCustomizationUpload(
 		UploadId,
-		Payload.Num(),
+		TotalBytes,
 		ContentHash);
 }
 
@@ -161,13 +162,12 @@ void UKCCustomizationNetworkComponent::RequestCustomizationPayload(
 
 	if (OwnerController->HasAuthority())
 	{
-		TArray<uint8> Payload;
-		if (TargetPlayerState->GetCustomizationPayload(
-			Descriptor.Revision,
-			Descriptor.ContentHash,
-			Payload))
+		if (const TArray<uint8>* Payload =
+			TargetPlayerState->FindCustomizationPayload(
+				Descriptor.Revision,
+				Descriptor.ContentHash))
 		{
-			ApplyReceivedCustomization(TargetPlayerState, Payload);
+			ApplyReceivedCustomization(TargetPlayerState, *Payload);
 		}
 		else
 		{
@@ -249,7 +249,7 @@ void UKCCustomizationNetworkComponent::ServerCommitCustomizationUpload_Implement
 		if (AKCPlayerState* KCPlayerState =
 			OwnerController->GetPlayerState<AKCPlayerState>())
 		{
-			bPublished = KCPlayerState->PublishCustomizationPayload(CompletedPayload);
+			bPublished = KCPlayerState->PublishCustomizationPayload(MoveTemp(CompletedPayload));
 		}
 	}
 	ClientFinishCustomizationUpload(UploadId, bPublished);
@@ -312,7 +312,7 @@ void UKCCustomizationNetworkComponent::ClientFinishCustomizationUpload_Implement
 	{
 		TArray<uint8> PendingPayload =
 			MoveTemp(PendingClientCustomizationUpload);
-		UploadCustomizationPayload(PendingPayload);
+		UploadCustomizationPayload(MoveTemp(PendingPayload));
 	}
 }
 
@@ -321,9 +321,10 @@ void UKCCustomizationNetworkComponent::ServerRequestCustomizationPayload_Impleme
 	const uint32 Revision,
 	const uint32 ContentHash)
 {
-	TArray<uint8> Payload;
-	if (!TargetPlayerState ||
-		!TargetPlayerState->GetCustomizationPayload(Revision, ContentHash, Payload))
+	const TArray<uint8>* Payload = TargetPlayerState
+		? TargetPlayerState->FindCustomizationPayload(Revision, ContentHash)
+		: nullptr;
+	if (!Payload)
 	{
 		ClientAbortCustomizationDownload(TargetPlayerState, Revision);
 		return;
@@ -333,16 +334,16 @@ void UKCCustomizationNetworkComponent::ServerRequestCustomizationPayload_Impleme
 	ActiveServerCustomizationDownload.PlayerState = TargetPlayerState;
 	ActiveServerCustomizationDownload.Revision = Revision;
 	ActiveServerCustomizationDownload.ContentHash = ContentHash;
-	ActiveServerCustomizationDownload.Bytes = MoveTemp(Payload);
+	ActiveServerCustomizationDownload.TotalBytes = Payload->Num();
 
 	const int32 TotalChunks = FMath::DivideAndRoundUp(
-		ActiveServerCustomizationDownload.Bytes.Num(),
+		ActiveServerCustomizationDownload.TotalBytes,
 		KCCustomizationNetwork::ChunkSizeBytes);
 	ClientBeginCustomizationDownload(
 		TargetPlayerState,
 		Revision,
 		ContentHash,
-		ActiveServerCustomizationDownload.Bytes.Num(),
+		ActiveServerCustomizationDownload.TotalBytes,
 		TotalChunks);
 }
 
@@ -360,9 +361,19 @@ void UKCCustomizationNetworkComponent::ServerAcknowledgeCustomizationDownloadChu
 		return;
 	}
 
+	const TArray<uint8>* Payload = TargetPlayerState
+		? TargetPlayerState->FindCustomizationPayload(Revision, ActiveServerCustomizationDownload.ContentHash)
+		: nullptr;
+	if (!Payload || Payload->Num() != ActiveServerCustomizationDownload.TotalBytes)
+	{
+		ActiveServerCustomizationDownload.Reset();
+		ClientAbortCustomizationDownload(TargetPlayerState, Revision);
+		return;
+	}
+
 	const int32 Offset =
 		NextChunkIndex * KCCustomizationNetwork::ChunkSizeBytes;
-	if (Offset >= ActiveServerCustomizationDownload.Bytes.Num())
+	if (Offset >= Payload->Num())
 	{
 		ActiveServerCustomizationDownload.Reset();
 		ClientCompleteCustomizationDownload(TargetPlayerState, Revision);
@@ -371,10 +382,10 @@ void UKCCustomizationNetworkComponent::ServerAcknowledgeCustomizationDownloadChu
 
 	const int32 BytesThisChunk = FMath::Min(
 		KCCustomizationNetwork::ChunkSizeBytes,
-		ActiveServerCustomizationDownload.Bytes.Num() - Offset);
+		Payload->Num() - Offset);
 	TArray<uint8> Chunk;
 	Chunk.Append(
-		ActiveServerCustomizationDownload.Bytes.GetData() + Offset,
+		Payload->GetData() + Offset,
 		BytesThisChunk);
 	++ActiveServerCustomizationDownload.NextChunkIndex;
 	ClientReceiveCustomizationChunk(
@@ -534,7 +545,7 @@ bool UKCCustomizationNetworkComponent::ApplyReceivedCustomization(
 	CachedData.Revision = Descriptor.Revision;
 	CachedData.ContentHash = Descriptor.ContentHash;
 	CachedData.bUseDefaultAppearance = bUseDefaultAppearance;
-	CachedData.PaintHistory = PaintHistory;
+	CachedData.PaintHistory = MoveTemp(PaintHistory);
 
 	UKCPlayerCustomizationComponent* TargetComponent = nullptr;
 	if (const TWeakObjectPtr<UKCPlayerCustomizationComponent>* PendingTarget =
@@ -550,7 +561,7 @@ bool UKCCustomizationNetworkComponent::ApplyReceivedCustomization(
 	PendingCustomizationTargets.Remove(TargetPlayerState);
 	PendingCustomizationRevisions.Remove(TargetPlayerState);
 	return TargetComponent && TargetComponent->ApplyNetworkCustomizationData(
-		PaintHistory,
+		CachedData.PaintHistory,
 		bUseDefaultAppearance,
 		Descriptor);
 }
