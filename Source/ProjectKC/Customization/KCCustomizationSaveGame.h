@@ -25,8 +25,8 @@ class PROJECTKC_API UKCCustomizationSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentSaveVersion = 1;
-	static constexpr int32 CurrentTargetSchemaVersion = 1;
+	static constexpr int32 CurrentSaveVersion = 2;
+	static constexpr int32 CurrentTargetSchemaVersion = 2;
 
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "KC|Customization|Save")
 	int32 SaveVersion = CurrentSaveVersion;

@@ -19,6 +19,27 @@ struct FKCServerCustomizationUpload
 	void Reset() { *this = FKCServerCustomizationUpload(); }
 };
 
+struct FKCClientCustomizationUpload
+{
+	int32 UploadId = INDEX_NONE;
+	int32 NextChunkIndex = 0;
+	uint32 ContentHash = 0;
+	TArray<uint8> Bytes;
+
+	void Reset() { *this = FKCClientCustomizationUpload(); }
+};
+
+struct FKCServerCustomizationDownload
+{
+	TWeakObjectPtr<AKCPlayerState> PlayerState;
+	uint32 Revision = 0;
+	uint32 ContentHash = 0;
+	int32 TotalBytes = 0;
+	int32 NextChunkIndex = 0;
+
+	void Reset() { *this = FKCServerCustomizationDownload(); }
+};
+
 struct FKCClientCustomizationDownload
 {
 	TWeakObjectPtr<AKCPlayerState> PlayerState;
@@ -54,12 +75,29 @@ public:
 	UKCCustomizationNetworkComponent();
 
 	/** 로컬 외형 페이로드를 서버로 분할 업로드합니다. */
-	void UploadCustomizationPayload(const TArray<uint8>& Payload);
+	void UploadCustomizationPayload(TArray<uint8>&& Payload);
 
 	/** 특정 PlayerState의 최신 외형을 요청하고 대상 컴포넌트에 적용합니다. */
 	void RequestCustomizationPayload(
 		AKCPlayerState* TargetPlayerState,
 		UKCPlayerCustomizationComponent* TargetComponent);
+
+	/**
+	 * 표시 컴포넌트 하나가 해제될 때 그 컴포넌트가 등록한 적용 대상만 분리합니다.
+	 * 같은 PlayerState를 이어서 표시할 Pawn을 위해 캐시와 진행 중 다운로드는 유지합니다.
+	 */
+	void ReleaseCustomizationTarget(
+		AKCPlayerState* TargetPlayerState,
+		UKCPlayerCustomizationComponent* TargetComponent);
+
+	/** PlayerState 자체가 더 이상 필요 없을 때 해당 외형 캐시와 전송 상태를 완전히 제거합니다. */
+	void ForgetCustomizationData(AKCPlayerState* TargetPlayerState);
+
+	/** 맵 이동/Controller 종료 시 유지할 필요가 없는 전송 버퍼와 수신 캐시를 전부 제거합니다. */
+	void ResetTransientCustomizationData();
+
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	UFUNCTION(Server, Reliable)
@@ -77,6 +115,16 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerCommitCustomizationUpload(int32 UploadId);
 
+	UFUNCTION(Client, Reliable)
+	void ClientRequestCustomizationUploadChunk(
+		int32 UploadId,
+		int32 ChunkIndex);
+
+	UFUNCTION(Client, Reliable)
+	void ClientFinishCustomizationUpload(
+		int32 UploadId,
+		bool bSucceeded);
+
 	UFUNCTION(Server, Reliable)
 	void ServerRequestCustomizationPayload(
 		AKCPlayerState* TargetPlayerState,
@@ -91,6 +139,17 @@ private:
 		int32 TotalBytes,
 		int32 TotalChunks);
 
+	UFUNCTION(Server, Reliable)
+	void ServerAcknowledgeCustomizationDownloadChunk(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision,
+		int32 NextChunkIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerCancelCustomizationDownload(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision);
+
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveCustomizationChunk(
 		AKCPlayerState* TargetPlayerState,
@@ -103,17 +162,30 @@ private:
 		AKCPlayerState* TargetPlayerState,
 		uint32 Revision);
 
+	UFUNCTION(Client, Reliable)
+	void ClientAbortCustomizationDownload(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision);
+
 	class APlayerController* GetOwningPlayerController() const;
 	bool ApplyReceivedCustomization(
 		AKCPlayerState* TargetPlayerState,
 		const TArray<uint8>& Payload);
 	UKCPlayerCustomizationComponent* ResolveCustomizationComponent(
 		AKCPlayerState* TargetPlayerState) const;
-	void ResetCustomizationDownload(AKCPlayerState* TargetPlayerState);
+	void TryStartNextCustomizationDownload();
+	void FinishCustomizationDownload(
+		AKCPlayerState* TargetPlayerState,
+		uint32 Revision);
 
 	int32 NextCustomizationUploadId = 1;
+	FKCClientCustomizationUpload ActiveClientCustomizationUpload;
+	TArray<uint8> PendingClientCustomizationUpload;
 	FKCServerCustomizationUpload ActiveCustomizationUpload;
+	FKCServerCustomizationDownload ActiveServerCustomizationDownload;
 	FKCClientCustomizationDownload ActiveCustomizationDownload;
+	TWeakObjectPtr<AKCPlayerState> ActiveCustomizationRequestPlayerState;
+	uint32 ActiveCustomizationRequestRevision = 0;
 	TMap<TWeakObjectPtr<AKCPlayerState>, FKCCachedCustomizationData> CustomizationCache;
 	TMap<TWeakObjectPtr<AKCPlayerState>, TWeakObjectPtr<UKCPlayerCustomizationComponent>> PendingCustomizationTargets;
 	TMap<TWeakObjectPtr<AKCPlayerState>, uint32> PendingCustomizationRevisions;

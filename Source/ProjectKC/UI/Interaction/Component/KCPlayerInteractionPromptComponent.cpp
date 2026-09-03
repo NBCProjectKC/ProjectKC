@@ -6,6 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "ProjectKC/Interaction/Interface/KCInteractableInterface.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
+#include "ProjectKC/Item/KCWorldItemActor.h"
 #include "ProjectKC/Player/Interaction/KCPlayerInteractionComponent.h"
 #include "ProjectKC/UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/UI/Interaction/Data/KCInteractionPromptRegistry.h"
@@ -26,6 +27,7 @@ void UKCPlayerInteractionPromptComponent::BeginPlay()
 void UKCPlayerInteractionPromptComponent::EndPlay(
 	const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindObservedHeldItem();
 	UnbindHeldItemComponent();
 	UnbindInteractionComponent();
 
@@ -143,6 +145,7 @@ void UKCPlayerInteractionPromptComponent::BindHeldItemComponent()
 	HeldItemComponent->OnHeldItemChanged.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleHeldItemChanged);
+	BindObservedHeldItem(HeldItemComponent->GetHeldItem());
 }
 
 void UKCPlayerInteractionPromptComponent::UnbindHeldItemComponent()
@@ -155,6 +158,40 @@ void UKCPlayerInteractionPromptComponent::UnbindHeldItemComponent()
 	}
 
 	BoundHeldItemComponent.Reset();
+}
+
+void UKCPlayerInteractionPromptComponent::BindObservedHeldItem(
+	AKCWorldItemActor* NewHeldItem)
+{
+	UnbindObservedHeldItem();
+
+	if (!IsValid(NewHeldItem))
+	{
+		return;
+	}
+
+	ObservedHeldItem = NewHeldItem;
+	NewHeldItem->OnItemBroken.AddUniqueDynamic(
+		this,
+		&ThisClass::HandleObservedHeldItemBroken);
+	NewHeldItem->OnDestroyed.AddUniqueDynamic(
+		this,
+		&ThisClass::HandleObservedHeldItemDestroyed);
+}
+
+void UKCPlayerInteractionPromptComponent::UnbindObservedHeldItem()
+{
+	if (AKCWorldItemActor* HeldItem = ObservedHeldItem.Get())
+	{
+		HeldItem->OnItemBroken.RemoveDynamic(
+			this,
+			&ThisClass::HandleObservedHeldItemBroken);
+		HeldItem->OnDestroyed.RemoveDynamic(
+			this,
+			&ThisClass::HandleObservedHeldItemDestroyed);
+	}
+
+	ObservedHeldItem.Reset();
 }
 
 void UKCPlayerInteractionPromptComponent::EnsureViewModel()
@@ -230,10 +267,14 @@ void UKCPlayerInteractionPromptComponent::HandleBestInteractableChanged(
 void UKCPlayerInteractionPromptComponent::HandleHeldItemChanged(
 	AKCWorldItemActor* NewHeldItem)
 {
+	BindObservedHeldItem(NewHeldItem);
+
 	if (!bLocalPromptInitialized && !InitializeLocalPrompt())
 	{
 		return;
 	}
+
+	ClearTargetActor();
 
 	if (UKCPlayerInteractionComponent* InteractionComponent =
 		BoundInteractionComponent.Get())
@@ -244,6 +285,19 @@ void UKCPlayerInteractionPromptComponent::HandleHeldItemChanged(
 	}
 
 	RefreshPrompt();
+}
+
+void UKCPlayerInteractionPromptComponent::HandleObservedHeldItemBroken()
+{
+	UnbindObservedHeldItem();
+	ClearTargetActor();
+}
+
+void UKCPlayerInteractionPromptComponent::HandleObservedHeldItemDestroyed(
+	AActor* DestroyedActor)
+{
+	UnbindObservedHeldItem();
+	ClearTargetActor();
 }
 
 void UKCPlayerInteractionPromptComponent::SetTargetActor(AActor* NewTargetActor)
