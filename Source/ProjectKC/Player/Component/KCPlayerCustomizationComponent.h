@@ -61,6 +61,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Customization|Player")
 	URuntimeMeshPaintTargetComponent* GetRuntimePaintTarget() const { return RuntimePaintTarget; }
 
+	/** 로컬 편집 중에만 패치 기록과 페인트용 충돌을 활성화합니다. */
+	bool BeginLocalCustomizationEditing();
+
+	/** 로컬 편집용 패치 기록과 충돌을 원래 표시 전용 상태로 되돌립니다. */
+	void EndLocalCustomizationEditing();
+
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Customization|Player")
 	EKCCustomizationSaveResult LastApplyResult = EKCCustomizationSaveResult::NoSaveFound;
 
@@ -128,6 +134,7 @@ private:
 	TObjectPtr<URuntimeMeshPaintTargetComponent> RuntimePaintTarget;
 
 	bool bLocalSaveApplied = false;
+	bool bLocalCustomizationEditing = false;
 	bool bCurrentUseDefaultAppearance = true;
 	uint32 AppliedCustomizationRevision = 0;
 	uint32 AppliedCustomizationHash = 0;

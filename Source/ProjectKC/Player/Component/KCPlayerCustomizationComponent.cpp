@@ -249,6 +249,67 @@ bool UKCPlayerCustomizationComponent::IsRuntimeAppearanceReady() const
 		IsValid(RuntimePaintTarget);
 }
 
+bool UKCPlayerCustomizationComponent::BeginLocalCustomizationEditing()
+{
+	if (bLocalCustomizationEditing)
+	{
+		return true;
+	}
+
+	if (!CreateRuntimeAppearance() || !RuntimePaintTarget)
+	{
+		return false;
+	}
+
+	RuntimePaintTarget->bRecordPaintPatchHistory = true;
+	for (UStaticMeshComponent* PaintMesh : {
+		EyesPaintMesh.Get(),
+		EyesPaintMesh_R.Get(),
+		ApronPaintMesh.Get(),
+		ChefHatPaintMesh.Get() })
+	{
+		if (!PaintMesh)
+		{
+			continue;
+		}
+
+		PaintMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		PaintMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+		PaintMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	}
+
+	bLocalCustomizationEditing = true;
+	return true;
+}
+
+void UKCPlayerCustomizationComponent::EndLocalCustomizationEditing()
+{
+	if (!bLocalCustomizationEditing)
+	{
+		return;
+	}
+
+	if (RuntimePaintTarget)
+	{
+		RuntimePaintTarget->FlushPendingPaintPatchCaptures();
+		RuntimePaintTarget->bRecordPaintPatchHistory = false;
+	}
+
+	for (UStaticMeshComponent* PaintMesh : {
+		EyesPaintMesh.Get(),
+		EyesPaintMesh_R.Get(),
+		ApronPaintMesh.Get(),
+		ChefHatPaintMesh.Get() })
+	{
+		if (PaintMesh)
+		{
+			PaintMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+	}
+
+	bLocalCustomizationEditing = false;
+}
+
 bool UKCPlayerCustomizationComponent::CreateRuntimeAppearance()
 {
 	if (IsRuntimeAppearanceReady())
@@ -531,6 +592,8 @@ void UKCPlayerCustomizationComponent::HandleCustomizationDescriptorChanged(
 
 void UKCPlayerCustomizationComponent::DestroyRuntimeAppearance()
 {
+	bLocalCustomizationEditing = false;
+
 	if (RuntimePaintTarget)
 	{
 		RuntimePaintTarget->DestroyComponent();

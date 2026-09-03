@@ -6,11 +6,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Customization/KCCustomizationSaveGame.h"
 #include "GameFramework/PlayerController.h"
 #include "KCLobbyPlayerController.generated.h"
 
 class UKCLobbyWidget;
+class ACameraActor;
+class AKCLobbyCharacter;
 class UKCCustomizationNetworkComponent;
+class UKCPlayerCustomizationComponent;
+class UPaintingModeControllerComponent;
+class URuntimeMeshPaintTargetComponent;
 
 /**
  * @brief 채팅 메시지 수신 시 UI(위젯)에 브로드캐스트할 다이나믹 멀티캐스트 델리게이트
@@ -55,6 +61,54 @@ public:
 	{
 		return CustomizationNetworkComponent;
 	}
+
+	/** 로비의 내 캐릭터를 로컬 페인트 편집 대상으로 엽니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization")
+	bool BeginCustomizationEditing();
+
+	/** 현재 편집 결과를 저장하고 내 로비 외형과 서버에 반영합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization")
+	bool SaveCustomizationEditing();
+
+	/** 저장 파일은 유지하고 현재 편집 화면만 기본 외형으로 초기화합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization")
+	bool ResetCustomizationEditing();
+
+	/** 저장하지 않은 변경을 폐기하고 기존 저장 외형을 복원합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization")
+	bool CancelCustomizationEditing();
+
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Customization")
+	bool IsCustomizationEditing() const { return bCustomizationEditing; }
+
+	/** 커스터마이징 카메라를 캐릭터 중심으로 회전시킵니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization|Camera")
+	void OrbitCustomizationCamera(float DeltaYaw, float DeltaPitch);
+
+	/** 양수 입력은 확대, 음수 입력은 축소합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization|Camera")
+	void ZoomCustomizationCamera(float ZoomDelta);
+
+	/** 커스터마이징 카메라를 최초 구도로 되돌립니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Customization|Camera")
+	void ResetCustomizationCamera();
+
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Customization")
+	URuntimeMeshPaintTargetComponent* GetCustomizationEditingPaintTarget() const
+	{
+		return CustomizationEditingPaintTarget;
+	}
+
+	/** UI의 색상·브러시 크기 컨트롤을 연결할 플러그인 컴포넌트입니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Customization")
+	UPaintingModeControllerComponent* GetCustomizationPaintingController() const
+	{
+		return CustomizationPaintingController;
+	}
+
+	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|Customization")
+	EKCCustomizationSaveResult LastCustomizationEditingResult =
+		EKCCustomizationSaveResult::NoSaveFound;
 	/* =========================================================================
 	 *  로비 채팅 시스템 (Lobby Chat System)
 	 * ========================================================================= */
@@ -88,6 +142,8 @@ public:
 protected:
 	//~APlayerController interface
 	virtual void BeginPlay() override;
+	virtual void PlayerTick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostSeamlessTravel() override;
 	virtual void OnRep_PlayerState() override;
 	//~End of APlayerController interface
@@ -109,7 +165,79 @@ protected:
 	/** 로비에서도 인게임과 동일한 외형 업로드/다운로드 경로를 사용합니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization|Network")
 	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
+
+	/** 로비 편집 중 마우스 입력과 브러시 설정을 담당합니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Lobby|Customization")
+	TObjectPtr<UPaintingModeControllerComponent> CustomizationPaintingController;
+
+	/** 캐릭터 바운드 중심에서 카메라가 바라볼 위치의 월드 오프셋입니다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera")
+	FVector CustomizationCameraFocusOffset = FVector(0.0f, 0.0f, 10.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "50.0"))
+	float CustomizationCameraInitialDistance = 350.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "10.0"))
+	float CustomizationCameraMinimumDistance = 150.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "50.0"))
+	float CustomizationCameraMaximumDistance = 650.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "0.0"))
+	float CustomizationCameraOrbitSensitivity = 0.25f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "0.0"))
+	float CustomizationCameraZoomSensitivity = 35.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera")
+	float CustomizationCameraInitialPitch = -5.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera")
+	float CustomizationCameraMinimumPitch = -55.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera")
+	float CustomizationCameraMaximumPitch = 25.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "5.0", ClampMax = "170.0"))
+	float CustomizationCameraFieldOfView = 45.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
+		meta = (ClampMin = "0.0"))
+	float CustomizationCameraBlendTime = 0.2f;
 private:
+	AKCLobbyCharacter* ResolveLocalCustomizationCharacter() const;
+	class UKCCustomizationSaveSubsystem* GetCustomizationSaveSubsystem() const;
+	bool OpenCustomizationCamera(AKCLobbyCharacter* TargetCharacter);
+	void UpdateCustomizationCameraTransform();
+	void CloseCustomizationCamera();
+	void CloseCustomizationEditingSession();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UKCPlayerCustomizationComponent> CustomizationEditingComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<URuntimeMeshPaintTargetComponent> CustomizationEditingPaintTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ACameraActor> CustomizationCameraActor;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AKCLobbyCharacter> CustomizationCameraTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> PreviousCustomizationViewTarget;
+
+	bool bCustomizationEditing = false;
+	float CustomizationCameraYaw = 0.0f;
+	float CustomizationCameraPitch = 0.0f;
+	float CustomizationCameraDistance = 0.0f;
+
 	/** @brief 도배 방지(쿨타임)를 위한 마지막 메시지 전송 시각 (초 단위) */
 	double LastChatMessageTimeSeconds = 0.0;
 
