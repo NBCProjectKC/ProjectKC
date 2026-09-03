@@ -39,6 +39,15 @@ bool UKCCustomizationSaveSubsystem::SaveCustomization(
 	{
 		return false;
 	}
+	if (PaintTarget->RuntimeRenderTargetWidth !=
+			KCCustomizationNetwork::ExpectedRenderTargetSize ||
+		PaintTarget->RuntimeRenderTargetHeight !=
+			KCCustomizationNetwork::ExpectedRenderTargetSize ||
+		PaintTarget->RuntimeRenderTargetFormat != RTF_RGBA16f)
+	{
+		OutResult = EKCCustomizationSaveResult::IncompatibleVersion;
+		return false;
+	}
 
 	UKCCustomizationSaveGame* SaveData = Cast<UKCCustomizationSaveGame>(
 		UGameplayStatics::CreateSaveGameObject(UKCCustomizationSaveGame::StaticClass()));

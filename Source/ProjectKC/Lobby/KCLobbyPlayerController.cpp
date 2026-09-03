@@ -148,11 +148,16 @@ bool AKCLobbyPlayerController::BeginCustomizationEditing()
 
 	bool bSaveFound = false;
 	bool bUseDefaultAppearance = true;
-	if (!SaveSubsystem->LoadCustomization(
-		PaintTarget,
-		bSaveFound,
-		bUseDefaultAppearance,
-		LastCustomizationEditingResult))
+	const bool bLoaded = TargetComponent->IsRenderTargetPreviewMode()
+		? SaveSubsystem->ResetCustomization(
+			PaintTarget,
+			LastCustomizationEditingResult)
+		: SaveSubsystem->LoadCustomization(
+			PaintTarget,
+			bSaveFound,
+			bUseDefaultAppearance,
+			LastCustomizationEditingResult);
+	if (!bLoaded)
 	{
 		TargetComponent->EndLocalCustomizationEditing();
 		return false;
@@ -194,6 +199,13 @@ bool AKCLobbyPlayerController::SaveCustomizationEditing()
 	{
 		LastCustomizationEditingResult =
 			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	if (CustomizationEditingComponent->IsRenderTargetPreviewMode())
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::IncompatibleVersion;
 		return false;
 	}
 
@@ -276,6 +288,15 @@ bool AKCLobbyPlayerController::CancelCustomizationEditing()
 		LastCustomizationEditingResult =
 			EKCCustomizationSaveResult::InvalidPaintTarget;
 		return false;
+	}
+
+	if (CustomizationEditingComponent &&
+		CustomizationEditingComponent->IsRenderTargetPreviewMode())
+	{
+		UKCPlayerCustomizationComponent* PreviewComponent =
+			CustomizationEditingComponent;
+		CloseCustomizationEditingSession();
+		return PreviewComponent->ApplyLocalSavedCustomization();
 	}
 
 	CustomizationPaintingController->ExitPaintingMode();

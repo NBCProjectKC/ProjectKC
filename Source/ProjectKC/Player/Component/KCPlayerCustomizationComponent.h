@@ -58,6 +58,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Customization|Player")
 	bool HasAppliedLocalSave() const { return bLocalSaveApplied; }
 
+	/** 256 RT 시각 비교 모드에서는 기존 SaveGame/네트워크 데이터를 변경하지 않습니다. */
+	bool IsRenderTargetPreviewMode() const;
+
 	UFUNCTION(BlueprintPure, Category = "KC|Customization|Player")
 	URuntimeMeshPaintTargetComponent* GetRuntimePaintTarget() const { return RuntimePaintTarget; }
 
@@ -102,6 +105,7 @@ protected:
 private:
 	bool CreateRuntimeVisuals();
 	bool CreateRuntimeAppearance();
+	int32 GetDesiredRenderTargetSize() const;
 	bool CompactLocalPaintHistory();
 	void ReleaseRuntimePaintTarget();
 	UStaticMeshComponent* CreatePaintMeshComponent(
