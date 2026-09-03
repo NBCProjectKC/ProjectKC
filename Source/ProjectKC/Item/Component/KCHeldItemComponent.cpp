@@ -150,12 +150,13 @@ bool UKCHeldItemComponent::UseHeldItemWithTarget(AActor* TargetActor)
 
 AKCWorldItemActor* UKCHeldItemComponent::GetHeldItem() const
 {
-	return HeldItem;
+	// 파괴가 예약된 아이템이 GC 전까지 손에 남은 것처럼 보이지 않게 유효성까지 확인한다.
+	return IsValid(HeldItem) ? HeldItem.Get() : nullptr;
 }
 
 bool UKCHeldItemComponent::HasHeldItem() const
 {
-	return IsValid(HeldItem);
+	return GetHeldItem() != nullptr;
 }
 
 USceneComponent* UKCHeldItemComponent::GetAttachmentComponent() const
