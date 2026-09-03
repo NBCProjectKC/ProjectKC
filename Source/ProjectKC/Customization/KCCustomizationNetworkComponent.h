@@ -82,7 +82,15 @@ public:
 		AKCPlayerState* TargetPlayerState,
 		UKCPlayerCustomizationComponent* TargetComponent);
 
-	/** 대상이 로비를 떠나거나 PlayerState가 교체될 때 해당 외형 캐시와 전송 상태를 제거합니다. */
+	/**
+	 * 표시 컴포넌트 하나가 해제될 때 그 컴포넌트가 등록한 적용 대상만 분리합니다.
+	 * 같은 PlayerState를 이어서 표시할 Pawn을 위해 캐시와 진행 중 다운로드는 유지합니다.
+	 */
+	void ReleaseCustomizationTarget(
+		AKCPlayerState* TargetPlayerState,
+		UKCPlayerCustomizationComponent* TargetComponent);
+
+	/** PlayerState 자체가 더 이상 필요 없을 때 해당 외형 캐시와 전송 상태를 완전히 제거합니다. */
 	void ForgetCustomizationData(AKCPlayerState* TargetPlayerState);
 
 	/** 맵 이동/Controller 종료 시 유지할 필요가 없는 전송 버퍼와 수신 캐시를 전부 제거합니다. */

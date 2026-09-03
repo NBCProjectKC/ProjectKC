@@ -84,6 +84,14 @@ void UKCPlayerCustomizationComponent::InitializeForPawn()
 	AKCPlayerState* PlayerState = OwnerPawn
 		? OwnerPawn->GetPlayerState<AKCPlayerState>()
 		: nullptr;
+	if (bPresentationBinding && !PlayerState)
+	{
+		// 비소유 로비 표시 캐릭터에는 Pawn PlayerState가 없습니다. 상속된
+		// Pawn 수명주기 콜백이 명시적인 로비 바인딩을 지우지 않게 합니다.
+		return;
+	}
+	bPresentationBinding = false;
+
 	APlayerController* LocalPlayerController =
 		OwnerPawn && OwnerPawn->IsLocallyControlled()
 			? Cast<APlayerController>(OwnerPawn->GetController())
@@ -95,6 +103,8 @@ void UKCPlayerCustomizationComponent::InitializeForPresentation(
 	AKCPlayerState* InPlayerState,
 	APlayerController* LocalPlayerController)
 {
+	bPresentationBinding = true;
+
 	if (LocalPlayerController &&
 		(!LocalPlayerController->IsLocalController() ||
 		 LocalPlayerController->PlayerState != InPlayerState))
@@ -593,7 +603,7 @@ void UKCPlayerCustomizationComponent::UnbindCustomizationPlayerState()
 			if (UKCCustomizationNetworkComponent* NetworkComponent =
 				LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>())
 			{
-				NetworkComponent->ForgetCustomizationData(PlayerState);
+				NetworkComponent->ReleaseCustomizationTarget(PlayerState, this);
 			}
 		}
 	}

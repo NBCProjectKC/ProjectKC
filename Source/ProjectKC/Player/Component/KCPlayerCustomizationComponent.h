@@ -139,6 +139,7 @@ private:
 	bool bLocalSaveApplied = false;
 	bool bLocalCustomizationEditing = false;
 	bool bCurrentUseDefaultAppearance = true;
+	bool bPresentationBinding = false;
 	uint32 AppliedCustomizationRevision = 0;
 	uint32 AppliedCustomizationHash = 0;
 	TWeakObjectPtr<AKCPlayerState> BoundCustomizationPlayerState;

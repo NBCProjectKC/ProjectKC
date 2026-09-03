@@ -19,6 +19,37 @@ void UKCCustomizationNetworkComponent::EndPlay(const EEndPlayReason::Type EndPla
 	Super::EndPlay(EndPlayReason);
 }
 
+void UKCCustomizationNetworkComponent::ReleaseCustomizationTarget(
+	AKCPlayerState* TargetPlayerState,
+	UKCPlayerCustomizationComponent* TargetComponent)
+{
+	if (!TargetPlayerState || !TargetComponent)
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<UKCPlayerCustomizationComponent>* PendingTarget =
+		PendingCustomizationTargets.Find(TargetPlayerState);
+	if (!PendingTarget ||
+		(PendingTarget->IsValid() && PendingTarget->Get() != TargetComponent))
+	{
+		return;
+	}
+
+	PendingCustomizationTargets.Remove(TargetPlayerState);
+
+	// 수신 중인 데이터는 끝까지 받아 캐시에 남깁니다. 로비 표시 액터가
+	// 먼저 사라져도 이어서 생성된 플레이어 Pawn이 같은 데이터를 재사용합니다.
+	if (ActiveCustomizationRequestPlayerState.Get() == TargetPlayerState)
+	{
+		return;
+	}
+
+	// 아직 시작하지 않은 요청은 적용 대상이 없으므로 다음 바인딩 때 다시 요청합니다.
+	PendingCustomizationRevisions.Remove(TargetPlayerState);
+	TryStartNextCustomizationDownload();
+}
+
 void UKCCustomizationNetworkComponent::ForgetCustomizationData(
 	AKCPlayerState* TargetPlayerState)
 {
