@@ -44,17 +44,9 @@ public:
 		URuntimeMeshPaintTargetComponent* PaintTarget,
 		EKCCustomizationSaveResult& OutResult);
 
-	UFUNCTION(BlueprintPure, Category = "KC|Customization|Save")
+private:
 	bool DoesCustomizationSaveExist() const;
 
-	/** 로컬 저장 파일을 삭제합니다. 이미 없으면 성공으로 처리합니다. */
-	UFUNCTION(BlueprintCallable, Category = "KC|Customization|Save")
-	bool DeleteCustomizationSave(EKCCustomizationSaveResult& OutResult);
-
-	UFUNCTION(BlueprintPure, Category = "KC|Customization|Save")
-	FString GetCustomizationSlotName() const;
-
-private:
 	static const FString CustomizationSlotName;
 	static constexpr int32 CustomizationUserIndex = 0;
 };

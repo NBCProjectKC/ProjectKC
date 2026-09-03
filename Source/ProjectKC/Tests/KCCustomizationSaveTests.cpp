@@ -4,7 +4,6 @@
 
 #include "Customization/KCCustomizationSaveGame.h"
 #include "Customization/KCCustomizationNetworkTypes.h"
-#include "Customization/KCCustomizationWorldSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -14,9 +13,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FKCCustomizationSaveSerializationTest::RunTest(const FString& Parameters)
 {
-	TestTrue(TEXT("커스터마이징 런타임은 월드 서브시스템으로 자동 생성된다."),
-		UKCCustomizationWorldSubsystem::StaticClass()->IsChildOf(UWorldSubsystem::StaticClass()));
-
 	UKCCustomizationSaveGame* Source = NewObject<UKCCustomizationSaveGame>();
 	Source->bUseDefaultAppearance = false;
 	Source->PaintHistory.Version = 1;

@@ -247,26 +247,3 @@ bool UKCCustomizationSaveSubsystem::DoesCustomizationSaveExist() const
 {
 	return UGameplayStatics::DoesSaveGameExist(CustomizationSlotName, CustomizationUserIndex);
 }
-
-bool UKCCustomizationSaveSubsystem::DeleteCustomizationSave(EKCCustomizationSaveResult& OutResult)
-{
-	if (!DoesCustomizationSaveExist())
-	{
-		OutResult = EKCCustomizationSaveResult::Success;
-		return true;
-	}
-
-	if (!UGameplayStatics::DeleteGameInSlot(CustomizationSlotName, CustomizationUserIndex))
-	{
-		OutResult = EKCCustomizationSaveResult::SaveFailed;
-		return false;
-	}
-
-	OutResult = EKCCustomizationSaveResult::Success;
-	return true;
-}
-
-FString UKCCustomizationSaveSubsystem::GetCustomizationSlotName() const
-{
-	return CustomizationSlotName;
-}
