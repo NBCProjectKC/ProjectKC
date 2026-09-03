@@ -55,6 +55,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnRep_Owner() override;
 	virtual void OnRep_Instigator() override;
+	virtual void PostNetReceiveLocationAndRotation() override;
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

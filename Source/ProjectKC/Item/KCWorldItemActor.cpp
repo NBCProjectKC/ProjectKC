@@ -223,6 +223,9 @@ bool AKCWorldItemActor::ExitHeldState(
 	SetOwner(nullptr);
 	RuntimeState.Holder = nullptr;
 	RuntimeState.State = EKCWorldItemState::World;
+	// 클라이언트가 물리를 켜기 전에 같은 지점으로 옮길 수 있도록 함께 복제한다.
+	RuntimeState.DropLocation = DropTransform.GetLocation();
+	RuntimeState.DropRotation = DropTransform.Rotator();
 	SetActorTransform(DropTransform, false, nullptr, ETeleportType::TeleportPhysics);
 	ApplyStatePresentation();
 
@@ -390,8 +393,33 @@ void AKCWorldItemActor::GetLifetimeReplicatedProps(
 
 void AKCWorldItemActor::OnRep_RuntimeState()
 {
-	ApplyStatePresentation();
-	RefreshReplicatedAttachment();
+	// 손에 들려 있던 아이템이 World로 돌아온 순간만 드롭으로 취급한다.
+	// 뒤늦게 관련성이 생긴 클라이언트가 예전 드롭 지점으로 되돌리지 않게 한다.
+	const bool bDroppedFromHand =
+		bHasObservedState &&
+		LastObservedState == EKCWorldItemState::Held &&
+		RuntimeState.State == EKCWorldItemState::World;
+	LastObservedState = RuntimeState.State;
+	bHasObservedState = true;
+
+	if (bDroppedFromHand)
+	{
+		// 서버 ExitHeldState()와 같은 순서다. 부착 해제 → 위치 확정 → 물리 활성화.
+		// 물리를 먼저 켜면 손 위치에서 낙하한 뒤 보정으로 끌려가게 된다.
+		RefreshReplicatedAttachment();
+		SetActorTransform(
+			FTransform(RuntimeState.DropRotation, RuntimeState.DropLocation),
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+		ApplyStatePresentation();
+	}
+	else
+	{
+		// 서버 EnterHeldState()와 같은 순서다. 물리를 멈춘 뒤 부착해야 웰딩되지 않는다.
+		ApplyStatePresentation();
+		RefreshReplicatedAttachment();
+	}
 	BroadcastStateChanged();
 }
 
