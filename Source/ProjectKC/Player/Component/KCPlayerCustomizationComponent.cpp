@@ -548,6 +548,20 @@ void UKCPlayerCustomizationComponent::UnbindCustomizationPlayerState()
 	if (AKCPlayerState* PlayerState = BoundCustomizationPlayerState.Get())
 	{
 		PlayerState->OnCustomizationDescriptorChanged.RemoveAll(this);
+
+		APlayerController* LocalPlayerController = ResolveLocalPlayerController();
+		if (!LocalPlayerController)
+		{
+			LocalPlayerController = UGameplayStatics::GetPlayerController(this, 0);
+		}
+		if (LocalPlayerController && LocalPlayerController->IsLocalController())
+		{
+			if (UKCCustomizationNetworkComponent* NetworkComponent =
+				LocalPlayerController->FindComponentByClass<UKCCustomizationNetworkComponent>())
+			{
+				NetworkComponent->ForgetCustomizationData(PlayerState);
+			}
+		}
 	}
 	BoundCustomizationPlayerState.Reset();
 }

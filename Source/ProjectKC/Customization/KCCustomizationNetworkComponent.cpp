@@ -13,6 +13,57 @@ UKCCustomizationNetworkComponent::UKCCustomizationNetworkComponent()
 	SetIsReplicatedByDefault(true);
 }
 
+void UKCCustomizationNetworkComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ResetTransientCustomizationData();
+	Super::EndPlay(EndPlayReason);
+}
+
+void UKCCustomizationNetworkComponent::ForgetCustomizationData(
+	AKCPlayerState* TargetPlayerState)
+{
+	if (!TargetPlayerState)
+	{
+		return;
+	}
+
+	CustomizationCache.Remove(TargetPlayerState);
+	PendingCustomizationTargets.Remove(TargetPlayerState);
+	PendingCustomizationRevisions.Remove(TargetPlayerState);
+
+	if (ActiveCustomizationRequestPlayerState.Get() == TargetPlayerState)
+	{
+		const uint32 ActiveRevision = ActiveCustomizationRequestRevision;
+		ActiveCustomizationRequestPlayerState.Reset();
+		ActiveCustomizationRequestRevision = 0;
+		ActiveCustomizationDownload.Reset();
+		if (ActiveRevision != 0)
+		{
+			ServerCancelCustomizationDownload(TargetPlayerState, ActiveRevision);
+		}
+		TryStartNextCustomizationDownload();
+	}
+
+	if (ActiveServerCustomizationDownload.PlayerState.Get() == TargetPlayerState)
+	{
+		ActiveServerCustomizationDownload.Reset();
+	}
+}
+
+void UKCCustomizationNetworkComponent::ResetTransientCustomizationData()
+{
+	ActiveClientCustomizationUpload.Reset();
+	PendingClientCustomizationUpload.Reset();
+	ActiveCustomizationUpload.Reset();
+	ActiveServerCustomizationDownload.Reset();
+	ActiveCustomizationDownload.Reset();
+	ActiveCustomizationRequestPlayerState.Reset();
+	ActiveCustomizationRequestRevision = 0;
+	CustomizationCache.Empty();
+	PendingCustomizationTargets.Empty();
+	PendingCustomizationRevisions.Empty();
+}
+
 void UKCCustomizationNetworkComponent::UploadCustomizationPayload(
 	const TArray<uint8>& Payload)
 {

@@ -75,12 +75,20 @@ void AKCLobbyPlayerController::PlayerTick(const float DeltaTime)
 void AKCLobbyPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	CloseCustomizationEditingSession();
+	if (CustomizationNetworkComponent)
+	{
+		CustomizationNetworkComponent->ResetTransientCustomizationData();
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
 void AKCLobbyPlayerController::PostSeamlessTravel()
 {
 	CloseCustomizationEditingSession();
+	if (CustomizationNetworkComponent)
+	{
+		CustomizationNetworkComponent->ResetTransientCustomizationData();
+	}
 	Super::PostSeamlessTravel();
 	SetupLobbyUI();
 	RefreshLobbyCustomizationPresentations();

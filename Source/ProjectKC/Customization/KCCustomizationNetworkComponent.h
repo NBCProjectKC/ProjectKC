@@ -82,6 +82,15 @@ public:
 		AKCPlayerState* TargetPlayerState,
 		UKCPlayerCustomizationComponent* TargetComponent);
 
+	/** 대상이 로비를 떠나거나 PlayerState가 교체될 때 해당 외형 캐시와 전송 상태를 제거합니다. */
+	void ForgetCustomizationData(AKCPlayerState* TargetPlayerState);
+
+	/** 맵 이동/Controller 종료 시 유지할 필요가 없는 전송 버퍼와 수신 캐시를 전부 제거합니다. */
+	void ResetTransientCustomizationData();
+
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerBeginCustomizationUpload(
