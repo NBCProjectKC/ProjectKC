@@ -13,18 +13,14 @@ class PROJECTKC_API UKCLocalPlayerUISubsystem : public ULocalPlayerSubsystem
 	GENERATED_BODY()
 
 public:
-	/**
-	 * @param bPersistAcrossLevelTravel true면 레벨 파괴에도 이 위젯은 자동으로 안 사라짐
-	 * (로딩화면처럼 레벨 트래블 구간 내내 떠 있어야 하는 위젯 전용)
-	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
-	UKCUserWidget* SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel = false);
-	
+	UKCUserWidget* SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass);
+
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void ClearScreenWidget();
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
-	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel = false);
+	UKCUserWidget* SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void ClearHUDWidget();

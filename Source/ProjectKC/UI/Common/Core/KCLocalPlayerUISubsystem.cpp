@@ -1,12 +1,11 @@
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 
-#include "Blueprint/GameViewportSubsystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 
-UKCUserWidget* UKCLocalPlayerUISubsystem::SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel)
+UKCUserWidget* UKCLocalPlayerUISubsystem::SetScreenWidget(TSubclassOf<UKCUserWidget> WidgetClass)
 {
 	ClearScreenWidget();
 
@@ -29,31 +28,12 @@ UKCUserWidget* UKCLocalPlayerUISubsystem::SetScreenWidget(TSubclassOf<UKCUserWid
 	ActiveScreenWidget = CreateWidget<UKCUserWidget>(OwnerPlayerController, WidgetClass);
 	if (ActiveScreenWidget)
 	{
-		bool bAddedToScreen = false;
+		const bool bAddedToScreen = ActiveScreenWidget->AddToPlayerScreen();
 
-		// 트래블 동안 위젯을 유지시키는 분기
-		if (bPersistAcrossLevelTravel)
-		{
-			// AddToPlayerScreen()은 ZOrder만 받고 Slot 세부값(bAutoRemoveOnWorldRemoved)을 노출 안 함
-			// 플래그를 끄려면 서브시스템 직접 호출 필요
-			if (UGameViewportSubsystem* ViewportSubsystem = UGameViewportSubsystem::Get())
-			{
-				FGameViewportWidgetSlot Slot;
-				Slot.bAutoRemoveOnWorldRemoved = false;
-				ViewportSubsystem->AddWidgetForPlayer(ActiveScreenWidget, OwnerLocalPlayer, Slot);
-				bAddedToScreen = true;
-			}
-		}
-		else
-		{
-			bAddedToScreen = ActiveScreenWidget->AddToPlayerScreen();
-		}
-
-		UE_LOG(LogTemp, Log, TEXT("KC UI set screen: Widget=%s, Class=%s, AddedToScreen=%s, Persistent=%s."),
+		UE_LOG(LogTemp, Log, TEXT("KC UI set screen: Widget=%s, Class=%s, AddedToScreen=%s."),
 			*GetNameSafe(ActiveScreenWidget),
 			*GetNameSafe(WidgetClass),
-			bAddedToScreen ? TEXT("true") : TEXT("false"),
-			bPersistAcrossLevelTravel ? TEXT("true") : TEXT("false"));
+			bAddedToScreen ? TEXT("true") : TEXT("false"));
 	}
 	else
 	{
@@ -73,9 +53,9 @@ void UKCLocalPlayerUISubsystem::ClearScreenWidget()
 	}
 }
 
-UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass, bool bPersistAcrossLevelTravel)
+UKCUserWidget* UKCLocalPlayerUISubsystem::SetHUDWidget(TSubclassOf<UKCUserWidget> WidgetClass)
 {
-	return SetScreenWidget(WidgetClass, bPersistAcrossLevelTravel);
+	return SetScreenWidget(WidgetClass);
 }
 
 void UKCLocalPlayerUISubsystem::ClearHUDWidget()

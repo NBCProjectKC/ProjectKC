@@ -186,6 +186,7 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	if (LobbyWidgetInstance)
 	{
 		LobbyWidgetInstance->PlayMatchStartAnim();
+		LobbyWidgetInstance->RemoveFromParent();
 	}
 	
 	// GasRange 진입 준비: 로딩화면 표시 + 에셋 프리로드 시작점

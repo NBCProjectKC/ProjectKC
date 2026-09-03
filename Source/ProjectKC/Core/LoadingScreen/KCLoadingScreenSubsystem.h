@@ -10,7 +10,8 @@ class UKCLoadingScreen;
 class UKCLoadingViewModel;
 struct FKCLevelChangedStruct;
 class UKCLoadingTipDataAsset;
- 
+class UKCUserWidget;
+
 UCLASS()
 class PROJECTKC_API UKCLoadingScreenSubsystem : public UGameInstanceSubsystem
 {
@@ -32,6 +33,8 @@ public:
 	void BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes,
 	TSubclassOf<UKCLoadingScreen> ScreenClass, const UKCLoadingTipDataAsset* TipsAsset);
  
+	UPROPERTY(Transient)
+	TObjectPtr<UKCUserWidget> ActiveLoadingWidget;
 private:
 	//Message_Level_Changed 받는 콜백
 	void OnLevelChangedMessage(FGameplayTag Channel, const FKCLevelChangedStruct& Message);
@@ -65,6 +68,10 @@ private:
 	
 	FTSTicker::FDelegateHandle ProgressAnimTickerHandle;
 	bool TickProgressAnimation(float DeltaTime);
+	
+	// 100% 노출을 위한 파괴 지연 티커
+	FTSTicker::FDelegateHandle HideDelayTickerHandle;
+	bool HideWidgetDelayed(float DeltaTime);
 	
 	// GMS 핸들
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;

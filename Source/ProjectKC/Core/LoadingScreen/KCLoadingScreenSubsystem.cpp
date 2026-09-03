@@ -9,6 +9,7 @@
 #include "ProjectKC/UI/Loading/Screen/KCLoadingScreen.h"
 #include "ProjectKC/UI/Loading/ViewModel/KCLoadingViewModel.h"
 #include "View/MVVMView.h"
+#include "Blueprint/GameViewportSubsystem.h"
 
 void UKCLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -47,10 +48,6 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] 방어 코드 통과, 상태 초기화 완료"));
 
 	const ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr;
-	UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer ? LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>() : nullptr;
-
-	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] LocalPlayer=%s, UISubsystem=%s"),
-		LocalPlayer ? TEXT("Valid") : TEXT("NULL"), UISubsystem ? TEXT("Valid") : TEXT("NULL"));
 
 	// ============ 1. 뷰모델 준비 ============
 	if (!LoadingViewModel)
@@ -68,33 +65,26 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] 뷰모델 준비 완료, 위젯 표시 단계 진입 직전"));
 
 	// ============ 2. 위젯 표시 + 뷰모델 연결 ============
-	if (UISubsystem)
+	if (LocalPlayer)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] SetHUDWidget 호출 직전"));
-		
-		if (UKCUserWidget* CreatedWidget = UISubsystem->SetHUDWidget(ScreenClass,/*bPersistAcrossLevelTravel=*/true))
+		if (APlayerController* PC = LocalPlayer->GetPlayerController(GetGameInstance()->GetWorld()))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] SetHUDWidget 성공, CreatedWidget=%s"), *GetNameSafe(CreatedWidget));
-			
-			if (UMVVMView* View = CreatedWidget->GetExtension<UMVVMView>())
+			ActiveLoadingWidget = CreateWidget<UKCUserWidget>(PC, ScreenClass);
+			if (ActiveLoadingWidget)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] MVVMView 획득 성공, SetViewModel 호출 직전"));
-				const bool bSetOk = View->SetViewModel(TEXT("LoadingViewModel"), LoadingViewModel);
-				UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] SetViewModel 결과=%s"), bSetOk ? TEXT("true") : TEXT("false"));
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] GetExtension<UMVVMView>() 실패 - WBP_Loading에 뷰모델이 아직 안 등록된 것으로 보임"));
+				if (UGameViewportSubsystem* ViewportSubsystem = UGameViewportSubsystem::Get())
+				{
+					FGameViewportWidgetSlot Slot;
+					Slot.bAutoRemoveOnWorldRemoved = false;
+					ViewportSubsystem->AddWidgetForPlayer(ActiveLoadingWidget, const_cast<ULocalPlayer*>(LocalPlayer), Slot);
+				}
+
+				if (UMVVMView* View = ActiveLoadingWidget->GetExtension<UMVVMView>())
+				{
+					View->SetViewModel(TEXT("LoadingViewModel"), LoadingViewModel);
+				}
 			}
 		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] SetHUDWidget이 nullptr 반환함"));
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] UISubsystem이 NULL이라 위젯 표시 단계 스킵됨"));
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] 위젯 단계 끝, 에셋 프리로드 시작 직전"));
@@ -110,7 +100,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 			{
 				if (StrongThis->LoadingViewModel)
 				{
-					const float CappedProgress = FMath::Min(NewProgress * 0.99f, 0.99f);
+					const float CappedProgress = FMath::Min(NewProgress * 0.97f, 0.97f);
 					UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] SetProgress 호출: NewProgress=%.3f, CappedProgress=%.3f"), NewProgress, CappedProgress);
 					StrongThis->LoadingViewModel->SetProgress(CappedProgress);
 				}
@@ -159,15 +149,23 @@ void UKCLoadingScreenSubsystem::TryHide()
 		LoadingViewModel->SetProgress(1.0f);
 	}
 
-	const ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr;
-	if (UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer ? LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>() : nullptr)
-	{
-		UISubsystem->ClearHUDWidget();
-	}
+	// 100%가 화면에 실제로 그려질 시간을 준 다음에 위젯을 지운다.
+	HideDelayTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+		FTickerDelegate::CreateUObject(this, &UKCLoadingScreenSubsystem::HideWidgetDelayed), 0.5f);
 
 	WaitingForLevel = EKCLevelType::None;
 }
 
+bool UKCLoadingScreenSubsystem::HideWidgetDelayed(float DeltaTime)
+{
+	if (ActiveLoadingWidget)
+	{
+		ActiveLoadingWidget->RemoveFromParent();
+		ActiveLoadingWidget = nullptr;
+	}
+
+	return false;
+}
 bool UKCLoadingScreenSubsystem::TickProgressAnimation(float DeltaTime)
 {
 	if (!LoadingViewModel)
@@ -176,7 +174,7 @@ bool UKCLoadingScreenSubsystem::TickProgressAnimation(float DeltaTime)
 	}
 
 	const double Elapsed = FPlatformTime::Seconds() - PreloadStartTimeSeconds;
-	const float FakeProgress = FMath::Min(static_cast<float>(Elapsed / MinDisplayDurationSeconds) * 0.99f, 0.99f);
+	const float FakeProgress = FMath::Min(static_cast<float>(Elapsed / MinDisplayDurationSeconds) * 0.97f, 0.97f);
 	LoadingViewModel->SetProgress(FakeProgress);
 
 	return true;
