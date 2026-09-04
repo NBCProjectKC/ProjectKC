@@ -10,7 +10,6 @@
 #include "KCPotActor.generated.h"
 
 class UBoxComponent;
-class UDataTable;
 class UPrimitiveComponent;
 class UKCAbilitySystemComponent;
 class UKCCookingProgressAttributeSet;
@@ -78,10 +77,6 @@ protected:
 	/** 0은 1팀, 1은 2팀이다. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "KC|Pot")
 	int32 AssignedTeamId = 0;
-
-	/** GameMode와 동일한 레시피 DataTable을 지정한다. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Pot")
-	TObjectPtr<UDataTable> RecipeDataTable;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Pot")
 	EKCPotStateType PotState = EKCPotStateType::Idle;
