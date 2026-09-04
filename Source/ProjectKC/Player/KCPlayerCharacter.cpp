@@ -358,10 +358,10 @@ void AKCPlayerCharacter::RefreshHeldItemPreview()
 	HeldItemPreviewMesh->SetRelativeTransform(FTransform::Identity);
 
 	USceneComponent* Attachment = HeldItemComponent
-		? HeldItemComponent->GetAttachmentComponent()
+		? HeldItemComponent->GetAttachmentComponentForItem(PreviewItemDefinition)
 		: nullptr;
 	const FName HandSocketName = HeldItemComponent
-		? HeldItemComponent->GetHandSocketName()
+		? HeldItemComponent->ResolveHolderSocketName(PreviewItemDefinition)
 		: NAME_None;
 	if (!PreviewItemDefinition || !Attachment || HandSocketName.IsNone() ||
 		!Attachment->DoesSocketExist(HandSocketName))

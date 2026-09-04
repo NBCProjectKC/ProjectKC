@@ -3,11 +3,13 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayAbilitySpec.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "TimerManager.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Struct/KCLoopingCueStruct.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Task/KCAbilityTask_ActionTraceWindow.h"
@@ -61,6 +63,7 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	bActionExecutionStarted = false;
 	bDurabilityConsumedThisActivation = false;
 	bUseConsumptionPendingThisActivation = false;
+	StopLoopingCue();
 	StopActiveDurabilityDrain(false);
 	ActiveSourceItem = nullptr;
 	ActiveTraceTask = nullptr;
@@ -158,6 +161,8 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	bool bWasCancelled)
 {
 	bFinishingAction = true;
+	// 정상 종료·취소·몽타주 중단이 모두 여기를 지난다. Cue 정리를 Hook에 두면 샌다.
+	StopLoopingCue();
 	StopActiveDurabilityDrain(true);
 	AKCWorldItemActor* PendingConsumptionItem =
 		bUseConsumptionPendingThisActivation
@@ -251,6 +256,8 @@ bool UKCGA_ActionRuntimeBase::BeginActionExecution()
 		ActiveTraceTask->ReadyForActivation();
 	}
 
+	// OnStart Hook이 같은 태그로 일회성 Cue를 쏠 수 있으므로 먼저 붙여 둔다.
+	StartLoopingCue();
 	ExecuteSourceHook(TAG_KC_ActionHook_OnStart);
 	return true;
 }
@@ -450,6 +457,70 @@ void UKCGA_ActionRuntimeBase::NotifySocketTraceWindowEnd()
 	{
 		ActiveTraceTask->EndTraceWindow();
 	}
+}
+
+const FKCLoopingCueStruct* UKCGA_ActionRuntimeBase::GetLoopingCueConfig() const
+{
+	return nullptr;
+}
+
+void UKCGA_ActionRuntimeBase::StartLoopingCue()
+{
+	const FKCLoopingCueStruct* LoopingCue = GetLoopingCueConfig();
+	UAbilitySystemComponent* AbilitySystem =
+		GetAbilitySystemComponentFromActorInfo();
+	if (!LoopingCue || !LoopingCue->IsEnabled() || !AbilitySystem ||
+		!AbilitySystem->IsOwnerActorAuthoritative() ||
+		ActiveLoopingCueTag.IsValid())
+	{
+		return;
+	}
+
+	AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	AKCWorldItemActor* SourceItem = ActiveSourceItem.Get();
+	UObject* SourceObject = GetCurrentSourceObject();
+	AActor* EffectCauser = IsValid(SourceItem) ? SourceItem : AvatarActor;
+
+	FGameplayEffectContextHandle EffectContext =
+		AbilitySystem->MakeEffectContext();
+	EffectContext.AddInstigator(AvatarActor, EffectCauser);
+	if (SourceObject)
+	{
+		EffectContext.AddSourceObject(SourceObject);
+	}
+
+	FGameplayCueParameters CueParameters(EffectContext);
+	CueParameters.Instigator = AvatarActor;
+	CueParameters.EffectCauser = EffectCauser;
+	CueParameters.SourceObject = SourceObject;
+	CueParameters.AbilityLevel = GetAbilityLevel();
+
+	/**
+	 * Location을 비워 둬야 Cue Notify가 부착 대상의 소켓 Transform으로 배치된다.
+	 * 위치와 방향이 모두 아이템을 따라가므로 방향을 따로 계산할 필요가 없다.
+	 */
+	if (LoopingCue->bAttachToSourceItem && IsValid(SourceItem))
+	{
+		CueParameters.TargetAttachComponent = SourceItem->GetItemMesh();
+	}
+
+	AbilitySystem->AddGameplayCue(LoopingCue->CueTag, CueParameters);
+	ActiveLoopingCueTag = LoopingCue->CueTag;
+}
+
+void UKCGA_ActionRuntimeBase::StopLoopingCue()
+{
+	if (!ActiveLoopingCueTag.IsValid())
+	{
+		return;
+	}
+
+	if (UAbilitySystemComponent* AbilitySystem =
+		GetAbilitySystemComponentFromActorInfo())
+	{
+		AbilitySystem->RemoveGameplayCue(ActiveLoopingCueTag);
+	}
+	ActiveLoopingCueTag = FGameplayTag();
 }
 
 void UKCGA_ActionRuntimeBase::ExecuteSourceHook(FGameplayTag HookTag)

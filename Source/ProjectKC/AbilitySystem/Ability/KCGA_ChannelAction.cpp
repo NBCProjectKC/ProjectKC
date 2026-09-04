@@ -28,38 +28,51 @@ void UKCGA_ChannelAction::ActivateAbility(
 
 	const UKCChannelActionDefinition* Definition =
 		Cast<UKCChannelActionDefinition>(GetActiveDefinition());
-	if (!Definition || !IsValid(Definition->ActionMontage.Montage))
+	if (!Definition)
 	{
 		FinishAction(true, false);
 		return;
 	}
 
-	const bool bListenForExecuteEvent =
-		Definition->ExecutionMode == EKCChannelExecutionMode::MontageEvent &&
-		Definition->ActionTargeting->IsA<UKCInstantActionTargeting>();
-	ActiveMontageTask = UKCAbilityTask_PlayActionMontage::Create(
-		this,
-		Definition->ActionMontage,
-		bListenForExecuteEvent);
-	if (!ActiveMontageTask)
+	// MontageEvent는 몽타주 Notify가 유일한 실행 시점이라 몽타주 없이는 성립하지 않는다.
+	const bool bHasMontage = IsValid(Definition->ActionMontage.Montage);
+	if (!bHasMontage &&
+		Definition->ExecutionMode == EKCChannelExecutionMode::MontageEvent)
 	{
 		FinishAction(true, false);
 		return;
 	}
 
-	if (bListenForExecuteEvent)
+	if (bHasMontage)
 	{
-		ActiveMontageTask->OnExecute.AddDynamic(
+		const bool bListenForExecuteEvent =
+			Definition->ExecutionMode == EKCChannelExecutionMode::MontageEvent &&
+			Definition->ActionTargeting->IsA<UKCInstantActionTargeting>();
+		ActiveMontageTask = UKCAbilityTask_PlayActionMontage::Create(
 			this,
-			&UKCGA_ChannelAction::HandleExecuteEvent);
+			Definition->ActionMontage,
+			bListenForExecuteEvent);
+		if (!ActiveMontageTask)
+		{
+			FinishAction(true, false);
+			return;
+		}
+
+		if (bListenForExecuteEvent)
+		{
+			ActiveMontageTask->OnExecute.AddDynamic(
+				this,
+				&UKCGA_ChannelAction::HandleExecuteEvent);
+		}
+		// 몽타주가 끝나면 채널도 끝난다. 유지형 연출에는 루프 몽타주를 써야 한다.
+		ActiveMontageTask->OnCompleted.AddDynamic(
+			this,
+			&UKCGA_ChannelAction::HandleMontageEnded);
+		ActiveMontageTask->OnInterrupted.AddDynamic(
+			this,
+			&UKCGA_ChannelAction::HandleMontageEnded);
+		ActiveMontageTask->ReadyForActivation();
 	}
-	ActiveMontageTask->OnCompleted.AddDynamic(
-		this,
-		&UKCGA_ChannelAction::HandleMontageEnded);
-	ActiveMontageTask->OnInterrupted.AddDynamic(
-		this,
-		&UKCGA_ChannelAction::HandleMontageEnded);
-	ActiveMontageTask->ReadyForActivation();
 
 	if (IsActive() && !IsFinishingAction() &&
 		Definition->ExecutionMode == EKCChannelExecutionMode::FixedInterval)
@@ -112,6 +125,13 @@ void UKCGA_ChannelAction::HandleMontageEnded()
 bool UKCGA_ChannelAction::TryBeginExecutionWindow()
 {
 	return !IsFinishingAction();
+}
+
+const FKCLoopingCueStruct* UKCGA_ChannelAction::GetLoopingCueConfig() const
+{
+	const UKCChannelActionDefinition* Definition =
+		Cast<UKCChannelActionDefinition>(GetActiveDefinition());
+	return Definition ? &Definition->LoopingCue : nullptr;
 }
 
 void UKCGA_ChannelAction::StartFixedIntervalExecution()

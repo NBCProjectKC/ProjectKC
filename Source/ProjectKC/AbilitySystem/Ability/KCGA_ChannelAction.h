@@ -6,6 +6,7 @@
 #include "KCGA_ChannelAction.generated.h"
 
 class UKCAbilityTask_PlayActionMontage;
+struct FKCLoopingCueStruct;
 
 /** Press부터 Release까지 유지되고 각 Event 또는 TraceWindow마다 결과를 만드는 ServerOnly Action이다. */
 UCLASS(Blueprintable, meta = (DisplayName = "KCGA_ChannelAction"))
@@ -42,6 +43,8 @@ protected:
 		bool bWasCancelled) override;
 
 	virtual bool TryBeginExecutionWindow() override;
+
+	virtual const FKCLoopingCueStruct* GetLoopingCueConfig() const override;
 
 private:
 	void StartFixedIntervalExecution();
