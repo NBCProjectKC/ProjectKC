@@ -137,9 +137,21 @@ public:
 	UFUNCTION(Client, Reliable, Category = "KC|Lobby|Chat")
 	void Client_ReceiveChatMessage(const FString& SenderName, const FString& Message);
 
-	/** @brief 채팅 메시지가 수신되었을 때 승재님의 UI 위젯이 감지할 델리게이트 */
+	/** @brief 채팅 메시지가 수신되었을 때 UI 위젯이 감지할 델리게이트 */
 	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Chat|Events")
 	FOnKCChatMessageReceivedDelegate OnChatMessageReceived;
+
+	/* =========================================================================
+	 *  세션 종료 및 퇴장 (Session Termination)
+	 * ========================================================================= */
+
+	/** @brief 서버 -> 클라이언트: 방장이 세션을 종료했음을 알리는 Client RPC */
+	UFUNCTION(Client, Reliable, Category = "KC|Lobby|Session")
+	void Client_NotifySessionTerminated(const FString& Reason);
+
+	/** @brief 방장 권한으로 세션을 종료하고 전원 메인 메뉴로 복귀 (UI 호출 및 콘솔 명령어 겸용) */
+	UFUNCTION(Exec, BlueprintCallable, Category = "KC|Lobby|Session")
+	void EndSession();
 
 protected:
 	//~APlayerController interface
