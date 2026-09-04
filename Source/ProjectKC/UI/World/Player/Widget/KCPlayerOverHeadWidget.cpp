@@ -1,5 +1,6 @@
 #include "ProjectKC/UI/World/Player/Widget/KCPlayerOverHeadWidget.h"
 
+#include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/World/Player/ViewModel/KCPlayerOverHeadViewModel.h"
@@ -48,6 +49,9 @@ void UKCPlayerOverHeadWidget::BindViewModel()
 	PlayerOverHeadViewModel->OnVisibilityChangedNative.AddUObject(
 		this,
 		&ThisClass::HandleVisibilityChanged);
+	PlayerOverHeadViewModel->OnStaminaChangedNative.AddUObject(
+		this,
+		&ThisClass::HandleStaminaChanged);
 }
 
 void UKCPlayerOverHeadWidget::UnbindViewModel()
@@ -60,6 +64,7 @@ void UKCPlayerOverHeadWidget::UnbindViewModel()
 	PlayerOverHeadViewModel->OnPlayerNameChangedNative.RemoveAll(this);
 	PlayerOverHeadViewModel->OnTeamIdChangedNative.RemoveAll(this);
 	PlayerOverHeadViewModel->OnVisibilityChangedNative.RemoveAll(this);
+	PlayerOverHeadViewModel->OnStaminaChangedNative.RemoveAll(this);
 }
 
 void UKCPlayerOverHeadWidget::RefreshFromViewModel()
@@ -74,7 +79,9 @@ void UKCPlayerOverHeadWidget::RefreshFromViewModel()
 	{
 		PlayerNameText->SetText(PlayerOverHeadViewModel->GetPlayerName());
 	}
+
 	RefreshTeamColor();
+	RefreshStamina();
 
 	SetVisibility(PlayerOverHeadViewModel->IsOverHeadVisible()
 		? ESlateVisibility::SelfHitTestInvisible
@@ -85,6 +92,7 @@ void UKCPlayerOverHeadWidget::NativeApplyColorStyle(const UKCColorStyle* InColor
 {
 	Super::NativeApplyColorStyle(InColorStyle);
 	RefreshTeamColor();
+	RefreshStamina();
 }
 
 void UKCPlayerOverHeadWidget::HandlePlayerNameChanged(const FText& NewPlayerName)
@@ -97,7 +105,8 @@ void UKCPlayerOverHeadWidget::HandlePlayerNameChanged(const FText& NewPlayerName
 
 void UKCPlayerOverHeadWidget::HandleTeamIdChanged(int32 NewTeamId)
 {
-	RefreshFromViewModel();
+	RefreshTeamColor();
+	RefreshStamina();
 }
 
 void UKCPlayerOverHeadWidget::HandleVisibilityChanged(bool bNewVisible)
@@ -105,6 +114,11 @@ void UKCPlayerOverHeadWidget::HandleVisibilityChanged(bool bNewVisible)
 	SetVisibility(bNewVisible
 		? ESlateVisibility::SelfHitTestInvisible
 		: ESlateVisibility::Hidden);
+}
+
+void UKCPlayerOverHeadWidget::HandleStaminaChanged(float NewStaminaPercent, bool bNewVisible)
+{
+	RefreshStamina();
 }
 
 void UKCPlayerOverHeadWidget::RefreshTeamColor()
@@ -120,4 +134,24 @@ void UKCPlayerOverHeadWidget::RefreshTeamColor()
 	{
 		PlayerNameText->SetColorAndOpacity(FSlateColor(CurrentColorStyle->TeamColors[TeamId]));
 	}
+}
+
+void UKCPlayerOverHeadWidget::RefreshStamina()
+{
+	if (!SteminaProgressBar || !PlayerOverHeadViewModel)
+	{
+		return;
+	}
+
+	const UKCColorStyle* CurrentColorStyle = GetColorStyle();
+	const int32 TeamId = PlayerOverHeadViewModel->GetTeamId();
+	if (CurrentColorStyle && CurrentColorStyle->TeamColors.IsValidIndex(TeamId))
+	{
+		SteminaProgressBar->SetFillColorAndOpacity(CurrentColorStyle->TeamColors[TeamId]);
+	}
+
+	SteminaProgressBar->SetPercent(PlayerOverHeadViewModel->GetStaminaPercent());
+	SteminaProgressBar->SetVisibility(PlayerOverHeadViewModel->IsStaminaVisible()
+		? ESlateVisibility::SelfHitTestInvisible
+		: ESlateVisibility::Hidden);
 }

@@ -4,6 +4,7 @@
 #include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCPlayerOverHeadWidget.generated.h"
 
+class UProgressBar;
 class UTextBlock;
 class UKCColorStyle;
 class UKCPlayerOverHeadViewModel;
@@ -29,6 +30,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UTextBlock> PlayerNameText;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UProgressBar> SteminaProgressBar;
+
 	UPROPERTY(BlueprintReadOnly, Transient, Category = "KC|UI")
 	TObjectPtr<UKCPlayerOverHeadViewModel> PlayerOverHeadViewModel;
 
@@ -37,7 +41,9 @@ private:
 	void UnbindViewModel();
 	void RefreshFromViewModel();
 	void RefreshTeamColor();
+	void RefreshStamina();
 	void HandlePlayerNameChanged(const FText& NewPlayerName);
 	void HandleTeamIdChanged(int32 NewTeamId);
 	void HandleVisibilityChanged(bool bNewVisible);
+	void HandleStaminaChanged(float NewStaminaPercent, bool bNewVisible);
 };
