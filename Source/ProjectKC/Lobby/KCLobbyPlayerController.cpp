@@ -655,22 +655,11 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	}
 	
 	// GasRange 진입 준비: 로딩화면 표시 + 에셋 프리로드 시작점
-
-	// [임시 디버그 로그] "[KC_LOADING_DEBUG]" 붙은 줄들은 호스트 GasRange 진입 멈춤
-	// 현상 원인 추적용. 원인 찾으면 이 파일에서도 지우면 됨.
-	UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] Client_OnMatchBegin_Implementation 진입"));
 	if (UGameInstance* GI = GetGameInstance())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] GameInstance 확보됨, LoadingScreenSubsystem 탐색 중"));
 		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] LoadingScreenSubsystem 확보됨, BeginPreload 호출 직전"));
 			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange, GasRangePreloadAssetTypes, GasRangeLoadingScreenClass, LoadingTipsAsset);
-			UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] BeginPreload 호출에서 정상 리턴함"));
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[KC_LOADING_DEBUG] LoadingScreenSubsystem이 NULL임!"));
 		}
 	}
 }
