@@ -4,6 +4,7 @@
  */
 
 #include "ProjectKC/Lobby/KCLobbyCharacter.h"
+#include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Lobby/UI/KCPlayerInfoWidget.h"
 #include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/Player/KCPlayerState.h"
@@ -26,6 +27,15 @@ void AKCLobbyCharacter::BeginPlay()
 	CachedWidgetComp = FindComponentByClass<UWidgetComponent>();
 	RefreshPlayerInfoWidget();
 	RefreshCustomizationPresentation();
+
+	if (AKCPlayerState* PresentationPlayerState = Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get()))
+	{
+		BindTeamAppearanceToPlayerState(PresentationPlayerState);
+	}
+	else if (const AKCPlayerSlotActor* PlayerSlot = Cast<AKCPlayerSlotActor>(GetOwner()))
+	{
+		ApplyTeamAppearance(PlayerSlot->GetSlotTeamId());
+	}
 }
 
 void AKCLobbyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -53,6 +63,15 @@ void AKCLobbyCharacter::OnRep_PlayerInfo()
 	OnPlayerInfoUpdated.Broadcast(PlayerInfo);
 	RefreshPlayerInfoWidget();
 	RefreshCustomizationPresentation();
+
+	if (AKCPlayerState* PresentationPlayerState = Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get()))
+	{
+		BindTeamAppearanceToPlayerState(PresentationPlayerState);
+	}
+	else if (const AKCPlayerSlotActor* PlayerSlot = Cast<AKCPlayerSlotActor>(GetOwner()))
+	{
+		ApplyTeamAppearance(PlayerSlot->GetSlotTeamId());
+	}
 }
 
 void AKCLobbyCharacter::RefreshCustomizationPresentation()
@@ -77,6 +96,11 @@ void AKCLobbyCharacter::RefreshCustomizationPresentation()
 	CustomizationComponent->InitializeForPresentation(
 		PresentationPlayerState,
 		LocalPlayerController);
+
+	if (LocalPlayerController)
+	{
+		CustomizationComponent->ApplyLocalSavedCustomization();
+	}
 }
 
 void AKCLobbyCharacter::RefreshPlayerInfoWidget()

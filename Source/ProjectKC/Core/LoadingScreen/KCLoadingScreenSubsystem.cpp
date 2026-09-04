@@ -48,6 +48,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	}
 	LoadingViewModel->SetProgress(0.0f);
 	LoadingViewModel->PickRandomTip(TipsAsset);
+	UpdateLoadingText();
 	
 	PreloadStartTimeSeconds = FPlatformTime::Seconds();
 	ProgressAnimTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
@@ -83,14 +84,15 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 		AssetTypes,
 		[WeakThis](float NewProgress)
 		{
-			if (UKCLoadingScreenSubsystem* StrongThis = WeakThis.Get())
+			// TODO : 현재 에셋매니저의 부하가 적어 가짜 진행률로 대체. 추후 수정할 예정
+			/*if (UKCLoadingScreenSubsystem* StrongThis = WeakThis.Get())
 			{
 				if (StrongThis->LoadingViewModel)
 				{
 					const float CappedProgress = FMath::Min(NewProgress * 0.97f, 0.97f);
 					StrongThis->LoadingViewModel->SetProgress(CappedProgress);
 				}
-			}
+			}*/
 		},
 		[WeakThis]()
 		{
@@ -125,6 +127,7 @@ void UKCLoadingScreenSubsystem::TryHide()
 	if (LoadingViewModel)
 	{
 		LoadingViewModel->SetProgress(1.0f);
+		UpdateLoadingText(); // Loading Text : "준비 완료!"
 	}
 
 	// 100%가 화면에 실제로 그려질 시간을 준 다음에 위젯 떼어냄
@@ -156,6 +159,43 @@ bool UKCLoadingScreenSubsystem::TickProgressAnimation(float DeltaTime)
 	const double Elapsed = FPlatformTime::Seconds() - PreloadStartTimeSeconds;
 	const float FakeProgress = FMath::Min(static_cast<float>(Elapsed / MinDisplayDurationSeconds) * 0.97f, 0.97f);
 	LoadingViewModel->SetProgress(FakeProgress);
+	UpdateLoadingText(); // 진행률 오를 때마다 체크해서 조건 맞으면 갱신
 
 	return true;
+}
+
+void UKCLoadingScreenSubsystem::UpdateLoadingText()
+{
+	if (!LoadingViewModel)
+	{
+		return;
+	}
+	
+	if (bAssetsReady && bLevelReady)
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("준비 완료!")));
+		return;
+	}
+
+	const float CurrentProgress = LoadingViewModel->GetProgress();
+	
+	if (CurrentProgress >= 0.97f)
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("맵 불러오는 중...")));
+		return;
+	}
+
+	// 97% 미만 구간을 에셋 종류별 문구로 3등분
+	if (CurrentProgress < 0.32f)
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("아이템 준비 중...")));
+	}
+	else if (CurrentProgress < 0.64f)
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("이펙트 준비 중...")));
+	}
+	else
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("사운드 준비 중...")));
+	}
 }

@@ -12,6 +12,9 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "ProjectKC/Lobby/KCLobbyPlayerController.h"
+#include "Engine/Engine.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
 {
@@ -51,11 +54,21 @@ void UKCSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] Initialize Failed: OnlineSubsystem::Get() returned null!"));
 	}
+
+	if (GEngine)
+	{
+		NetworkFailureDelegateHandle = GEngine->OnNetworkFailure().AddUObject(this, &UKCSessionSubsystem::HandleNetworkFailure);
+	}
 }
 
 void UKCSessionSubsystem::Deinitialize()
 {
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Deinitializing KCSessionSubsystem..."));
+
+	if (GEngine && NetworkFailureDelegateHandle.IsValid())
+	{
+		GEngine->OnNetworkFailure().Remove(NetworkFailureDelegateHandle);
+	}
 
 	if (SessionInterface.IsValid())
 	{
@@ -73,6 +86,8 @@ void UKCSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLANM
 {
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] CreateSession requested: NumPublicConnections=%d, bIsLANMatch=%s"),
 		NumPublicConnections, bIsLANMatch ? TEXT("TRUE") : TEXT("FALSE"));
+
+	bSessionTerminationNotified = false;
 
 	if (!SessionInterface.IsValid())
 	{
@@ -123,6 +138,8 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 {
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession requested"));
 
+	bSessionTerminationNotified = false;
+
 	// 세션 정보 캐싱 (재접속 지원)
 	CacheSessionResult(SessionResult);
 
@@ -172,6 +189,10 @@ void UKCSessionSubsystem::DestroySession()
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] DestroySession Failed: SessionInterface is invalid"));
 		OnDestroySessionComplete.Broadcast(false);
+		if (bPendingReturnToMainMenu)
+		{
+			PerformReturnToMainMenu();
+		}
 		return;
 	}
 
@@ -180,6 +201,103 @@ void UKCSessionSubsystem::DestroySession()
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] DestroySession returned false immediately"));
 		OnDestroySessionComplete.Broadcast(false);
+		if (bPendingReturnToMainMenu)
+		{
+			PerformReturnToMainMenu();
+		}
+	}
+}
+
+void UKCSessionSubsystem::EndSession()
+{
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] EndSession requested by Host"));
+	BroadcastSessionTerminatedToClients(TEXT("Host has ended the session."));
+	ReturnToMainMenu();
+}
+
+void UKCSessionSubsystem::ReturnToMainMenu()
+{
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] ReturnToMainMenu requested"));
+	bPendingReturnToMainMenu = true;
+
+	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
+	{
+		DestroySession();
+	}
+	else
+	{
+		PerformReturnToMainMenu();
+	}
+}
+
+void UKCSessionSubsystem::PerformReturnToMainMenu()
+{
+	bPendingReturnToMainMenu = false;
+	bSessionTerminationNotified = false;
+	const FName MainMenuLevelName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::MainMenu);
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Opening MainMenu level: %s"), *MainMenuLevelName.ToString());
+
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		UGameplayStatics::OpenLevel(World, MainMenuLevelName);
+	}
+	else
+	{
+		UGameplayStatics::OpenLevel(this, MainMenuLevelName);
+	}
+}
+
+void UKCSessionSubsystem::NotifySessionTerminatedByHost(const FString& Reason)
+{
+	if (bSessionTerminationNotified)
+	{
+		UE_LOG(LogKCSession, Verbose, TEXT("[KCSessionSubsystem] NotifySessionTerminatedByHost skipped: Already notified (Reason: %s)"), *Reason);
+		return;
+	}
+	bSessionTerminationNotified = true;
+
+	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] NotifySessionTerminatedByHost: %s"), *Reason);
+	OnSessionTerminatedByHost.Broadcast(Reason);
+
+	// 방장이 세션을 종료했으므로 선택지(팝업) 없이 즉시 메인 메뉴로 자동 복귀
+	ReturnToMainMenu();
+}
+
+void UKCSessionSubsystem::BroadcastSessionTerminatedToClients(const FString& Reason)
+{
+	UWorld* World = GetWorld();
+	if (!World || World->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Broadcasting SessionTerminated to all remote clients..."));
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (!PC || PC->IsLocalPlayerController())
+		{
+			continue;
+		}
+
+		if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(PC))
+		{
+			LobbyPC->Client_NotifySessionTerminated(Reason);
+		}
+	}
+}
+
+void UKCSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
+{
+	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] HandleNetworkFailure: Type=%d, Error='%s'"),
+		static_cast<int32>(FailureType), *ErrorString);
+
+	// 클라이언트 환경에서 방장과의 연결이 끊겼을 때 (방장이 강제 종료했거나 네트워크가 단절된 경우)
+	if (World && World->GetNetMode() == NM_Client)
+	{
+		NotifySessionTerminatedByHost(TEXT("Connection to host has been lost."));
 	}
 }
 
@@ -301,6 +419,12 @@ void UKCSessionSubsystem::HandleDestroySessionComplete(FName SessionName, bool b
 	}
 
 	OnDestroySessionComplete.Broadcast(bWasSuccessful);
+
+	if (bPendingReturnToMainMenu)
+	{
+		PerformReturnToMainMenu();
+		return;
+	}
 }
 
 void UKCSessionSubsystem::HandleSessionUserInviteAccepted(const bool bWasSuccessful, const int32 ControllerId, FUniqueNetIdPtr UserId, const FOnlineSessionSearchResult& InviteResult)

@@ -11,6 +11,7 @@
 #include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -516,6 +517,18 @@ void AKCLobbyPlayerController::CloseCustomizationEditingSession()
 	CustomizationEditingComponent = nullptr;
 	CustomizationEditingPaintTarget = nullptr;
 	bCustomizationEditing = false;
+
+	// 페인팅 플러그인이 GameOnly로 바꾼 입력 모드를 로비 전용 GameAndUI로 복구
+	if (IsLocalPlayerController())
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+		bEnableClickEvents = true;
+		bEnableMouseOverEvents = true;
+	}
 }
 
 void AKCLobbyPlayerController::RefreshLobbyCustomizationPresentations()
@@ -609,10 +622,10 @@ void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 Target
 {
 	const FString PlayerName = PlayerState ? PlayerState->GetPlayerName() : GetName();
 
-	if (TargetSlotIndex < 0 || TargetSlotIndex >= 6)
+	if (TargetSlotIndex < 0 || TargetSlotIndex >= AKCLobbyGameMode::MAX_LOBBY_SLOTS)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] ROS_RequestMoveToSlot: Invalid SlotIndex %d from Player '%s'"),
-			TargetSlotIndex, *PlayerName);
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] ROS_RequestMoveToSlot: Invalid SlotIndex %d from Player '%s' (Valid: 0-%d)"),
+			TargetSlotIndex, *PlayerName, AKCLobbyGameMode::MAX_LOBBY_SLOTS - 1);
 		return;
 	}
 
@@ -626,6 +639,11 @@ void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 Target
 			GM->MovePlayerToSlot(this, TargetSlotIndex);
 		}
 	}
+}
+
+void AKCLobbyPlayerController::MoveSlot(int32 TargetSlotIndex)
+{
+	ROS_RequestMoveToSlot(TargetSlotIndex);
 }
 
 void AKCLobbyPlayerController::ROS_UpdatePlayerInfo_Implementation()
@@ -755,5 +773,29 @@ void AKCLobbyPlayerController::Client_ReceiveChatMessage_Implementation(const FS
 
 	// 2. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
 	OnChatMessageReceived.Broadcast(SenderName, Message);
+}
+
+void AKCLobbyPlayerController::Client_NotifySessionTerminated_Implementation(const FString& Reason)
+{
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] Client_NotifySessionTerminated received: %s"), *Reason);
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSubsystem->NotifySessionTerminatedByHost(Reason);
+		}
+	}
+}
+
+void AKCLobbyPlayerController::EndSession()
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSubsystem->EndSession();
+		}
+	}
 }
 
