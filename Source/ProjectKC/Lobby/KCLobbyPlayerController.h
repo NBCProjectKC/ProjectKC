@@ -43,9 +43,13 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void ROS_ToggleReadyStatus();
 
-	/** @brief 클라이언트가 서버에 특정 슬롯(TargetSlotIndex: 0~5)으로 1:1 자리 이동을 요청하는 Server RPC */
+	/** @brief 클라이언트가 서버에 특정 슬롯(TargetSlotIndex: 0~5 정규 슬롯, 6: 스왑 슬롯)으로 1:1 자리 이동을 요청하는 Server RPC */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void ROS_RequestMoveToSlot(int32 TargetSlotIndex);
+
+	/** @brief 개발/테스트용 콘솔 명령어로 자리 이동 요청 (콘솔창 ` 열고 'MoveSlot 6' 입력) */
+	UFUNCTION(Exec, Category = "KC|Lobby|Slot")
+	void MoveSlot(int32 TargetSlotIndex);
 
 	/** @brief 클라이언트가 서버에 플레이어 정보 동기화를 요청하는 Server RPC */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
