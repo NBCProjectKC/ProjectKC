@@ -74,7 +74,7 @@ protected:
 	float ResultScreenDuration = 10.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
-	float MatchDurationSeconds = 180.f;
+	float MatchDurationSeconds = 300.f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug")
 	bool bUseFixedRecipeList = true;
