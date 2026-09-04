@@ -5,7 +5,6 @@
 #include "ProjectKC/Core/AssetManager/KCAssetManager.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCLevelChangedStruct.h"
-#include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 #include "ProjectKC/UI/Loading/Screen/KCLoadingScreen.h"
 #include "ProjectKC/UI/Loading/ViewModel/KCLoadingViewModel.h"
 #include "View/MVVMView.h"
@@ -128,7 +127,7 @@ void UKCLoadingScreenSubsystem::TryHide()
 		LoadingViewModel->SetProgress(1.0f);
 	}
 
-	// 100%가 화면에 실제로 그려질 시간을 준 다음에 위젯을 지운다.
+	// 100%가 화면에 실제로 그려질 시간을 준 다음에 위젯 떼어냄
 	HideDelayTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 		FTickerDelegate::CreateUObject(this, &UKCLoadingScreenSubsystem::HideWidgetDelayed), 0.3f);
 
@@ -142,7 +141,7 @@ bool UKCLoadingScreenSubsystem::HideWidgetDelayed(float DeltaTime)
 		ActiveLoadingWidget->RemoveFromParent();
 		ActiveLoadingWidget = nullptr;
 	}
-	
+	// 로딩화면 Hide 후 알림 -> InGameHUD 세팅 호출
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_LoadingScreen_Hidden, FKCEmptyMessageStruct());
 	
 	return false;
