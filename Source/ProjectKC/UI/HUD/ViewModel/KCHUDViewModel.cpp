@@ -214,6 +214,13 @@ void UKCHUDViewModel::HandleLocalTeamIdChanged(int32 NewTeamId)
 
 void UKCHUDViewModel::HandleScoreChanged(FGameplayTag Channel, const FKCScoreChangedStruct& Message)
 {
+	if (Message.TeamId < 0)
+	{
+		return;
+	}
+
+	const int32 PreviousScore = GetTeamScore(Message.TeamId);
+
 	TArray<int32> NewTeamScores = TeamScores;
 	if (Message.TeamId >= NewTeamScores.Num())
 	{
@@ -223,6 +230,12 @@ void UKCHUDViewModel::HandleScoreChanged(FGameplayTag Channel, const FKCScoreCha
 	NewTeamScores[Message.TeamId] = Message.NewScore;
 	SetTeamScores(NewTeamScores);
 	OnScoreChanged(Message.TeamId, Message.NewScore);
+
+	const int32 AddedScore = Message.NewScore - PreviousScore;
+	if (AddedScore > 0)
+	{
+		OnTeamScoreAddedNative.Broadcast(Message.TeamId, AddedScore);
+	}
 }
 
 void UKCHUDViewModel::HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message)

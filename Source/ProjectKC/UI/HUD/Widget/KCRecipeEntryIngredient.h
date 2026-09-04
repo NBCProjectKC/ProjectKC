@@ -50,7 +50,13 @@ protected:
 	TObjectPtr<UBorder> BackBorder;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UBorder> Team1CheckBoxBorder;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UImage> Team1InnerImage;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
+	TObjectPtr<UBorder> Team2CheckBoxBorder;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "KC|UI")
 	TObjectPtr<UImage> Team2InnerImage;

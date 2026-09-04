@@ -23,6 +23,7 @@ struct FKCScoreChangedStruct;
 DECLARE_MULTICAST_DELEGATE(FKCRecipesChangedNativeDelegate);
 DECLARE_MULTICAST_DELEGATE(FKCLocalDishRuinedNativeDelegate);
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCTeamScoresChangedNativeDelegate, const TArray<int32>&);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FKCTeamScoreAddedNativeDelegate, int32, int32);
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCMatchTimerChangedNativeDelegate, int32);
 
 USTRUCT(BlueprintType)
@@ -123,6 +124,7 @@ public:
 		bool bCompleted);
 
 	FKCTeamScoresChangedNativeDelegate OnTeamScoresChangedNative;
+	FKCTeamScoreAddedNativeDelegate OnTeamScoreAddedNative;
 	FKCRecipesChangedNativeDelegate OnRecipesChangedNative;
 	FKCMatchTimerChangedNativeDelegate OnMatchTimerChangedNative;
 	FKCPotProgressChangedNativeDelegate OnPotProgressChangedNative;

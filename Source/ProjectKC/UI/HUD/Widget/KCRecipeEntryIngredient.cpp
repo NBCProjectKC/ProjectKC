@@ -1,5 +1,7 @@
 #include "UI/HUD/Widget/KCRecipeEntryIngredient.h"
 
+#include "Components/Border.h"
+
 #include "Components/Image.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 
@@ -91,8 +93,16 @@ void UKCRecipeEntryIngredient::RefreshSubmittedTeamImages()
 {
 	const UKCColorStyle* ResolvedColorStyle = GetColorStyle();
 
-	auto ApplyTeamImage = [ResolvedColorStyle](UImage* TeamImage, int32 TeamId, bool bSubmitted)
+	auto ApplyTeamVisual = [ResolvedColorStyle](UBorder* TeamBorder, UImage* TeamImage, int32 TeamId, bool bSubmitted)
 	{
+		const bool bHasTeamColor = ResolvedColorStyle && ResolvedColorStyle->TeamColors.IsValidIndex(TeamId);
+		const FLinearColor TeamColor = bHasTeamColor ? ResolvedColorStyle->TeamColors[TeamId] : FLinearColor::White;
+
+		if (TeamBorder && bHasTeamColor)
+		{
+			TeamBorder->SetBrushColor(TeamColor);
+		}
+
 		if (!TeamImage)
 		{
 			return;
@@ -104,14 +114,10 @@ void UKCRecipeEntryIngredient::RefreshSubmittedTeamImages()
 			return;
 		}
 
-		if (ResolvedColorStyle && ResolvedColorStyle->TeamColors.IsValidIndex(TeamId))
-		{
-			TeamImage->SetColorAndOpacity(ResolvedColorStyle->TeamColors[TeamId]);
-		}
-
+		TeamImage->SetColorAndOpacity(TeamColor);
 		TeamImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	};
 
-	ApplyTeamImage(Team1InnerImage.Get(), 0, CurrentIngredient.bSubmittedByTeam0);
-	ApplyTeamImage(Team2InnerImage.Get(), 1, CurrentIngredient.bSubmittedByTeam1);
+	ApplyTeamVisual(Team1CheckBoxBorder.Get(), Team1InnerImage.Get(), 0, CurrentIngredient.bSubmittedByTeam0);
+	ApplyTeamVisual(Team2CheckBoxBorder.Get(), Team2InnerImage.Get(), 1, CurrentIngredient.bSubmittedByTeam1);
 }
