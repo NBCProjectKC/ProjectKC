@@ -50,6 +50,8 @@ class PROJECTKC_API AKCItemSpawnManager : public AActor
 
 public:
 	AKCItemSpawnManager();
+	virtual void GetLifetimeReplicatedProps(
+		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
@@ -136,12 +138,19 @@ private:
 		const FTransform* OverrideTransform = nullptr);
 	FTransform BuildOrbitTransform(const FSpawnSlot& TargetSlot) const;
 	void UpdateIngredientOrbit(float DeltaSeconds);
+	void DisableReplicatedOrbitPhysics();
 
 	UFUNCTION()
 	void HandleItemDestroyed(AActor* DestroyedActor);
 
 	UFUNCTION()
 	void HandleItemStateChanged(EKCWorldItemState NewState, AActor* NewHolder);
+
+	UFUNCTION()
+	void OnRep_OrbitItems();
+
+	UPROPERTY(ReplicatedUsing = OnRep_OrbitItems)
+	TArray<TObjectPtr<AKCWorldItemActor>> ReplicatedOrbitItems;
 
 	TArray<FSpawnSlot> Slots;
 	FGameplayMessageListenerHandle RecipeListener;

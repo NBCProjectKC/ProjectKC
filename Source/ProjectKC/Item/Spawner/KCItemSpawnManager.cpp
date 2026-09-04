@@ -1,6 +1,7 @@
 #include "ProjectKC/Item/Spawner/KCItemSpawnManager.h"
 
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Misc/DataValidation.h"
@@ -11,6 +12,7 @@
 #include "ProjectKC/Item/Spawner/KCItemSpawnPoint.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCActiveRecipesChangedStruct.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCItemSpawnManager, Log, All);
@@ -19,9 +21,17 @@ AKCItemSpawnManager::AKCItemSpawnManager()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
-	bNetLoadOnClient = false;
+	bReplicates = true;
+	SetReplicateMovement(false);
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 	ItemActorClass = AKCWorldItemActor::StaticClass();
+}
+
+void AKCItemSpawnManager::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AKCItemSpawnManager, ReplicatedOrbitItems);
 }
 
 bool AKCItemSpawnManager::ValidateSettings(FString& OutError) const
@@ -128,7 +138,13 @@ EDataValidationResult AKCItemSpawnManager::IsDataValid(FDataValidationContext& C
 void AKCItemSpawnManager::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!HasAuthority() || GetNetMode() == NM_Client) { return; }
+	if (GetNetMode() == NM_Client)
+	{
+		SetActorTickEnabled(
+			IngredientPlacementMode == EKCIngredientPlacementMode::Orbit);
+		return;
+	}
+	if (!HasAuthority()) { return; }
 	for (TActorIterator<AKCItemSpawnManager> It(GetWorld()); It; ++It)
 	{
 		if (*It != this && It->bRunning)
@@ -168,6 +184,7 @@ void AKCItemSpawnManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 				&ThisClass::HandleItemStateChanged);
 		}
 	}
+	ReplicatedOrbitItems.Reset();
 	Slots.Reset();
 	Super::EndPlay(EndPlayReason);
 }
@@ -175,8 +192,16 @@ void AKCItemSpawnManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AKCItemSpawnManager::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (bRunning && HasAuthority() && GetNetMode() != NM_Client &&
-		IngredientPlacementMode == EKCIngredientPlacementMode::Orbit)
+	if (IngredientPlacementMode != EKCIngredientPlacementMode::Orbit)
+	{
+		return;
+	}
+	if (GetNetMode() == NM_Client)
+	{
+		DisableReplicatedOrbitPhysics();
+		return;
+	}
+	if (bRunning && HasAuthority())
 	{
 		UpdateIngredientOrbit(DeltaSeconds);
 	}
@@ -359,6 +384,22 @@ void AKCItemSpawnManager::UpdateIngredientOrbit(float DeltaSeconds)
 	}
 }
 
+void AKCItemSpawnManager::DisableReplicatedOrbitPhysics()
+{
+	for (AKCWorldItemActor* Item : ReplicatedOrbitItems)
+	{
+		if (IsValid(Item) && Item->GetItemMesh())
+		{
+			Item->GetItemMesh()->SetSimulatePhysics(false);
+		}
+	}
+}
+
+void AKCItemSpawnManager::OnRep_OrbitItems()
+{
+	DisableReplicatedOrbitPhysics();
+}
+
 void AKCItemSpawnManager::ServiceSpawns()
 {
 	if (!HasAuthority() || GetNetMode() == NM_Client || !bRunning) { return; }
@@ -394,6 +435,9 @@ void AKCItemSpawnManager::ServiceSpawns()
 			Item->OnDestroyed.AddDynamic(this, &ThisClass::HandleItemDestroyed);
 			if (bUseOrbit)
 			{
+				ReplicatedOrbitItems.AddUnique(Item);
+				DisableReplicatedOrbitPhysics();
+				ForceNetUpdate();
 				Item->OnItemStateChanged.AddDynamic(
 					this,
 					&ThisClass::HandleItemStateChanged);
@@ -410,6 +454,9 @@ void AKCItemSpawnManager::HandleItemDestroyed(AActor* DestroyedActor)
 	{
 		if (Slot.Item.Get(true) == DestroyedActor)
 		{
+			ReplicatedOrbitItems.Remove(
+				Cast<AKCWorldItemActor>(DestroyedActor));
+			ForceNetUpdate();
 			Slot.Item.Reset();
 			if (!Slot.bIngredient) { Slot.Definition.Reset(); }
 			const float DelayMin = Slot.bIngredient
@@ -440,6 +487,8 @@ void AKCItemSpawnManager::HandleItemStateChanged(
 			Slot.Item->GetItemState() == EKCWorldItemState::Held)
 		{
 			Slot.bOrbiting = false;
+			ReplicatedOrbitItems.Remove(Slot.Item.Get());
+			ForceNetUpdate();
 		}
 	}
 }
