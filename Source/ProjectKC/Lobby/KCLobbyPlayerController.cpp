@@ -610,10 +610,10 @@ void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 Target
 {
 	const FString PlayerName = PlayerState ? PlayerState->GetPlayerName() : GetName();
 
-	if (TargetSlotIndex < 0 || TargetSlotIndex >= 6)
+	if (TargetSlotIndex < 0 || TargetSlotIndex >= AKCLobbyGameMode::MAX_LOBBY_SLOTS)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] ROS_RequestMoveToSlot: Invalid SlotIndex %d from Player '%s'"),
-			TargetSlotIndex, *PlayerName);
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] ROS_RequestMoveToSlot: Invalid SlotIndex %d from Player '%s' (Valid: 0-%d)"),
+			TargetSlotIndex, *PlayerName, AKCLobbyGameMode::MAX_LOBBY_SLOTS - 1);
 		return;
 	}
 
@@ -627,6 +627,11 @@ void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 Target
 			GM->MovePlayerToSlot(this, TargetSlotIndex);
 		}
 	}
+}
+
+void AKCLobbyPlayerController::MoveSlot(int32 TargetSlotIndex)
+{
+	ROS_RequestMoveToSlot(TargetSlotIndex);
 }
 
 void AKCLobbyPlayerController::ROS_UpdatePlayerInfo_Implementation()
