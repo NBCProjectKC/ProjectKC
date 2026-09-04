@@ -4,6 +4,8 @@
 #include "ProjectKC/UI/Common/Core/KCViewModelBase.h"
 #include "KCLoadingViewModel.generated.h"
 
+class UKCLoadingTipDataAsset;
+
 UCLASS(BlueprintType, Blueprintable, meta = (MVVMAllowedContextCreationType = "Manual|CreateInstance"))
 class PROJECTKC_API UKCLoadingViewModel : public UKCViewModelBase
 {
@@ -30,6 +32,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI|Preview")
 	void SetPreviewData(float NewProgress, const FText& NewLoadingText, const FText& NewTipText);
+	
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void PickRandomTip(const UKCLoadingTipDataAsset* TipsAsset);
 
 private:
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))

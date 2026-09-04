@@ -16,10 +16,12 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraActor.h"
 #include "Components/StaticMeshComponent.h"
+#include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "InputCoreTypes.h"
 #include "Painting/PaintingModeControllerComponent.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
@@ -649,6 +651,16 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	if (LobbyWidgetInstance)
 	{
 		LobbyWidgetInstance->PlayMatchStartAnim();
+		LobbyWidgetInstance->RemoveFromParent();
+	}
+	
+	// GasRange 진입 준비: 로딩화면 표시 + 에셋 프리로드 시작점
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange, GasRangePreloadAssetTypes, GasRangeLoadingScreenClass, LoadingTipsAsset);
+		}
 	}
 }
 

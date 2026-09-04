@@ -53,4 +53,9 @@ namespace KCGameplayTags
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Item_Equip);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Pot_SubmitIngredient);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Pot_Cook);
+	
+	/* =========================================================================
+	 *  Loading Screen Tag
+	 * ========================================================================= */
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_LoadingScreen_Hidden);
 }

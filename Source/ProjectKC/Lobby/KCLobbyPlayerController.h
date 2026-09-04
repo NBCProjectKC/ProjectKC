@@ -14,6 +14,8 @@ class UKCLobbyWidget;
 class ACameraActor;
 class AKCLobbyCharacter;
 class UKCCustomizationNetworkComponent;
+class UKCLoadingScreen;
+class UKCLoadingTipDataAsset;
 class UKCPlayerCustomizationComponent;
 class UPaintingModeControllerComponent;
 class URuntimeMeshPaintTargetComponent;
@@ -161,6 +163,20 @@ protected:
 	/** @brief 생성된 로비 메인 UI 위젯 인스턴스 */
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCLobbyWidget> LobbyWidgetInstance;
+
+	/** @brief GasRange 진입 전 표시할 로딩화면 위젯 클래스
+	 * Client_OnMatchBegin에서 UKCLoadingScreenSubsystem::BeginPreload()에 전달
+	 *  BP_PC_Lobby 디테일 -> WBP_Loading 지정 필요 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TSubclassOf<UKCLoadingScreen> GasRangeLoadingScreenClass;
+
+	/** @brief GasRange 진입 전 pre-load 할 PrimaryAssetType 목록 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TArray<FPrimaryAssetType> GasRangePreloadAssetTypes;
+
+	/** @brief 로딩화면에 표시할 팁 문구 목록 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TObjectPtr<UKCLoadingTipDataAsset> LoadingTipsAsset;
 
 	/** 로비에서도 인게임과 동일한 외형 업로드/다운로드 경로를 사용합니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization|Network")

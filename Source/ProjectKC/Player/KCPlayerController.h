@@ -8,6 +8,8 @@ struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
 class UKCCustomizationNetworkComponent;
+struct FGameplayTag;
+struct FKCEmptyMessageStruct;
 
 UCLASS()
 class PROJECTKC_API AKCPlayerController : public APlayerController
@@ -31,6 +33,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaSeconds) override;
+	// 로딩화면 끝 콜백
+	void HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message);
 
 private:
 	void InitializeInGameHUD();
