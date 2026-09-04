@@ -11,6 +11,7 @@
 #include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -755,5 +756,29 @@ void AKCLobbyPlayerController::Client_ReceiveChatMessage_Implementation(const FS
 
 	// 2. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
 	OnChatMessageReceived.Broadcast(SenderName, Message);
+}
+
+void AKCLobbyPlayerController::Client_NotifySessionTerminated_Implementation(const FString& Reason)
+{
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] Client_NotifySessionTerminated received: %s"), *Reason);
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSubsystem->NotifySessionTerminatedByHost(Reason);
+		}
+	}
+}
+
+void AKCLobbyPlayerController::EndSession()
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSubsystem->EndSession();
+		}
+	}
 }
 
