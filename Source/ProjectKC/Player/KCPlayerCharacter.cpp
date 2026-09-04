@@ -88,6 +88,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		TEXT("/Game/KC/Player/Avatar/MI_Red.MI_Red"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlueMaterialFinder(
 		TEXT("/Game/KC/Player/Avatar/MI_Blue.MI_Blue"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BrownMaterialFinder(
+		TEXT("/Game/KC/Player/Avatar/MI_Brown.MI_Brown"));
 	if (RedMaterialFinder.Succeeded())
 	{
 		FKCAvatarTeamAppearanceStruct& Team0Appearance =
@@ -105,6 +107,15 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		Team1Appearance.BodyMaterial = BlueMaterialFinder.Object;
 		Team1Appearance.HandMaterial = BlueMaterialFinder.Object;
 		Team1Appearance.FootMaterial = BlueMaterialFinder.Object;
+	}
+	if (BrownMaterialFinder.Succeeded())
+	{
+		FKCAvatarTeamAppearanceStruct& WaitingAppearance =
+			TeamAppearances.AddDefaulted_GetRef();
+		WaitingAppearance.TeamId = -1;
+		WaitingAppearance.BodyMaterial = BrownMaterialFinder.Object;
+		WaitingAppearance.HandMaterial = BrownMaterialFinder.Object;
+		WaitingAppearance.FootMaterial = BrownMaterialFinder.Object;
 	}
 
 	AvatarBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarBody"));
@@ -358,10 +369,10 @@ void AKCPlayerCharacter::RefreshHeldItemPreview()
 	HeldItemPreviewMesh->SetRelativeTransform(FTransform::Identity);
 
 	USceneComponent* Attachment = HeldItemComponent
-		? HeldItemComponent->GetAttachmentComponent()
+		? HeldItemComponent->GetAttachmentComponentForItem(PreviewItemDefinition)
 		: nullptr;
 	const FName HandSocketName = HeldItemComponent
-		? HeldItemComponent->GetHandSocketName()
+		? HeldItemComponent->ResolveHolderSocketName(PreviewItemDefinition)
 		: NAME_None;
 	if (!PreviewItemDefinition || !Attachment || HandSocketName.IsNone() ||
 		!Attachment->DoesSocketExist(HandSocketName))

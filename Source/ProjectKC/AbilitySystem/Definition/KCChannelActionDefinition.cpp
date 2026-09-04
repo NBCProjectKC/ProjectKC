@@ -10,9 +10,25 @@ TSubclassOf<UKCGA_Base> UKCChannelActionDefinition::GetAbilityClass() const
 
 bool UKCChannelActionDefinition::ValidateLifecycle(FString& OutError) const
 {
-	if (!IsValid(ActionMontage.Montage))
+	/**
+	 * MontageEvent는 실행 시점을 몽타주의 Notify에서 받으므로 몽타주가 없으면
+	 * 영원히 아무것도 실행하지 못한다. FixedInterval은 서버 타이머가 시점을 만들고
+	 * Instant Targeting만 허용하므로 몽타주는 연출일 뿐이라 없어도 된다.
+	 */
+	if (ExecutionMode == EKCChannelExecutionMode::MontageEvent &&
+		!IsValid(ActionMontage.Montage))
 	{
-		OutError = TEXT("Channel Action에는 유지 동작을 재생할 Montage가 필요합니다.");
+		OutError = TEXT(
+			"Montage Event Channel Action에는 실행 시점을 담을 Montage가 필요합니다.");
+		return false;
+	}
+
+	FString LoopingCueError;
+	if (!LoopingCue.Validate(LoopingCueError))
+	{
+		OutError = FString::Printf(
+			TEXT("LoopingCue가 유효하지 않습니다: %s"),
+			*LoopingCueError);
 		return false;
 	}
 

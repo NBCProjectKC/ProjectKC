@@ -171,7 +171,7 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	UKCChannelActionDefinition* ChannelDefinition =
 		MakeChannelDefinition(UKCOverlapTargeting::StaticClass());
 	TestFalse(
-		TEXT("Channel Action은 반복 실행 시점을 제공할 Montage가 필수다."),
+		TEXT("Montage Event Channel Action은 실행 시점을 담을 Montage가 필수다."),
 		ChannelDefinition->Validate(Error));
 	AddMontage(ChannelDefinition);
 	TestTrue(
@@ -196,6 +196,15 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Instant Targeting Channel은 고정 주기 Pulse를 사용할 수 있다."),
 		FixedIntervalChannel->ValidateWithActionContract(Error));
+
+	UKCChannelActionDefinition* MontagelessFixedInterval =
+		MakeChannelDefinition(UKCSweepTargeting::StaticClass());
+	MontagelessFixedInterval->ExecutionMode =
+		EKCChannelExecutionMode::FixedInterval;
+	MontagelessFixedInterval->PulseInterval = 0.1f;
+	TestTrue(
+		TEXT("FixedInterval Channel은 서버 타이머가 시점을 만들므로 Montage가 없어도 된다."),
+		MontagelessFixedInterval->ValidateWithActionContract(Error));
 
 	UKCChannelActionDefinition* TooFastFixedInterval =
 		MakeChannelDefinition(UKCSweepTargeting::StaticClass());

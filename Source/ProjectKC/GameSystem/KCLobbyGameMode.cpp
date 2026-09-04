@@ -534,15 +534,20 @@ bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlo
 		return false;
 	}
 
-	// 2. 기존 슬롯 비우기
+	// 2. 기존 슬롯에서 캐릭터 분리 (액터를 파괴하지 않고 슬롯만 비움)
+	AKCLobbyCharacter* MovingCharacter = nullptr;
 	const int32 PrevSlotIdx = PS->GetSlotIndex();
 	if (AKCPlayerSlotActor* PrevSlot = FindSlotByIndex(PrevSlotIdx))
 	{
-		PrevSlot->ClearSlot();
+		MovingCharacter = PrevSlot->GetSpawnedCharacter();
+		PrevSlot->ClearSlot(false);
 	}
 
-	// 3. 새 슬롯에 배정
-	AssignPlayerToSlot(TargetSlot, PS);
+	// 3. 새 슬롯에 배정 (기존 캐릭터를 그대로 인계하여 커스텀 외형 보존)
+	const FKCPlayerInfoStruct Info(PS->GetPlayerName(), PS->IsReady(), PS);
+	TargetSlot->AssignPlayer(Info, MovingCharacter);
+	PS->SetSlotIndex(TargetSlot->GetSlotIndex());
+	PS->SetTeamId(TargetSlot->GetSlotTeamId());
 
 	// 스왑 슬롯으로 이동한 경우 레디 상태를 즉시 false로 해제
 	if (TargetSlotIndex == SWAP_SLOT_INDEX)

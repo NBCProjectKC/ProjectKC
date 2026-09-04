@@ -1,7 +1,6 @@
 #include "ProjectKC/Pot/KCPotActor.h"
 
 #include "Components/BoxComponent.h"
-#include "Engine/DataTable.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
@@ -189,15 +188,17 @@ void AKCPotActor::HandleRecipeCompleted(
 	FGameplayTag Channel,
 	const FKCRecipeCompletedStruct& Message)
 {
+	const AKCGameState* GameState = GetWorld()
+		? GetWorld()->GetGameState<AKCGameState>()
+		: nullptr;
 	if (!HasAuthority() || PotState != EKCPotStateType::Idle ||
-		Message.TeamId != AssignedTeamId || !RecipeDataTable)
+		Message.TeamId != AssignedTeamId || !GameState)
 	{
 		return;
 	}
 
-	const FKCRecipeStruct* Recipe = RecipeDataTable->FindRow<FKCRecipeStruct>(
-		Message.RecipeRowName,
-		TEXT("PotRecipeCompleted"));
+	const FKCRecipeStruct* Recipe =
+		GameState->FindRecipeByRowName(Message.RecipeRowName);
 	if (!Recipe || !FMath::IsFinite(Recipe->ProgressSpeedPerSecond) ||
 		Recipe->ProgressSpeedPerSecond <= 0.0f)
 	{
@@ -227,16 +228,14 @@ bool AKCPotActor::IsRegisteredIngredient(const FGameplayTag& IngredientId) const
 	const AKCGameState* GameState = GetWorld()
 		? GetWorld()->GetGameState<AKCGameState>()
 		: nullptr;
-	if (!RecipeDataTable || !GameState)
+	if (!GameState)
 	{
 		return false;
 	}
 
 	for (const FName& RowName : GameState->GetActiveRecipes())
 	{
-		const FKCRecipeStruct* Recipe = RecipeDataTable->FindRow<FKCRecipeStruct>(
-			RowName,
-			TEXT("PotRegisteredIngredient"));
+		const FKCRecipeStruct* Recipe = GameState->FindRecipeByRowName(RowName);
 		if (Recipe && Recipe->RequiredIngredients.Contains(IngredientId))
 		{
 			return true;
