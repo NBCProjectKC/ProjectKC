@@ -32,6 +32,14 @@ struct PROJECTKC_API FKCItemPresentationStruct
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
 	FName GripSocketName = TEXT("Grip");
 
+	/**
+	 * 이 아이템을 Holder의 어느 소켓에 붙일지 덮어쓴다.
+	 * 비어 있으면 Holder의 HeldItemComponent가 정한 HandSocketName을 쓴다.
+	 * 등에 메거나 허리에 차는 등 손이 아닌 곳에 붙는 아이템에만 지정한다.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
+	FName HolderSocketNameOverride = NAME_None;
+
 	/** 실제 Anim Sequence는 AnimBP가 이 키에 매핑한다. 아이템에는 자세 종류만 저장한다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Animation")
 	EKCHeldPose HeldPose = EKCHeldPose::Default;

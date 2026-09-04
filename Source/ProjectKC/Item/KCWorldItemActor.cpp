@@ -554,12 +554,12 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 
 	UKCHeldItemComponent* HolderItemComponent =
 		RuntimeState.Holder->FindComponentByClass<UKCHeldItemComponent>();
-	USceneComponent* AttachParent = HolderItemComponent
-		? HolderItemComponent->ResolveAttachmentComponent()
-		: nullptr;
 	const FName AttachSocket = HolderItemComponent
-		? HolderItemComponent->HandSocketName
+		? HolderItemComponent->ResolveHolderSocketName(ItemDefinition)
 		: NAME_None;
+	USceneComponent* AttachParent = HolderItemComponent
+		? HolderItemComponent->ResolveAttachmentComponent(AttachSocket)
+		: nullptr;
 	if (!AttachParent || AttachSocket.IsNone() ||
 		!AttachParent->DoesSocketExist(AttachSocket))
 	{

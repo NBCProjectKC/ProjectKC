@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
+#include "ProjectKC/AbilitySystem/Struct/KCLoopingCueStruct.h"
 #include "KCChannelActionDefinition.generated.h"
 
 /** Channel Action이 반복 결과를 만드는 기준이다. */
@@ -57,6 +58,17 @@ public:
 			EditCondition = "ExecutionMode == EKCChannelExecutionMode::FixedInterval",
 			EditConditionHides))
 	bool bExecuteImmediately = true;
+
+	/**
+	 * Press부터 Release까지 유지할 표현 Cue다. 화염방사처럼 누르는 동안 이어지는
+	 * 연출에 쓴다. GA가 실행 시작에 붙이고 종료에 뗀다.
+	 */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Presentation",
+		meta = (ShowOnlyInnerProperties))
+	FKCLoopingCueStruct LoopingCue;
 
 protected:
 	virtual bool ValidateLifecycle(FString& OutError) const override;
