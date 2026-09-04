@@ -1,4 +1,5 @@
 #include "ProjectKC/UI/Loading/ViewModel/KCLoadingViewModel.h"
+#include "ProjectKC/UI/Loading/Tip/KCLoadingTipDataAsset.h"
 
 void UKCLoadingViewModel::SetProgress(float NewProgress)
 {
@@ -20,4 +21,15 @@ void UKCLoadingViewModel::SetPreviewData(float NewProgress, const FText& NewLoad
 	SetProgress(NewProgress);
 	SetLoadingText(NewLoadingText);
 	SetTipText(NewTipText);
+}
+
+void UKCLoadingViewModel::PickRandomTip(const UKCLoadingTipDataAsset* TipsAsset)
+{
+	if (!TipsAsset || TipsAsset->Tips.Num() == 0)
+	{
+		return;
+	}
+
+	const int32 RandomIndex = FMath::RandHelper(TipsAsset->Tips.Num());
+	SetTipText(TipsAsset->Tips[RandomIndex].Text);
 }

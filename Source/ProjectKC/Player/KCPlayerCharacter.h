@@ -19,8 +19,11 @@ class UKCEmoteComponent;
 class UKCHeldItemComponent;
 class UKCItemDefinition;
 class UKCKnockbackComponent;
+class UKCPlayerCustomizationComponent;
 class UKCPlayerOverHeadComponent;
+class UKCPlayerInteractionPromptComponent;
 class UKCPlayerInteractionComponent;
+class UKCProjectileTrajectoryPreviewComponent;
 class USceneComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
@@ -72,8 +75,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Knockback")
 	UKCKnockbackComponent* GetKnockbackComponent() const;
 
+	UFUNCTION(BlueprintPure, Category = "KC|Projectile|Preview")
+	UKCProjectileTrajectoryPreviewComponent*
+	GetProjectileTrajectoryPreviewComponent() const;
+	
+	UFUNCTION(BlueprintPure, Category = "KC|Customization")
+	UKCPlayerCustomizationComponent* GetPlayerCustomizationComponent() const;
+
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UKCPlayerInteractionComponent* GetInteractionComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	UKCPlayerInteractionPromptComponent* GetInteractionPromptComponent() const;
 
 	/** 선택한 Item Definition을 실제 HandItem/Grip 계산으로 에디터에 표시한다. */
 	UFUNCTION(CallInEditor, Category = "KC|Item|Preview")
@@ -157,6 +170,18 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCKnockbackComponent> KnockbackComponent;
 
+	UPROPERTY(
+		VisibleAnywhere,
+		BlueprintReadOnly,
+		Category = "KC|Projectile|Preview",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCProjectileTrajectoryPreviewComponent>
+		ProjectileTrajectoryPreviewComponent;
+		
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerCustomizationComponent> PlayerCustomizationComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerInteractionComponent> InteractionComponent;
@@ -164,6 +189,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|UI",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UKCPlayerOverHeadComponent> PlayerOverHeadComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|UI",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UKCPlayerInteractionPromptComponent> InteractionPromptComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Avatar",
 		meta = (AllowPrivateAccess = "true"))

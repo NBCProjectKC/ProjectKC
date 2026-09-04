@@ -32,6 +32,10 @@ public:
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
+	virtual FGameplayTag GetInteractionPromptTag_Implementation(
+		AActor* Interactor) const override;
+	virtual FVector GetInteractionPromptWorldLocation_Implementation(
+		AActor* Interactor) const override;
 
 	UFUNCTION(BlueprintPure, Category = "KC|Pot")
 	EKCPotStateType GetPotState() const { return PotState; }

@@ -11,7 +11,11 @@ struct PROJECTKC_API FKCActionMontageConfigStruct
 {
 	GENERATED_BODY()
 
-	/** 비어 있으면 Single Action은 즉시 실행한다. Channel Action에는 필수다. */
+	/**
+	 * 비어 있으면 Single Action은 즉시 실행한다.
+	 * Channel Action은 Montage Event 방식일 때만 필수다. Fixed Interval은
+	 * 서버 타이머가 실행 시점을 만들므로 몽타주 없이도 동작한다.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Playback")
 	TObjectPtr<UAnimMontage> Montage;
 

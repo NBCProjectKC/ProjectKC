@@ -42,6 +42,19 @@ namespace KCGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Recipe_Completed, "Message.Recipe.Completed", "재료가 다 모여 요리가 시작될 때 서버에서 브로드캐스트되는 메시지 채널입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Dish_Finished, "Message.Dish.Finished", "요리 진행도 100% 도달 시 냄비에서 브로드캐스트되는 메시지 채널입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_Dish_Ruined, "Message.Dish.Ruined", "잘못된 재료 투입으로 요리가 망했을 때 서버에서 브로드캐스트되는 메시지 채널입니다.");
+
+	/* =========================================================================
+	 *  Interaction Prompt Tags
+	 * ========================================================================= */
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Item_PickUp, "Interaction.Item.PickUp", "월드 아이템을 주울 수 있을 때 표시하는 상호작용 프롬프트입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Item_Equip, "Interaction.Item.Equip", "월드 아이템을 장착할 수 있을 때 표시하는 상호작용 프롬프트입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Pot_SubmitIngredient, "Interaction.Pot.SubmitIngredient", "냄비에 들고 있는 재료를 넣을 수 있을 때 표시하는 상호작용 프롬프트입니다.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Pot_Cook, "Interaction.Pot.Cook", "냄비를 조리 상호작용할 수 있을 때 표시하는 상호작용 프롬프트입니다.");
+	
+	/* =========================================================================
+	 *  Loading Screen Tags
+	 * ========================================================================= */
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_LoadingScreen_Hidden, "Message.LoadingScreen.Hidden", "로딩화면 위젯이 화면에서 완전히 사라졌을 때 브로드캐스트되는 메시지 채널입니다.");
 	
 	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString)
 	{

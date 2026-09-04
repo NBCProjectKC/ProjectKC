@@ -8,6 +8,7 @@
 class UImage;
 class UTextBlock;
 class UWidgetAnimation;
+class UKCColorStyle;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTKC_API UKCHUDPotProgressWidget : public UKCUserWidget
@@ -19,14 +20,22 @@ public:
 	virtual void NativeDestruct() override;
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetTeamId(int32 NewTeamId);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetPotProgress(const FKCPotProgressViewData& PotProgress);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void HidePotProgress();
 
 protected:
+	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KC|UI|Preview")
 	FKCPotProgressViewData PreviewPotProgress;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KC|UI|Preview")
+	int32 TeamId = 0;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|UI|Material")
 	FName ProgressParameterName = TEXT("Radial_wipe");
@@ -50,6 +59,7 @@ private:
 	void ShowPotProgress();
 	void ApplyProgressMaterial(float ProgressPercent);
 	void ApplyRemainingSeconds(int32 RemainingSeconds);
+	void ApplyTeamColor();
 	void PlayCompletedAnimationThenHide();
 	void PlayHideAnimationThenHide();
 

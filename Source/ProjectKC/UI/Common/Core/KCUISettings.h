@@ -10,6 +10,7 @@ class UKCToastWidget;
 class UKCModalWidget;
 class UKCWorldIndicatorWidget;
 class UKCInteractionPromptWidget;
+class UKCInteractionPromptRegistry;
 class UKCUserWidget;
 
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "ProjectKC UI"))
@@ -53,4 +54,7 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Indicator")
 	TSoftClassPtr<UKCInteractionPromptWidget> InteractionPromptWidgetClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Indicator")
+	TSoftObjectPtr<UKCInteractionPromptRegistry> InteractionPromptRegistry;
 };

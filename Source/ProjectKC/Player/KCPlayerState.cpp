@@ -21,6 +21,7 @@ void AKCPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AKCPlayerState, TeamId);
 	DOREPLIFETIME(AKCPlayerState, SlotIndex);
 	DOREPLIFETIME(AKCPlayerState, GamePlayerName);
+	DOREPLIFETIME(AKCPlayerState, CustomizationDescriptor);
 }
 
 void AKCPlayerState::CopyProperties(APlayerState* PlayerState)
@@ -34,6 +35,10 @@ void AKCPlayerState::CopyProperties(APlayerState* PlayerState)
 		TargetPS->SetTeamId(this->TeamId);
 		TargetPS->SetSlotIndex(this->SlotIndex);
 		TargetPS->SetGamePlayerName(this->GamePlayerName);
+		TargetPS->CustomizationDescriptor = CustomizationDescriptor;
+		TargetPS->CustomizationPayload = CustomizationPayload;
+		TargetPS->OnRep_CustomizationDescriptor();
+		TargetPS->ForceNetUpdate();
 	}
 }
 
@@ -49,7 +54,86 @@ void AKCPlayerState::OverrideWith(APlayerState* PlayerState)
 		SetTeamId(InactivePS->TeamId);
 		SetSlotIndex(InactivePS->SlotIndex);
 		SetGamePlayerName(InactivePS->GamePlayerName);
+		CustomizationDescriptor = InactivePS->CustomizationDescriptor;
+		CustomizationPayload = InactivePS->CustomizationPayload;
+		OnRep_CustomizationDescriptor();
+		ForceNetUpdate();
 	}
+}
+
+bool AKCPlayerState::PublishCustomizationPayload(TArray<uint8>&& InPayload)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	FRuntimeMeshPaintPatchHistory PaintHistory;
+	bool bUseDefaultAppearance = true;
+	if (!KCCustomizationNetwork::DeserializePayload(
+		InPayload,
+		PaintHistory,
+		bUseDefaultAppearance))
+	{
+		return false;
+	}
+
+	const uint32 ContentHash = KCCustomizationNetwork::ComputePayloadHash(InPayload);
+	if (CustomizationDescriptor.IsPublished() &&
+		CustomizationDescriptor.ContentHash == ContentHash &&
+		CustomizationDescriptor.TargetSchemaVersion == UKCCustomizationSaveGame::CurrentTargetSchemaVersion &&
+		CustomizationDescriptor.bUseDefaultAppearance == bUseDefaultAppearance)
+	{
+		return true;
+	}
+
+	CustomizationPayload = MoveTemp(InPayload);
+	CustomizationDescriptor.ContentHash = ContentHash;
+	CustomizationDescriptor.TargetSchemaVersion = UKCCustomizationSaveGame::CurrentTargetSchemaVersion;
+	CustomizationDescriptor.bUseDefaultAppearance = bUseDefaultAppearance;
+	++CustomizationDescriptor.Revision;
+	if (CustomizationDescriptor.Revision == 0)
+	{
+		CustomizationDescriptor.Revision = 1;
+	}
+
+	OnRep_CustomizationDescriptor();
+	ForceNetUpdate();
+	return true;
+}
+
+bool AKCPlayerState::GetCustomizationPayload(
+	const uint32 ExpectedRevision,
+	const uint32 ExpectedHash,
+	TArray<uint8>& OutPayload) const
+{
+	OutPayload.Reset();
+	const TArray<uint8>* Payload = FindCustomizationPayload(
+		ExpectedRevision,
+		ExpectedHash);
+	if (!Payload)
+	{
+		return false;
+	}
+
+	OutPayload = *Payload;
+	return true;
+}
+
+const TArray<uint8>* AKCPlayerState::FindCustomizationPayload(
+	const uint32 ExpectedRevision,
+	const uint32 ExpectedHash) const
+{
+	if (!HasAuthority() ||
+		!CustomizationDescriptor.IsPublished() ||
+		CustomizationDescriptor.Revision != ExpectedRevision ||
+		CustomizationDescriptor.ContentHash != ExpectedHash ||
+		CustomizationPayload.IsEmpty())
+	{
+		return nullptr;
+	}
+
+	return &CustomizationPayload;
 }
 
 void AKCPlayerState::SetSlotIndex(int32 InSlotIndex)
@@ -133,6 +217,11 @@ void AKCPlayerState::OnRep_SlotIndex()
 void AKCPlayerState::OnRep_GamePlayerName()
 {
 	OnGamePlayerNameChanged.Broadcast(GetGamePlayerName());
+}
+
+void AKCPlayerState::OnRep_CustomizationDescriptor()
+{
+	OnCustomizationDescriptorChanged.Broadcast(CustomizationDescriptor);
 }
 
 void AKCPlayerState::BeginPlay()

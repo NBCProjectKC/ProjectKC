@@ -7,6 +7,9 @@
 struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
+class UKCCustomizationNetworkComponent;
+struct FGameplayTag;
+struct FKCEmptyMessageStruct;
 
 UCLASS()
 class PROJECTKC_API AKCPlayerController : public APlayerController
@@ -19,12 +22,19 @@ public:
 	virtual void ReceivedPlayer() override;
 	UFUNCTION(BlueprintPure, Category = "KC|Network")
 	float GetServerTime() const; 
+
+	UKCCustomizationNetworkComponent* GetCustomizationNetworkComponent() const
+	{
+		return CustomizationNetworkComponent;
+	}
 	
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaSeconds) override;
+	// 로딩화면 끝 콜백
+	void HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message);
 
 private:
 	void InitializeInGameHUD();
@@ -43,8 +53,12 @@ private:
 	void ServerRequestServerTime(float TimeOfClientRequest);
 	UFUNCTION(Client, Reliable)
 	void ClientReportServerTime(float TimeOfClientRequest, float TimeServerReceivedClientRequest);
+
 	float ClientServerDelta = 0.0f;
 	float TimeSinceLastServerTimeSync = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, Category = "KC|Customization|Network")
+	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> PlayerMappingContext;

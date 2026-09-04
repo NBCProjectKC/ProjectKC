@@ -22,6 +22,9 @@
 #include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/Player/Component/KCEmoteComponent.h"
+#include "ProjectKC/Player/Component/KCProjectileTrajectoryPreviewComponent.h"
+#include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
+#include "ProjectKC/UI/Interaction/Component/KCPlayerInteractionPromptComponent.h"
 #include "ProjectKC/UI/World/Player/Component/KCPlayerOverHeadComponent.h"
 #include "ProjectKC/UI/World/Player/Struct/KCPlayerDisplayInfoStruct.h"
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
@@ -85,6 +88,8 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		TEXT("/Game/KC/Player/Avatar/MI_Red.MI_Red"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlueMaterialFinder(
 		TEXT("/Game/KC/Player/Avatar/MI_Blue.MI_Blue"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BrownMaterialFinder(
+		TEXT("/Game/KC/Player/Avatar/MI_Brown.MI_Brown"));
 	if (RedMaterialFinder.Succeeded())
 	{
 		FKCAvatarTeamAppearanceStruct& Team0Appearance =
@@ -102,6 +107,15 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		Team1Appearance.BodyMaterial = BlueMaterialFinder.Object;
 		Team1Appearance.HandMaterial = BlueMaterialFinder.Object;
 		Team1Appearance.FootMaterial = BlueMaterialFinder.Object;
+	}
+	if (BrownMaterialFinder.Succeeded())
+	{
+		FKCAvatarTeamAppearanceStruct& WaitingAppearance =
+			TeamAppearances.AddDefaulted_GetRef();
+		WaitingAppearance.TeamId = -1;
+		WaitingAppearance.BodyMaterial = BrownMaterialFinder.Object;
+		WaitingAppearance.HandMaterial = BrownMaterialFinder.Object;
+		WaitingAppearance.FootMaterial = BrownMaterialFinder.Object;
 	}
 
 	AvatarBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AvatarBody"));
@@ -160,6 +174,11 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 		CreateDefaultSubobject<UKCHeldItemComponent>(TEXT("HeldItem"));
 	KnockbackComponent =
 		CreateDefaultSubobject<UKCKnockbackComponent>(TEXT("Knockback"));
+	ProjectileTrajectoryPreviewComponent =
+		CreateDefaultSubobject<UKCProjectileTrajectoryPreviewComponent>(
+			TEXT("ProjectileTrajectoryPreview"));
+	PlayerCustomizationComponent =
+		CreateDefaultSubobject<UKCPlayerCustomizationComponent>(TEXT("PlayerCustomization"));
 
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoomComponent"));
 	CameraBoomComponent->SetupAttachment(RootComponent);
@@ -179,6 +198,9 @@ AKCPlayerCharacter::AKCPlayerCharacter()
 	InteractionComponent->SetupAttachment(RootComponent);
 	PlayerOverHeadComponent = CreateDefaultSubobject<UKCPlayerOverHeadComponent>(
 		TEXT("PlayerOverHead"));
+	InteractionPromptComponent =
+		CreateDefaultSubobject<UKCPlayerInteractionPromptComponent>(
+			TEXT("InteractionPrompt"));
 
 #if WITH_EDITORONLY_DATA
 	HeldItemPreviewMesh =
@@ -243,6 +265,11 @@ bool AKCPlayerCharacter::BeginUseHeldItem()
 	if (bUseStarted)
 	{
 		InterruptEmote();
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->BeginPreview(
+				HeldItemComponent->GetHeldItem());
+		}
 	}
 	return bUseStarted;
 }
@@ -251,6 +278,10 @@ void AKCPlayerCharacter::EndUseHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
 	{
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->EndPreview();
+		}
 		HeldItemComponent->ReleaseHeldItemUse();
 	}
 }
@@ -270,6 +301,10 @@ void AKCPlayerCharacter::RequestDropHeldItem()
 {
 	if (IsLocallyControlled() && HeldItemComponent)
 	{
+		if (ProjectileTrajectoryPreviewComponent)
+		{
+			ProjectileTrajectoryPreviewComponent->EndPreview();
+		}
 		HeldItemComponent->TryDropHeldItem();
 	}
 }
@@ -299,9 +334,26 @@ UKCKnockbackComponent* AKCPlayerCharacter::GetKnockbackComponent() const
 	return KnockbackComponent;
 }
 
+UKCProjectileTrajectoryPreviewComponent*
+AKCPlayerCharacter::GetProjectileTrajectoryPreviewComponent() const
+{
+	return ProjectileTrajectoryPreviewComponent;
+}
+
+UKCPlayerCustomizationComponent* AKCPlayerCharacter::GetPlayerCustomizationComponent() const
+{
+	return PlayerCustomizationComponent;
+}
+
 UKCPlayerInteractionComponent* AKCPlayerCharacter::GetInteractionComponent() const
 {
 	return InteractionComponent;
+}
+
+UKCPlayerInteractionPromptComponent*
+AKCPlayerCharacter::GetInteractionPromptComponent() const
+{
+	return InteractionPromptComponent;
 }
 
 void AKCPlayerCharacter::RefreshHeldItemPreview()
@@ -317,10 +369,10 @@ void AKCPlayerCharacter::RefreshHeldItemPreview()
 	HeldItemPreviewMesh->SetRelativeTransform(FTransform::Identity);
 
 	USceneComponent* Attachment = HeldItemComponent
-		? HeldItemComponent->GetAttachmentComponent()
+		? HeldItemComponent->GetAttachmentComponentForItem(PreviewItemDefinition)
 		: nullptr;
 	const FName HandSocketName = HeldItemComponent
-		? HeldItemComponent->GetHandSocketName()
+		? HeldItemComponent->ResolveHolderSocketName(PreviewItemDefinition)
 		: NAME_None;
 	if (!PreviewItemDefinition || !Attachment || HandSocketName.IsNone() ||
 		!Attachment->DoesSocketExist(HandSocketName))
@@ -372,6 +424,10 @@ void AKCPlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -385,6 +441,10 @@ void AKCPlayerCharacter::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::OnRep_Controller()
@@ -392,6 +452,10 @@ void AKCPlayerCharacter::OnRep_Controller()
 	Super::OnRep_Controller();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::OnRep_Owner()
@@ -404,6 +468,10 @@ void AKCPlayerCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::PawnClientRestart()
@@ -411,6 +479,10 @@ void AKCPlayerCharacter::PawnClientRestart()
 	Super::PawnClientRestart();
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
+	if (PlayerCustomizationComponent)
+	{
+		PlayerCustomizationComponent->InitializeForPawn();
+	}
 }
 
 void AKCPlayerCharacter::RefreshTeamAppearanceBinding()

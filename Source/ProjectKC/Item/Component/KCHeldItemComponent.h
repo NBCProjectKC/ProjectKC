@@ -7,6 +7,7 @@
 #include "KCHeldItemComponent.generated.h"
 
 class AKCWorldItemActor;
+class UKCItemDefinition;
 class USceneComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
@@ -39,6 +40,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool TryPickUp(AKCWorldItemActor* Item);
 
+	UFUNCTION(BlueprintPure, Category = "KC|Item")
+	bool CanPickUpItem(const AKCWorldItemActor* Item) const;
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item")
 	bool DropHeldItem(
 		const FTransform& DropTransform,
@@ -65,6 +69,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "KC|Item|Attachment")
 	FName GetHandSocketName() const;
+
+	/**
+	 * 아이템이 Presentation에서 소켓을 덮어썼으면 그 이름을, 아니면 HandSocketName을
+	 * 반환한다. Definition이 없으면 언제나 HandSocketName이다.
+	 */
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Attachment")
+	FName ResolveHolderSocketName(const UKCItemDefinition* ItemDefinition) const;
+
+	/** 아이템이 덮어쓴 소켓까지 반영해 부착 대상 컴포넌트를 찾는다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Attachment")
+	USceneComponent* GetAttachmentComponentForItem(
+		const UKCItemDefinition* ItemDefinition) const;
 
 	UPROPERTY(BlueprintAssignable, Category = "KC|Item")
 	FKCHeldItemChangedSignature OnHeldItemChanged;
@@ -118,7 +134,7 @@ protected:
 private:
 	friend class AKCWorldItemActor;
 
-	USceneComponent* ResolveAttachmentComponent() const;
+	USceneComponent* ResolveAttachmentComponent(FName SocketName) const;
 	FTransform MakeHeldItemDropTransform() const;
 	bool ClearHeldItemForDestruction(AKCWorldItemActor* Item);
 	void BroadcastHeldItemChanged();

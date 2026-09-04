@@ -27,7 +27,7 @@ void AKCPlayerSlotActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AKCPlayerSlotActor, CurrentPlayerInfo);
 }
 
-void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo)
+void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo, AKCLobbyCharacter* ExistingCharacter)
 {
 	CurrentPlayerInfo = InPlayerInfo;
 	bIsOccupied = true;
@@ -39,6 +39,38 @@ void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo)
 
 	if (!HasAuthority())
 	{
+		return;
+	}
+
+	FTransform SpawnTransform = GetActorTransform();
+	if (UArrowComponent* ArrowComp = FindComponentByClass<UArrowComponent>())
+	{
+		SpawnTransform = ArrowComp->GetComponentTransform();
+	}
+	SpawnTransform.SetScale3D(FVector::OneVector);
+
+	// [자리 이동] 다른 슬롯에서 이전해온 기존 캐릭터가 있다면 위치만 이동하고 소유권 인계
+	if (ExistingCharacter && IsValid(ExistingCharacter))
+	{
+		if (SpawnedCharacter && SpawnedCharacter != ExistingCharacter)
+		{
+			DestroySpawnedCharacter();
+		}
+
+		SpawnedCharacter = ExistingCharacter;
+		SpawnedCharacter->SetOwner(this);
+
+		if (UCapsuleComponent* Capsule = SpawnedCharacter->GetCapsuleComponent())
+		{
+			FVector AdjustedLoc = SpawnTransform.GetLocation();
+			AdjustedLoc.Z += Capsule->GetScaledCapsuleHalfHeight();
+			SpawnTransform.SetLocation(AdjustedLoc);
+		}
+		SpawnedCharacter->SetActorTransform(SpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+		SpawnedCharacter->UpdatePlayerInfo(InPlayerInfo);
+
+		UE_LOG(LogKCLobby, Log, TEXT("[KCPlayerSlotActor] Slot %d: Relocated existing lobby character for '%s'"),
+			SlotIndex, *InPlayerInfo.PlayerName);
 		return;
 	}
 
@@ -62,14 +94,6 @@ void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo)
 
 	if (CharacterClass)
 	{
-		FTransform SpawnTransform = GetActorTransform();
-		if (UArrowComponent* ArrowComp = FindComponentByClass<UArrowComponent>())
-		{
-			SpawnTransform = ArrowComp->GetComponentTransform();
-		}
-
-		SpawnTransform.SetScale3D(FVector::OneVector);
-
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.Owner = this;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -106,16 +130,24 @@ void AKCPlayerSlotActor::DestroySpawnedCharacter()
 	}
 }
 
-void AKCPlayerSlotActor::ClearSlot()
+void AKCPlayerSlotActor::ClearSlot(bool bDestroyCharacter)
 {
-	UE_LOG(LogKCLobby, Log, TEXT("[KCPlayerSlotActor] Slot %d cleared (Previous Player: '%s')"), SlotIndex, *CurrentPlayerInfo.PlayerName);
+	UE_LOG(LogKCLobby, Log, TEXT("[KCPlayerSlotActor] Slot %d cleared (Previous Player: '%s', DestroyChar: %s)"),
+		SlotIndex, *CurrentPlayerInfo.PlayerName, bDestroyCharacter ? TEXT("TRUE") : TEXT("FALSE"));
 
 	CurrentPlayerInfo = FKCPlayerInfoStruct();
 	bIsOccupied = false;
 	SlotState = EKCLobbySlotStateType::Empty;
 	OnRep_SlotState();
 
-	DestroySpawnedCharacter();
+	if (bDestroyCharacter)
+	{
+		DestroySpawnedCharacter();
+	}
+	else
+	{
+		SpawnedCharacter = nullptr;
+	}
 }
 
 void AKCPlayerSlotActor::SetSlotClosed(bool bClosed)

@@ -18,6 +18,12 @@ public:
 	virtual bool DeclaresSetByCallerTag(FGameplayTag DataTag) const;
 	virtual void AppendDeclaredSetByCallerTags(
 		FGameplayTagContainer& OutTags) const;
+	/** Ability 실행이 끝난 뒤 별도 Runtime Actor에서도 안전하게 실행할 수 있는가. */
+	virtual bool SupportsDeferredExecution() const;
+	/** Runtime Actor가 지연 실행에 필요한 상태를 발사 시점에 캡처한다. */
+	virtual bool PrepareDeferredExecution(
+		const FKCActionExecutionContext& Context,
+		FString& OutError);
 	virtual bool CanExecute(
 		const FKCActionExecutionContext& Context,
 		FString& OutError) const;

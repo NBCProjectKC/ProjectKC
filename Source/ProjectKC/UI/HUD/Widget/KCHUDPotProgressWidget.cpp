@@ -1,16 +1,18 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDPotProgressWidget.h"
 
+#include "Animation/WidgetAnimation.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
-#include "Animation/WidgetAnimation.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "TimerManager.h"
 
 void UKCHUDPotProgressWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 
+	ApplyTeamColor();
 	SetPotProgress(PreviewPotProgress);
 }
 
@@ -22,6 +24,18 @@ void UKCHUDPotProgressWidget::NativeDestruct()
 	}
 
 	Super::NativeDestruct();
+}
+
+void UKCHUDPotProgressWidget::SetTeamId(int32 NewTeamId)
+{
+	NewTeamId = FMath::Max(0, NewTeamId);
+	if (TeamId == NewTeamId)
+	{
+		return;
+	}
+
+	TeamId = NewTeamId;
+	ApplyTeamColor();
 }
 
 void UKCHUDPotProgressWidget::SetPotProgress(const FKCPotProgressViewData& PotProgress)
@@ -41,6 +55,7 @@ void UKCHUDPotProgressWidget::SetPotProgress(const FKCPotProgressViewData& PotPr
 	}
 
 	ShowPotProgress();
+	ApplyTeamColor();
 	ApplyProgressMaterial(PotProgress.ProgressPercent);
 	ApplyRemainingSeconds(PotProgress.RemainingSeconds);
 
@@ -70,6 +85,13 @@ void UKCHUDPotProgressWidget::HidePotProgress()
 	SetVisibility(ESlateVisibility::Hidden);
 	bShowing = false;
 	bHideAnimationPlaying = false;
+}
+
+void UKCHUDPotProgressWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
+{
+	Super::NativeApplyColorStyle(InColorStyle);
+
+	ApplyTeamColor();
 }
 
 void UKCHUDPotProgressWidget::ShowPotProgress()
@@ -120,6 +142,26 @@ void UKCHUDPotProgressWidget::ApplyRemainingSeconds(int32 RemainingSeconds)
 	Team1PotProgressText->SetText(FText::FromString(FString::Printf(
 		TEXT("%ds"),
 		FMath::Max(0, RemainingSeconds))));
+}
+
+void UKCHUDPotProgressWidget::ApplyTeamColor()
+{
+	const UKCColorStyle* CurrentColorStyle = GetColorStyle();
+	if (!CurrentColorStyle || !CurrentColorStyle->TeamColors.IsValidIndex(TeamId))
+	{
+		return;
+	}
+
+	const FLinearColor TeamColor = CurrentColorStyle->TeamColors[TeamId];
+	if (Team1PotProgress)
+	{
+		Team1PotProgress->SetColorAndOpacity(TeamColor);
+	}
+
+	if (Team1PotProgressText)
+	{
+		Team1PotProgressText->SetColorAndOpacity(FSlateColor(TeamColor));
+	}
 }
 
 void UKCHUDPotProgressWidget::PlayCompletedAnimationThenHide()

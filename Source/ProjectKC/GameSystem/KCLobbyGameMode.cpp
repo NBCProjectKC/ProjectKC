@@ -74,11 +74,21 @@ void AKCLobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 		CurrentPlayerCount, RequiredPlayerCount, *Address);
 }
 
+bool AKCLobbyGameMode::IsSwapSlotOccupied() const
+{
+	if (const AKCPlayerSlotActor* SwapSlot = FindSlotByIndex(SWAP_SLOT_INDEX))
+	{
+		return SwapSlot->IsOccupied();
+	}
+	return false;
+}
+
 AKCPlayerSlotActor* AKCLobbyGameMode::FindSlotByIndex(int32 SlotIndex) const
 {
-	if (SlotIndex < 0 || SlotIndex >= 6)
+	if (SlotIndex < 0 || SlotIndex >= MAX_LOBBY_SLOTS)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] FindSlotByIndex: SlotIndex %d out of bounds (0-5)"), SlotIndex);
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] FindSlotByIndex: SlotIndex %d out of bounds (0-%d)"),
+			SlotIndex, MAX_LOBBY_SLOTS - 1);
 		return nullptr;
 	}
 
@@ -143,9 +153,10 @@ void AKCLobbyGameMode::EnsureSlotsCollected()
 	}
 
 	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] EnsureSlotsCollected: Found and collected %d Slot Actors in level"), LobbySlots.Num());
-	if (LobbySlots.Num() != 6)
+	if (LobbySlots.Num() < REGULAR_SLOT_COUNT)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Expected 6 Slot Actors, but found %d. Please check the lobby map placement."), LobbySlots.Num());
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] Expected at least %d Slot Actors, but found %d. Please check the lobby map placement."),
+			REGULAR_SLOT_COUNT, LobbySlots.Num());
 	}
 
 	ApplySlotOpenCloseRules();
@@ -321,6 +332,11 @@ void AKCLobbyGameMode::ApplySlotOpenCloseRules()
 			// Team 1 슬롯 (3, 4, 5)
 			bShouldOpen = ((SlotIdx - 3) < PlayersPerTeam);
 		}
+		else if (SlotIdx == SWAP_SLOT_INDEX)
+		{
+			// 자리 바꾸기용 스왑 슬롯은 인원수 설정과 무관하게 상시 개방
+			bShouldOpen = true;
+		}
 
 		Slot->SetSlotClosed(!bShouldOpen);
 		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyGameMode] Slot %d (Team %d) -> %s"),
@@ -476,7 +492,7 @@ bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlo
 		return false;
 	}
 
-	if (TargetSlotIndex < 0 || TargetSlotIndex >= 6)
+	if (TargetSlotIndex < 0 || TargetSlotIndex >= MAX_LOBBY_SLOTS)
 	{
 		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] MovePlayerToSlot Failed: Invalid SlotIndex %d"), TargetSlotIndex);
 		return false;
@@ -518,15 +534,26 @@ bool AKCLobbyGameMode::MovePlayerToSlot(AController* Controller, int32 TargetSlo
 		return false;
 	}
 
-	// 2. 기존 슬롯 비우기
+	// 2. 기존 슬롯에서 캐릭터 분리 (액터를 파괴하지 않고 슬롯만 비움)
+	AKCLobbyCharacter* MovingCharacter = nullptr;
 	const int32 PrevSlotIdx = PS->GetSlotIndex();
 	if (AKCPlayerSlotActor* PrevSlot = FindSlotByIndex(PrevSlotIdx))
 	{
-		PrevSlot->ClearSlot();
+		MovingCharacter = PrevSlot->GetSpawnedCharacter();
+		PrevSlot->ClearSlot(false);
 	}
 
-	// 3. 새 슬롯에 배정
-	AssignPlayerToSlot(TargetSlot, PS);
+	// 3. 새 슬롯에 배정 (기존 캐릭터를 그대로 인계하여 커스텀 외형 보존)
+	const FKCPlayerInfoStruct Info(PS->GetPlayerName(), PS->IsReady(), PS);
+	TargetSlot->AssignPlayer(Info, MovingCharacter);
+	PS->SetSlotIndex(TargetSlot->GetSlotIndex());
+	PS->SetTeamId(TargetSlot->GetSlotTeamId());
+
+	// 스왑 슬롯으로 이동한 경우 레디 상태를 즉시 false로 해제
+	if (TargetSlotIndex == SWAP_SLOT_INDEX)
+	{
+		PS->SetIsReady(false);
+	}
 
 	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Player '%s' moved from Slot %d to Slot %d (Team %d)"),
 		*PS->GetPlayerName(), PrevSlotIdx, TargetSlotIndex, TargetSlot->GetSlotTeamId());
@@ -550,6 +577,14 @@ void AKCLobbyGameMode::HandlePlayerReadyToggled(AController* Controller)
 		return;
 	}
 
+	// 스왑 슬롯에 위치한 플레이어는 레디 불가
+	if (PS->GetSlotIndex() == SWAP_SLOT_INDEX)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] HandlePlayerReadyToggled Rejected: Player '%s' is in Swap Slot (Index: %d)"),
+			*PS->GetPlayerName(), SWAP_SLOT_INDEX);
+		return;
+	}
+
 	// 레디 상태 토글
 	PS->ToggleReady();
 
@@ -569,11 +604,19 @@ void AKCLobbyGameMode::HandlePlayerReadyToggled(AController* Controller)
 
 bool AKCLobbyGameMode::CheckAllPlayersReady() const
 {
+	// 1. 스왑 슬롯에 플레이어가 위치해 있다면 게임 시작 불가
+	if (IsSwapSlotOccupied())
+	{
+		return false;
+	}
+
+	// 2. 필요 정규 인원수가 맞지 않으면 시작 불가
 	if (ConnectedPlayers.Num() != RequiredPlayerCount || RequiredPlayerCount == 0)
 	{
 		return false;
 	}
 
+	// 3. 전원 레디 상태 확인
 	for (const FKCPlayerInfoStruct& Info : ConnectedPlayers)
 	{
 		if (!Info.bReady)
@@ -632,6 +675,18 @@ void AKCLobbyGameMode::UpdateLobbyReadyState()
 
 void AKCLobbyGameMode::StartGame()
 {
+	if (IsSwapSlotOccupied())
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] StartGame Rejected: Swap slot is currently occupied!"));
+		return;
+	}
+
+	if (!CheckAllPlayersReady())
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] StartGame Rejected: Not all players are ready!"));
+		return;
+	}
+
 	UGameInstance* GI = GetGameInstance();
 	if (!GI)
 	{

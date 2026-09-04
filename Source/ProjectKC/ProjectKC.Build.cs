@@ -18,6 +18,7 @@ public class ProjectKC : ModuleRules
 			"EnhancedInput",
 			"GameplayAbilities",
 			"GameplayTasks",
+			"MeshPaintingCore",
 		
 			// GMS
 			"GameplayTags","GameplayMessageRuntime", "NetCore",

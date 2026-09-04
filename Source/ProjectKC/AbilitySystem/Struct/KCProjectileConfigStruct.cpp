@@ -13,6 +13,31 @@ namespace
 	}
 }
 
+float FKCProjectileLaunchConfigStruct::CalculateChargeAlpha(
+	float HeldDuration) const
+{
+	if (!bEnableCharge)
+	{
+		return 1.0f;
+	}
+
+	return FMath::Clamp(
+		HeldDuration / FMath::Max(MaximumChargeDuration, UE_SMALL_NUMBER),
+		0.0f,
+		1.0f);
+}
+
+float FKCProjectileLaunchConfigStruct::ResolveForwardSpeed(
+	float ChargeAlpha) const
+{
+	return bEnableCharge
+		? FMath::Lerp(
+			MinimumForwardSpeed,
+			ForwardSpeed,
+			FMath::Clamp(ChargeAlpha, 0.0f, 1.0f))
+		: ForwardSpeed;
+}
+
 bool FKCProjectileLaunchConfigStruct::Validate(FString& OutError) const
 {
 	OutError.Reset();
@@ -60,32 +85,34 @@ bool FKCProjectileLaunchConfigStruct::Validate(FString& OutError) const
 		return false;
 	}
 
+	if (bEnableCharge &&
+		(!FMath::IsFinite(MinimumForwardSpeed) ||
+		 MinimumForwardSpeed < 0.0f ||
+		 MinimumForwardSpeed > ForwardSpeed ||
+		 !FMath::IsFinite(MaximumChargeDuration) ||
+		 MaximumChargeDuration <= 0.0f))
+	{
+		OutError = TEXT("충전 투척은 0 이상 최대 ForwardSpeed 이하의 MinimumForwardSpeed와 0보다 큰 MaximumChargeDuration이 필요합니다.");
+		return false;
+	}
+
+	if (bEnableCharge && bShowTrajectoryPreview &&
+		(!FMath::IsFinite(PreviewMaximumSimulationTime) ||
+		 PreviewMaximumSimulationTime <= 0.0f ||
+		 !FMath::IsFinite(PreviewSimulationFrequency) ||
+		 PreviewSimulationFrequency < 1.0f ||
+		 PreviewSimulationFrequency > 60.0f))
+	{
+		OutError = TEXT("궤적 미리보기의 Simulation Time은 0보다 크고 Frequency는 1~60이어야 합니다.");
+		return false;
+	}
+
 	if (bShouldBounce &&
 		(!FMath::IsFinite(Bounciness) || Bounciness < 0.0f ||
 		 Bounciness > 1.0f || !FMath::IsFinite(Friction) ||
 		 Friction < 0.0f || Friction > 1.0f))
 	{
 		OutError = TEXT("Bounciness와 Friction은 0~1 사이의 유한한 수여야 합니다.");
-		return false;
-	}
-
-	return true;
-}
-
-bool FKCProjectileKnockbackConfigStruct::Validate(FString& OutError) const
-{
-	OutError.Reset();
-	if (!bEnabled)
-	{
-		return true;
-	}
-
-	if (!FMath::IsFinite(HorizontalSpeed) || HorizontalSpeed < 0.0f ||
-		!FMath::IsFinite(VerticalSpeed) || VerticalSpeed < 0.0f ||
-		(FMath::IsNearlyZero(HorizontalSpeed) &&
-		 FMath::IsNearlyZero(VerticalSpeed)))
-	{
-		OutError = TEXT("넉백 속도는 0 이상의 유한한 수이며 둘 중 하나는 0보다 커야 합니다.");
 		return false;
 	}
 
@@ -133,24 +160,5 @@ bool FKCProjectileExplosionConfigStruct::Validate(FString& OutError) const
 		return false;
 	}
 
-	FString EffectError;
-	if (!EffectRecipe.Validate(EffectError))
-	{
-		OutError = FString::Printf(
-			TEXT("EffectRecipe가 유효하지 않습니다: %s"),
-			*EffectError);
-		return false;
-	}
-
-	FString KnockbackError;
-	if (!Knockback.Validate(KnockbackError))
-	{
-		OutError = FString::Printf(
-			TEXT("Knockback이 유효하지 않습니다: %s"),
-			*KnockbackError);
-		return false;
-	}
-
 	return true;
 }
-

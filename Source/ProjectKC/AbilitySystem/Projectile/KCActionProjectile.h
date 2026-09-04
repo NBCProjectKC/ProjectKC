@@ -2,12 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "GameplayEffectTypes.h"
 #include "ProjectKC/AbilitySystem/Struct/KCProjectileConfigStruct.h"
 #include "KCActionProjectile.generated.h"
 
 class APawn;
 class UAbilitySystemComponent;
+class UKCActionFragment;
 class UNiagaraSystem;
 class UProjectileMovementComponent;
 class USoundBase;
@@ -31,6 +31,7 @@ public:
 	bool InitializeProjectile(
 		const FKCProjectileLaunchConfigStruct& LaunchConfig,
 		const FKCProjectileExplosionConfigStruct& ExplosionConfig,
+		const TArray<TObjectPtr<UKCActionFragment>>& ExplosionTargetFragments,
 		UAbilitySystemComponent* SourceAbilitySystem,
 		UObject* EffectSourceObject,
 		AActor* SourceActor,
@@ -54,6 +55,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnRep_Owner() override;
 	virtual void OnRep_Instigator() override;
+	virtual void PostNetReceiveLocationAndRotation() override;
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -90,6 +92,15 @@ private:
 	void GatherExplosionTargets(TArray<AActor*>& OutTargets) const;
 	bool HasLineOfSightTo(const AActor* TargetActor) const;
 	void ApplyExplosionToTarget(AActor* TargetActor) const;
+	bool InitializeExplosionTargetFragments(
+		const TArray<TObjectPtr<UKCActionFragment>>& SourceFragments,
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UObject* EffectSourceObject,
+		AActor* SourceActor,
+		FString& OutError);
+	bool ExecuteExplosionTargetFragments(
+		AActor* TargetActor,
+		UAbilitySystemComponent* TargetAbilitySystem) const;
 	void RefreshSourceMovementIgnore(AActor* SourceActor, APawn* SourcePawn);
 	void ClearSourceMovementIgnore();
 
@@ -111,7 +122,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilitySystemComponent> ActiveSourceAbilitySystem;
 
-	FGameplayEffectSpecHandle ExplosionEffectSpec;
+	/** 원본 DA와 Ability 수명에서 분리한 투사체 소유 Runtime 복제본이다. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UKCActionFragment>> ActiveExplosionTargetFragments;
+
 	TWeakObjectPtr<AActor> IgnoredSourceActor;
 	TWeakObjectPtr<APawn> IgnoredSourcePawn;
 	FTimerHandle FuseTimerHandle;

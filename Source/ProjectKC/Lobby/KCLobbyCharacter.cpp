@@ -4,9 +4,14 @@
  */
 
 #include "ProjectKC/Lobby/KCLobbyCharacter.h"
+#include "ProjectKC/Lobby/KCPlayerSlotActor.h"
 #include "ProjectKC/Lobby/UI/KCPlayerInfoWidget.h"
+#include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Components/WidgetComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 
@@ -21,6 +26,16 @@ void AKCLobbyCharacter::BeginPlay()
 
 	CachedWidgetComp = FindComponentByClass<UWidgetComponent>();
 	RefreshPlayerInfoWidget();
+	RefreshCustomizationPresentation();
+
+	if (AKCPlayerState* PresentationPlayerState = Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get()))
+	{
+		BindTeamAppearanceToPlayerState(PresentationPlayerState);
+	}
+	else if (const AKCPlayerSlotActor* PlayerSlot = Cast<AKCPlayerSlotActor>(GetOwner()))
+	{
+		ApplyTeamAppearance(PlayerSlot->GetSlotTeamId());
+	}
 }
 
 void AKCLobbyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -47,6 +62,45 @@ void AKCLobbyCharacter::OnRep_PlayerInfo()
 		*PlayerInfo.PlayerName, PlayerInfo.bReady ? TEXT("TRUE") : TEXT("FALSE"));
 	OnPlayerInfoUpdated.Broadcast(PlayerInfo);
 	RefreshPlayerInfoWidget();
+	RefreshCustomizationPresentation();
+
+	if (AKCPlayerState* PresentationPlayerState = Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get()))
+	{
+		BindTeamAppearanceToPlayerState(PresentationPlayerState);
+	}
+	else if (const AKCPlayerSlotActor* PlayerSlot = Cast<AKCPlayerSlotActor>(GetOwner()))
+	{
+		ApplyTeamAppearance(PlayerSlot->GetSlotTeamId());
+	}
+}
+
+void AKCLobbyCharacter::RefreshCustomizationPresentation()
+{
+	UKCPlayerCustomizationComponent* CustomizationComponent =
+		GetPlayerCustomizationComponent();
+	AKCPlayerState* PresentationPlayerState =
+		Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get());
+	if (!CustomizationComponent)
+	{
+		return;
+	}
+
+	APlayerController* LocalPlayerController =
+		UGameplayStatics::GetPlayerController(this, 0);
+	if (!LocalPlayerController ||
+		LocalPlayerController->PlayerState != PresentationPlayerState)
+	{
+		LocalPlayerController = nullptr;
+	}
+
+	CustomizationComponent->InitializeForPresentation(
+		PresentationPlayerState,
+		LocalPlayerController);
+
+	if (LocalPlayerController)
+	{
+		CustomizationComponent->ApplyLocalSavedCustomization();
+	}
 }
 
 void AKCLobbyCharacter::RefreshPlayerInfoWidget()

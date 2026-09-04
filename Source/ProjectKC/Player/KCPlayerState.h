@@ -6,6 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Customization/KCCustomizationNetworkTypes.h"
 #include "GameFramework/PlayerState.h"
 #include "KCPlayerState.generated.h"
 
@@ -13,6 +14,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCReadyStatusChangedDelegate, boo
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCTeamIdChangedDelegate, int32, NewTeamId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCSlotIndexChangedDelegate, int32, NewSlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCGamePlayerNameChangedDelegate, const FString&, NewPlayerName);
+DECLARE_MULTICAST_DELEGATE_OneParam(
+	FOnKCCustomizationDescriptorChangedDelegate,
+	const FKCCustomizationDescriptor&);
 
 /**
  * @class AKCPlayerState
@@ -76,6 +80,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
 	void ToggleReady();
 
+	/** 검증된 외형 페이로드를 서버 권위 상태로 게시합니다. */
+	bool PublishCustomizationPayload(TArray<uint8>&& InPayload);
+
+	/** 요청한 Revision/Hash와 일치하는 서버 전용 외형 페이로드를 반환합니다. */
+	bool GetCustomizationPayload(
+		uint32 ExpectedRevision,
+		uint32 ExpectedHash,
+		TArray<uint8>& OutPayload) const;
+
+	/** 서버 청크 전송용 읽기 전용 Payload입니다. 호출 중 Revision/Hash를 다시 검증해야 합니다. */
+	const TArray<uint8>* FindCustomizationPayload(
+		uint32 ExpectedRevision,
+		uint32 ExpectedHash) const;
+
+	const FKCCustomizationDescriptor& GetCustomizationDescriptor() const
+	{
+		return CustomizationDescriptor;
+	}
+
 public:
 	/** @brief 준비 상태가 변경되었을 때 브로드캐스트되는 델리게이트 */
 	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Events")
@@ -92,6 +115,9 @@ public:
 	/** @brief 인게임 UI 표시 이름이 변경되었을 때 브로드캐스트되는 델리게이트 */
 	UPROPERTY(BlueprintAssignable, Category = "KC|Player|Events")
 	FOnKCGamePlayerNameChangedDelegate OnGamePlayerNameChanged;
+
+	/** C++ 외형 컴포넌트가 Revision 변경을 구독합니다. */
+	FOnKCCustomizationDescriptorChangedDelegate OnCustomizationDescriptorChanged;
 
 protected:
 	/** @brief 플레이어 준비 완료 상태 (네트워크 복제) */
@@ -110,6 +136,10 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_GamePlayerName, VisibleAnywhere, BlueprintReadOnly, Category = "KC|Player")
 	FString GamePlayerName;
 
+	/** 실제 픽셀 데이터 대신 모든 클라이언트에 복제되는 외형 식별자입니다. */
+	UPROPERTY(ReplicatedUsing = OnRep_CustomizationDescriptor)
+	FKCCustomizationDescriptor CustomizationDescriptor;
+
 	/** @brief bReady 프로퍼티 복제 수신 시 호출 */
 	UFUNCTION()
 	virtual void OnRep_Ready();
@@ -126,9 +156,15 @@ protected:
 	UFUNCTION()
 	virtual void OnRep_GamePlayerName();
 
+	UFUNCTION()
+	void OnRep_CustomizationDescriptor();
+
 	virtual void BeginPlay() override;
 	virtual void OnRep_PlayerName() override;
 
 	/** @brief KCSessionSubsystem에 저장된 이전 팀/슬롯 정보가 있다면 자동 복원 */
 	void TryRestoreSavedLobbyData();
+
+	/** 서버에만 보관하며 요청받은 클라이언트에만 청크 RPC로 전송합니다. */
+	TArray<uint8> CustomizationPayload;
 };

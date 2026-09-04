@@ -45,4 +45,17 @@ namespace KCGameplayTags
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Recipe_Completed);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Dish_Finished);
 	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_Dish_Ruined);
+
+	/* =========================================================================
+	 *  Interaction Prompt Tags
+	 * ========================================================================= */
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Item_PickUp);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Item_Equip);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Pot_SubmitIngredient);
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Pot_Cook);
+	
+	/* =========================================================================
+	 *  Loading Screen Tag
+	 * ========================================================================= */
+	PROJECTKC_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Message_LoadingScreen_Hidden);
 }

@@ -4,6 +4,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCHeldItemComponent, Log, All);
@@ -66,23 +67,20 @@ bool UKCHeldItemComponent::DropHeldItemUsingSettings(
 bool UKCHeldItemComponent::TryPickUp(AKCWorldItemActor* Item)
 {
 	AActor* Holder = GetOwner();
-	if (!Holder || !Holder->HasAuthority() || IsValid(HeldItem) ||
-		!IsValid(Item) || !Item->CanBePickedUp() ||
-		MaxPickupDistance <= 0.0f ||
-		FVector::DistSquared(Holder->GetActorLocation(), Item->GetActorLocation()) >
-			FMath::Square(MaxPickupDistance))
+	if (!Holder || !Holder->HasAuthority() || !CanPickUpItem(Item))
 	{
 		return false;
 	}
 
-	USceneComponent* AttachComponent = ResolveAttachmentComponent();
-	if (!AttachComponent || HandSocketName.IsNone() ||
-		!AttachComponent->DoesSocketExist(HandSocketName))
+	const FName AttachSocket =
+		ResolveHolderSocketName(Item->GetItemDefinition());
+	USceneComponent* AttachComponent = ResolveAttachmentComponent(AttachSocket);
+	if (!AttachComponent || !AttachComponent->DoesSocketExist(AttachSocket))
 	{
 		return false;
 	}
 
-	if (!Item->EnterHeldState(Holder, AttachComponent, HandSocketName))
+	if (!Item->EnterHeldState(Holder, AttachComponent, AttachSocket))
 	{
 		return false;
 	}
@@ -91,6 +89,18 @@ bool UKCHeldItemComponent::TryPickUp(AKCWorldItemActor* Item)
 	Holder->ForceNetUpdate();
 	BroadcastHeldItemChanged();
 	return true;
+}
+
+bool UKCHeldItemComponent::CanPickUpItem(const AKCWorldItemActor* Item) const
+{
+	const AActor* Holder = GetOwner();
+	return Holder &&
+		!IsValid(HeldItem) &&
+		IsValid(Item) &&
+		Item->CanBePickedUp() &&
+		MaxPickupDistance > 0.0f &&
+		FVector::DistSquared(Holder->GetActorLocation(), Item->GetActorLocation()) <=
+			FMath::Square(MaxPickupDistance);
 }
 
 bool UKCHeldItemComponent::DropHeldItem(
@@ -150,17 +160,18 @@ bool UKCHeldItemComponent::UseHeldItemWithTarget(AActor* TargetActor)
 
 AKCWorldItemActor* UKCHeldItemComponent::GetHeldItem() const
 {
-	return HeldItem;
+	// 파괴가 예약된 아이템이 GC 전까지 손에 남은 것처럼 보이지 않게 유효성까지 확인한다.
+	return IsValid(HeldItem) ? HeldItem.Get() : nullptr;
 }
 
 bool UKCHeldItemComponent::HasHeldItem() const
 {
-	return IsValid(HeldItem);
+	return GetHeldItem() != nullptr;
 }
 
 USceneComponent* UKCHeldItemComponent::GetAttachmentComponent() const
 {
-	return ResolveAttachmentComponent();
+	return ResolveAttachmentComponent(HandSocketName);
 }
 
 FName UKCHeldItemComponent::GetHandSocketName() const
@@ -168,11 +179,26 @@ FName UKCHeldItemComponent::GetHandSocketName() const
 	return HandSocketName;
 }
 
+FName UKCHeldItemComponent::ResolveHolderSocketName(
+	const UKCItemDefinition* ItemDefinition) const
+{
+	const FName SocketOverride = IsValid(ItemDefinition)
+		? ItemDefinition->Presentation.HolderSocketNameOverride
+		: NAME_None;
+	return SocketOverride.IsNone() ? HandSocketName : SocketOverride;
+}
+
+USceneComponent* UKCHeldItemComponent::GetAttachmentComponentForItem(
+	const UKCItemDefinition* ItemDefinition) const
+{
+	return ResolveAttachmentComponent(ResolveHolderSocketName(ItemDefinition));
+}
+
 void UKCHeldItemComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	RuntimeAttachmentComponent = ResolveAttachmentComponent();
+	RuntimeAttachmentComponent = ResolveAttachmentComponent(HandSocketName);
 	if (!RuntimeAttachmentComponent || HandSocketName.IsNone() ||
 		!RuntimeAttachmentComponent->DoesSocketExist(HandSocketName))
 	{
@@ -221,9 +247,17 @@ void UKCHeldItemComponent::ServerDropHeldItem_Implementation()
 	DropHeldItemUsingSettings(FVector::ZeroVector);
 }
 
-USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
+USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent(
+	FName SocketName) const
 {
-	if (IsValid(RuntimeAttachmentComponent))
+	if (SocketName.IsNone())
+	{
+		return nullptr;
+	}
+
+	// 아이템이 소켓을 덮어쓰면 캐시된 컴포넌트가 그 소켓을 갖고 있지 않을 수 있다.
+	if (IsValid(RuntimeAttachmentComponent) &&
+		RuntimeAttachmentComponent->DoesSocketExist(SocketName))
 	{
 		return RuntimeAttachmentComponent;
 	}
@@ -238,8 +272,8 @@ USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
 		Cast<USceneComponent>(AttachmentComponent.GetComponent(Holder)))
 	{
 		// 비어 있는 FComponentReference는 Owner의 RootComponent를 반환할 수 있다.
-		// 실제 Hand 소켓을 제공할 때만 명시적 설정으로 채택한다.
-		if (ExplicitComponent->DoesSocketExist(HandSocketName))
+		// 실제 소켓을 제공할 때만 명시적 설정으로 채택한다.
+		if (ExplicitComponent->DoesSocketExist(SocketName))
 		{
 			return ExplicitComponent;
 		}
@@ -250,7 +284,7 @@ USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
 	TInlineComponentArray<USkeletalMeshComponent*> SkeletalMeshes(Holder);
 	for (USkeletalMeshComponent* SkeletalMesh : SkeletalMeshes)
 	{
-		if (IsValid(SkeletalMesh) && SkeletalMesh->DoesSocketExist(HandSocketName))
+		if (IsValid(SkeletalMesh) && SkeletalMesh->DoesSocketExist(SocketName))
 		{
 			return SkeletalMesh;
 		}
@@ -260,7 +294,7 @@ USceneComponent* UKCHeldItemComponent::ResolveAttachmentComponent() const
 	for (USceneComponent* SceneComponent : SceneComponents)
 	{
 		if (IsValid(SceneComponent) &&
-			SceneComponent->DoesSocketExist(HandSocketName))
+			SceneComponent->DoesSocketExist(SocketName))
 		{
 			return SceneComponent;
 		}

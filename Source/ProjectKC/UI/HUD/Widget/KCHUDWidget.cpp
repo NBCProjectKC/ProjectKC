@@ -1,5 +1,6 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
 
+#include "Animation/WidgetAnimation.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
 #include "ProjectKC/UI/Common/Style/KCColorStyle.h"
@@ -23,9 +24,36 @@ void UKCHUDWidget::NativeConstruct()
 
 	HUDViewModel->StartListening(this);
 	HUDViewModel->OnTeamScoresChangedNative.AddUObject(this, &ThisClass::HandleTeamScoresChanged);
+	HUDViewModel->OnTeamScoreAddedNative.AddUObject(this, &ThisClass::HandleTeamScoreAdded);
 	HUDViewModel->OnMatchTimerChangedNative.AddUObject(this, &ThisClass::HandleMatchTimerChanged);
 	HUDViewModel->OnRecipesChangedNative.AddUObject(this, &ThisClass::HandleRecipesChanged);
 	HUDViewModel->OnPotProgressChangedNative.AddUObject(this, &ThisClass::HandlePotProgressChanged);
+	HUDViewModel->OnLocalDishRuinedNative.AddUObject(this, &ThisClass::HandleLocalDishRuined);
+
+	if (Team1ScoreUp)
+	{
+		FWidgetAnimationDynamicEvent FinishedEvent;
+		FinishedEvent.BindDynamic(this, &ThisClass::HandleTeam1ScoreUpFinished);
+		BindToAnimationFinished(Team1ScoreUp, FinishedEvent);
+	}
+
+	if (Team2ScoreUp)
+	{
+		FWidgetAnimationDynamicEvent FinishedEvent;
+		FinishedEvent.BindDynamic(this, &ThisClass::HandleTeam2ScoreUpFinished);
+		BindToAnimationFinished(Team2ScoreUp, FinishedEvent);
+	}
+
+	if (WBP_Team1PotProgress)
+	{
+		WBP_Team1PotProgress->SetTeamId(0);
+	}
+
+	if (WBP_Team2PotProgress)
+	{
+		WBP_Team2PotProgress->SetTeamId(1);
+	}
+
 	RefreshHUD();
 }
 
@@ -34,9 +62,22 @@ void UKCHUDWidget::NativeDestruct()
 	if (HUDViewModel)
 	{
 		HUDViewModel->OnTeamScoresChangedNative.RemoveAll(this);
+		HUDViewModel->OnTeamScoreAddedNative.RemoveAll(this);
 		HUDViewModel->OnMatchTimerChangedNative.RemoveAll(this);
 		HUDViewModel->OnRecipesChangedNative.RemoveAll(this);
 		HUDViewModel->OnPotProgressChangedNative.RemoveAll(this);
+		HUDViewModel->OnLocalDishRuinedNative.RemoveAll(this);
+
+		if (Team1ScoreUp)
+		{
+			UnbindAllFromAnimationFinished(Team1ScoreUp);
+		}
+
+		if (Team2ScoreUp)
+		{
+			UnbindAllFromAnimationFinished(Team2ScoreUp);
+		}
+
 		HUDViewModel->StopListening();
 	}
 
@@ -48,6 +89,11 @@ void UKCHUDWidget::HandleTeamScoresChanged(const TArray<int32>& TeamScores)
 	RefreshScore();
 }
 
+void UKCHUDWidget::HandleTeamScoreAdded(int32 TeamId, int32 AddedScore)
+{
+	PlayTeamScoreUp(TeamId, AddedScore);
+}
+
 void UKCHUDWidget::HandleRecipesChanged()
 {
 	RefreshRecipes();
@@ -56,6 +102,14 @@ void UKCHUDWidget::HandleRecipesChanged()
 void UKCHUDWidget::HandlePotProgressChanged(int32 TeamId, const FKCPotProgressViewData& PotProgress)
 {
 	RefreshPotProgress(TeamId);
+}
+
+void UKCHUDWidget::HandleLocalDishRuined()
+{
+	if (WBP_HUDRecipeList)
+	{
+		WBP_HUDRecipeList->PlayListShake();
+	}
 }
 
 void UKCHUDWidget::RefreshHUD()
@@ -73,15 +127,62 @@ void UKCHUDWidget::RefreshScore()
 		return;
 	}
 
-	const int32 LeftScore = HUDViewModel->GetTeamScore(0);
-	const int32 RightScore = HUDViewModel->GetTeamScore(1);
-	
 	if (!Team1ScoreText || !Team2ScoreText)
 		return;
 	
-	Team1ScoreText->SetText(FText::AsNumber(LeftScore));
-	Team2ScoreText->SetText(FText::AsNumber(RightScore));
-	
+	Team1ScoreText->SetText(HUDViewModel->GetTeamScoreText(0));
+	Team2ScoreText->SetText(HUDViewModel->GetTeamScoreText(1));
+}
+
+void UKCHUDWidget::PlayTeamScoreUp(int32 TeamId, int32 AddedScore)
+{
+	if (AddedScore <= 0)
+	{
+		return;
+	}
+
+	UTextBlock* PlusText = nullptr;
+	UWidgetAnimation* ScoreUpAnimation = nullptr;
+	if (TeamId == 0)
+	{
+		PlusText = Team1PlusText.Get();
+		ScoreUpAnimation = Team1ScoreUp.Get();
+	}
+	else if (TeamId == 1)
+	{
+		PlusText = Team2PlusText.Get();
+		ScoreUpAnimation = Team2ScoreUp.Get();
+	}
+
+	if (!PlusText)
+	{
+		return;
+	}
+
+	PlusText->SetText(FText::FromString(FString::Printf(TEXT("+%d"), AddedScore)));
+	PlusText->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+	if (ScoreUpAnimation)
+	{
+		StopAnimation(ScoreUpAnimation);
+		PlayAnimation(ScoreUpAnimation);
+	}
+}
+
+void UKCHUDWidget::HandleTeam1ScoreUpFinished()
+{
+	if (Team1PlusText)
+	{
+		Team1PlusText->SetVisibility(ESlateVisibility::Hidden);
+	}
+}
+
+void UKCHUDWidget::HandleTeam2ScoreUpFinished()
+{
+	if (Team2PlusText)
+	{
+		Team2PlusText->SetVisibility(ESlateVisibility::Hidden);
+	}
 }
 
 void UKCHUDWidget::HandleMatchTimerChanged(int32 RemainingSeconds)
@@ -97,11 +198,10 @@ void UKCHUDWidget::ApplyMatchTimerText(int32 RemainingSeconds)
 		return;
 	}
 
-	const int32 ClampedSeconds = FMath::Max(0, RemainingSeconds);
-	TimerTextBlock->SetText(FText::FromString(FString::Printf(
-		TEXT("%02d:%02d"),
-		ClampedSeconds / 60,
-		ClampedSeconds % 60)));
+	(void)RemainingSeconds;
+	TimerTextBlock->SetText(HUDViewModel
+		? HUDViewModel->GetRemainingMatchTimeText()
+		: FText::GetEmpty());
 }
 
 UTextBlock* UKCHUDWidget::ResolveTimerTextBlock()
@@ -126,10 +226,9 @@ void UKCHUDWidget::RefreshRecipes()
 		return;
 	}
 
-	const TArray<FKCRecipeViewData>& Recipes = HUDViewModel->GetRecipes();
 	if (WBP_HUDRecipeList)
 	{
-		WBP_HUDRecipeList->SetRecipes(Recipes);
+		WBP_HUDRecipeList->SetRecipeViewModels(HUDViewModel->GetRecipeViewModels());
 	}
 }
 
@@ -164,10 +263,30 @@ void UKCHUDWidget::RefreshPotProgress(int32 TeamId)
 
 void UKCHUDWidget::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
 {
-	// if (!HUDScoreText || !InColorStyle)
-	// {
-	// 	return;
-	// }
+	Super::NativeApplyColorStyle(InColorStyle);
 
-	// HUDScoreText->SetColorAndOpacity(FSlateColor(InColorStyle->ScoreText));
+	if (!InColorStyle)
+	{
+		return;
+	}
+
+	if (Team1ScoreText && InColorStyle->TeamColors.IsValidIndex(0))
+	{
+		Team1ScoreText->SetColorAndOpacity(FSlateColor(InColorStyle->TeamColors[0]));
+	}
+
+	if (Team1PlusText && InColorStyle->TeamColors.IsValidIndex(0))
+	{
+		Team1PlusText->SetColorAndOpacity(FSlateColor(InColorStyle->TeamColors[0]));
+	}
+
+	if (Team2ScoreText && InColorStyle->TeamColors.IsValidIndex(1))
+	{
+		Team2ScoreText->SetColorAndOpacity(FSlateColor(InColorStyle->TeamColors[1]));
+	}
+
+	if (Team2PlusText && InColorStyle->TeamColors.IsValidIndex(1))
+	{
+		Team2PlusText->SetColorAndOpacity(FSlateColor(InColorStyle->TeamColors[1]));
+	}
 }
