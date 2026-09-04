@@ -75,5 +75,12 @@ private:
 	
 	// GMS 핸들
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;
+	
+	/** bAssetsReady/bLevelReady 상태에 맞춰 LoadingText를 갱신 
+	* 97% 미만 : 아이템, 사운드 효과 준비 중... 문구
+	* 97%~ : 맵 불러오는 중...
+	* bAssetsReady/bLevelReady 둘 다 true일 때 : 준비 완료!
+	*/
+    void UpdateLoadingText();
 };
  
