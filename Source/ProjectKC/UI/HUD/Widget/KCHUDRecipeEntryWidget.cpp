@@ -315,9 +315,19 @@ void UKCHUDRecipeEntryWidget::NativeApplyColorStyle(const UKCColorStyle* InColor
 		Team1CookingImage->SetColorAndOpacity(InColorStyle->TeamColors[0]);
 	}
 
+	if (Team1CookingBorder && InColorStyle->TeamColors.IsValidIndex(0))
+	{
+		Team1CookingBorder->SetBrushColor(InColorStyle->TeamColors[0]);
+	}
+
 	if (Team2CookingImage && InColorStyle->TeamColors.IsValidIndex(1))
 	{
 		Team2CookingImage->SetColorAndOpacity(InColorStyle->TeamColors[1]);
+	}
+
+	if (Team2CookingBorder && InColorStyle->TeamColors.IsValidIndex(1))
+	{
+		Team2CookingBorder->SetBrushColor(InColorStyle->TeamColors[1]);
 	}
 
 	if (Team1ProgressBar && InColorStyle->TeamColors.IsValidIndex(0))
