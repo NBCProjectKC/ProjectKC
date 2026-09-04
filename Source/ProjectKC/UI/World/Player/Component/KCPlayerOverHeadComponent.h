@@ -6,8 +6,10 @@
 #include "KCPlayerOverHeadComponent.generated.h"
 
 class UWidgetComponent;
+class UKCAbilitySystemComponent;
 class UKCPlayerOverHeadViewModel;
 class UKCPlayerOverHeadWidget;
+struct FOnAttributeChangeData;
 
 UCLASS(ClassGroup = (KC), meta = (BlueprintSpawnableComponent))
 class PROJECTKC_API UKCPlayerOverHeadComponent : public UActorComponent
@@ -46,6 +48,11 @@ private:
 	void EnsureViewModel();
 	void EnsureWidgetComponent();
 	void ApplyDisplayInfoToWidget();
+	void BindStaminaDelegates();
+	void UnbindStaminaDelegates();
+	void RefreshStaminaFromOwner();
+	void HandleStaminaChanged(const FOnAttributeChangeData& ChangeData);
+	void HandleMaxStaminaChanged(const FOnAttributeChangeData& ChangeData);
 	UKCPlayerOverHeadWidget* GetPlayerOverHeadWidget() const;
 
 	UPROPERTY(Transient)
@@ -53,4 +60,8 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UWidgetComponent> PlayerOverHeadWidgetComponent;
+
+	TWeakObjectPtr<UKCAbilitySystemComponent> BoundAbilitySystemComponent;
+	FDelegateHandle StaminaChangedDelegateHandle;
+	FDelegateHandle MaxStaminaChangedDelegateHandle;
 };
