@@ -102,7 +102,7 @@ void UKCLobbyWidget::NotifyCustomizationWidgetClosed(
 	{
 		CustomizationWidgetInstance = nullptr;
 	}
-	SetVisibility(ESlateVisibility::Visible);
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
 bool UKCLobbyWidget::TryBindPlayerState()
