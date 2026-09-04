@@ -14,6 +14,8 @@ class UKCLobbyWidget;
 class ACameraActor;
 class AKCLobbyCharacter;
 class UKCCustomizationNetworkComponent;
+class UKCLoadingScreen;
+class UKCLoadingTipDataAsset;
 class UKCPlayerCustomizationComponent;
 class UPaintingModeControllerComponent;
 class URuntimeMeshPaintTargetComponent;
@@ -135,9 +137,21 @@ public:
 	UFUNCTION(Client, Reliable, Category = "KC|Lobby|Chat")
 	void Client_ReceiveChatMessage(const FString& SenderName, const FString& Message);
 
-	/** @brief 채팅 메시지가 수신되었을 때 승재님의 UI 위젯이 감지할 델리게이트 */
+	/** @brief 채팅 메시지가 수신되었을 때 UI 위젯이 감지할 델리게이트 */
 	UPROPERTY(BlueprintAssignable, Category = "KC|Lobby|Chat|Events")
 	FOnKCChatMessageReceivedDelegate OnChatMessageReceived;
+
+	/* =========================================================================
+	 *  세션 종료 및 퇴장 (Session Termination)
+	 * ========================================================================= */
+
+	/** @brief 서버 -> 클라이언트: 방장이 세션을 종료했음을 알리는 Client RPC */
+	UFUNCTION(Client, Reliable, Category = "KC|Lobby|Session")
+	void Client_NotifySessionTerminated(const FString& Reason);
+
+	/** @brief 방장 권한으로 세션을 종료하고 전원 메인 메뉴로 복귀 (UI 호출 및 콘솔 명령어 겸용) */
+	UFUNCTION(Exec, BlueprintCallable, Category = "KC|Lobby|Session")
+	void EndSession();
 
 protected:
 	//~APlayerController interface
@@ -161,6 +175,20 @@ protected:
 	/** @brief 생성된 로비 메인 UI 위젯 인스턴스 */
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCLobbyWidget> LobbyWidgetInstance;
+
+	/** @brief GasRange 진입 전 표시할 로딩화면 위젯 클래스
+	 * Client_OnMatchBegin에서 UKCLoadingScreenSubsystem::BeginPreload()에 전달
+	 *  BP_PC_Lobby 디테일 -> WBP_Loading 지정 필요 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TSubclassOf<UKCLoadingScreen> GasRangeLoadingScreenClass;
+
+	/** @brief GasRange 진입 전 pre-load 할 PrimaryAssetType 목록 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TArray<FPrimaryAssetType> GasRangePreloadAssetTypes;
+
+	/** @brief 로딩화면에 표시할 팁 문구 목록 */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TObjectPtr<UKCLoadingTipDataAsset> LoadingTipsAsset;
 
 	/** 로비에서도 인게임과 동일한 외형 업로드/다운로드 경로를 사용합니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Customization|Network")

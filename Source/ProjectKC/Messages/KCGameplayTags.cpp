@@ -51,6 +51,11 @@ namespace KCGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Pot_SubmitIngredient, "Interaction.Pot.SubmitIngredient", "냄비에 들고 있는 재료를 넣을 수 있을 때 표시하는 상호작용 프롬프트입니다.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Pot_Cook, "Interaction.Pot.Cook", "냄비를 조리 상호작용할 수 있을 때 표시하는 상호작용 프롬프트입니다.");
 	
+	/* =========================================================================
+	 *  Loading Screen Tags
+	 * ========================================================================= */
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Message_LoadingScreen_Hidden, "Message.LoadingScreen.Hidden", "로딩화면 위젯이 화면에서 완전히 사라졌을 때 브로드캐스트되는 메시지 채널입니다.");
+	
 	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString)
 	{
 		const UGameplayTagsManager& Manager = UGameplayTagsManager::Get();

@@ -11,15 +11,18 @@
 #include "ProjectKC/Player/Component/KCPlayerCustomizationComponent.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraActor.h"
 #include "Components/StaticMeshComponent.h"
+#include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "InputCoreTypes.h"
 #include "Painting/PaintingModeControllerComponent.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
@@ -649,6 +652,16 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	if (LobbyWidgetInstance)
 	{
 		LobbyWidgetInstance->PlayMatchStartAnim();
+		LobbyWidgetInstance->RemoveFromParent();
+	}
+	
+	// GasRange 진입 준비: 로딩화면 표시 + 에셋 프리로드 시작점
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange, GasRangePreloadAssetTypes, GasRangeLoadingScreenClass, LoadingTipsAsset);
+		}
 	}
 }
 
@@ -743,5 +756,29 @@ void AKCLobbyPlayerController::Client_ReceiveChatMessage_Implementation(const FS
 
 	// 2. [추후 UI 연동용] 승재님의 위젯이 수신할 수 있도록 델리게이트 브로드캐스트
 	OnChatMessageReceived.Broadcast(SenderName, Message);
+}
+
+void AKCLobbyPlayerController::Client_NotifySessionTerminated_Implementation(const FString& Reason)
+{
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] Client_NotifySessionTerminated received: %s"), *Reason);
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSubsystem->NotifySessionTerminatedByHost(Reason);
+		}
+	}
+}
+
+void AKCLobbyPlayerController::EndSession()
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSubsystem->EndSession();
+		}
+	}
 }
 

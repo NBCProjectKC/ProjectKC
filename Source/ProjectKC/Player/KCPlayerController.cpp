@@ -8,10 +8,13 @@
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
 #include "Customization/KCCustomizationNetworkComponent.h"
+#include "GameFramework/GameplayMessageSubsystem.h"
 #include "Player/KCPlayerCharacter.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 #include "ProjectKC/UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
+#include "Messages/KCGameplayTags.h"
+#include "Messages/Struct/KCEmptyMessageStruct.h"
 
 AKCPlayerController::AKCPlayerController()
 {
@@ -24,7 +27,7 @@ AKCPlayerController::AKCPlayerController()
 void AKCPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem =
@@ -36,8 +39,9 @@ void AKCPlayerController::BeginPlay()
 			}
 		}
 	}
-
-	InitializeInGameHUD();
+	// 로딩화면 내려가고 안전하게 HUD 세팅 이벤트
+	UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
+		KCGameplayTags::Message_LoadingScreen_Hidden, this, &AKCPlayerController::HandleLoadingScreenHidden);
 }
 
 void AKCPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -340,4 +344,9 @@ void AKCPlayerController::ClientReportServerTime_Implementation(float TimeOfClie
 float AKCPlayerController::GetServerTime() const
 {
 	return HasAuthority() ? GetWorld()->GetTimeSeconds() : GetWorld()->GetTimeSeconds() + ClientServerDelta;
+}
+
+void AKCPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
+{
+	InitializeInGameHUD();
 }
