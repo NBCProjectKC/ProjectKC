@@ -5,6 +5,7 @@
 #include "KCHUDWidget.generated.h"
 
 class UTextBlock;
+class UWidgetAnimation;
 class UKCColorStyle;
 class UKCHUDPotProgressWidget;
 class UKCHUDRecipeListWidget;
@@ -38,24 +39,38 @@ protected:
 
 private:
 	void HandleTeamScoresChanged(const TArray<int32>& TeamScores);
+	void HandleTeamScoreAdded(int32 TeamId, int32 AddedScore);
 	void HandleMatchTimerChanged(int32 RemainingSeconds);
 	void HandleRecipesChanged();
 	void HandlePotProgressChanged(int32 TeamId, const FKCPotProgressViewData& PotProgress);
 	void HandleLocalDishRuined();
 	void RefreshHUD();
 	void RefreshScore();
+	void PlayTeamScoreUp(int32 TeamId, int32 AddedScore);
 	void RefreshRecipes();
 	void RefreshPotProgresses();
 	void RefreshPotProgress(int32 TeamId);
 	void ApplyMatchTimerText(int32 RemainingSeconds);
 	UTextBlock* ResolveTimerTextBlock();
 
+	UFUNCTION()
+	void HandleTeam1ScoreUpFinished();
+
+	UFUNCTION()
+	void HandleTeam2ScoreUpFinished();
+
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team1ScoreText;
-	
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Team2ScoreText;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Team1PlusText;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Team2PlusText;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Timer;
@@ -65,4 +80,10 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UKCHUDPotProgressWidget> WBP_Team2PotProgress;
+
+	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> Team1ScoreUp;
+
+	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> Team2ScoreUp;
 };
