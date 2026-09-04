@@ -32,15 +32,21 @@ public:
 	/**
 	 * @brief 슬롯에 플레이어를 배정하고 3D 캐릭터(AKCLobbyCharacter)를 스폰 또는 갱신합니다. (서버 전용)
 	 * @param InPlayerInfo 배정할 플레이어의 정보
+	 * @param ExistingCharacter 다른 슬롯에서 이전해올 기존 캐릭터가 있을 경우 전달 (재스폰 방지)
 	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
-	void AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo);
+	void AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo, AKCLobbyCharacter* ExistingCharacter = nullptr);
 
 	/**
-	 * @brief 슬롯을 비우고 스폰되어 있던 3D 캐릭터 액터를 파괴합니다. (서버 전용)
+	 * @brief 슬롯을 비웁니다.
+	 * @param bDestroyCharacter 캐릭터 액터까지 파괴할지 여부 (자리 이동 시에는 false)
 	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
-	void ClearSlot();
+	void ClearSlot(bool bDestroyCharacter = true);
+
+	/** @brief 현재 슬롯에 스폰/배치되어 있는 로비 캐릭터를 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	AKCLobbyCharacter* GetSpawnedCharacter() const { return SpawnedCharacter; }
 
 	/**
 	 * @brief 슬롯을 닫힘(Closed) 또는 열림(Open/Empty) 상태로 설정합니다. (인원수 제한 제어)

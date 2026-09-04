@@ -77,6 +77,11 @@ void AKCLobbyCharacter::RefreshCustomizationPresentation()
 	CustomizationComponent->InitializeForPresentation(
 		PresentationPlayerState,
 		LocalPlayerController);
+
+	if (LocalPlayerController)
+	{
+		CustomizationComponent->ApplyLocalSavedCustomization();
+	}
 }
 
 void AKCLobbyCharacter::RefreshPlayerInfoWidget()
