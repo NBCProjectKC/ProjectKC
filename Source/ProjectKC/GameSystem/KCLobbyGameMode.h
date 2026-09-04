@@ -42,10 +42,31 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetRequiredPlayerCount() const { return RequiredPlayerCount; }
 
+	/** @brief 정규 팀 슬롯 개수 (0~5: Team 0은 0~2, Team 1은 3~5) */
+	static constexpr int32 REGULAR_SLOT_COUNT = 6;
+
+	/** @brief 자리 바꾸기용 임시 대기 슬롯 인덱스 */
+	static constexpr int32 SWAP_SLOT_INDEX = 6;
+
+	/** @brief 총 슬롯 개수 (정규 슬롯 6개 + 스왑 슬롯 1개) */
+	static constexpr int32 MAX_LOBBY_SLOTS = 7;
+
+	/** @brief 특정 슬롯이 자리 바꾸기용 스왑 슬롯인지 여부를 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	static bool IsSwapSlot(int32 SlotIndex) { return SlotIndex == SWAP_SLOT_INDEX; }
+
+	/** @brief 스왑 슬롯 인덱스 번호를 반환합니다. (기본값: 6) */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	static int32 GetSwapSlotIndex() { return SWAP_SLOT_INDEX; }
+
+	/** @brief 현재 자리 바꾸기용 스왑 슬롯이 플레이어에 의해 점유되어 있는지 여부를 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	bool IsSwapSlotOccupied() const;
+
 	/**
 	 * @brief 특정 플레이어가 원하는 대상 슬롯(TargetSlotIndex)으로 1:1 자리 이동을 요청합니다.
 	 * @param Controller 이동을 요청한 플레이어의 Controller
-	 * @param TargetSlotIndex 목표 슬롯 번호 (0~5)
+	 * @param TargetSlotIndex 목표 슬롯 번호 (0~5 정규 슬롯, 6 스왑 슬롯)
 	 * @return 이동 성공 여부 (비어있고 열려있는 슬롯일 때 true)
 	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
