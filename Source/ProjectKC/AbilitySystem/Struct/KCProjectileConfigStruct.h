@@ -5,8 +5,6 @@
 #include "KCProjectileConfigStruct.generated.h"
 
 class AKCActionProjectile;
-class UNiagaraSystem;
-class USoundBase;
 class UStaticMesh;
 
 /** 투사체가 폭발하는 시점을 정한다. */
@@ -214,13 +212,21 @@ struct PROJECTKC_API FKCProjectileExplosionConfigStruct
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion")
 	bool bRequireLineOfSight = false;
 
-	/** 폭발 위치에서 한 번 재생할 사운드다. 비워도 된다. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion|Effects")
-	TObjectPtr<USoundBase> ExplosionSound;
+	/** 개발용. 폭발 반경과 실제로 처리한 대상을 월드에 그린다. Shipping에서는 그리지 않는다. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Debug",
+		meta = (DisplayName = "Draw Debug Explosion"))
+	bool bDrawDebugExplosion = false;
 
-	/** 폭발 위치에서 한 번 생성할 Niagara 시스템이다. 비워도 된다. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion|Effects")
-	TObjectPtr<UNiagaraSystem> ExplosionVFX;
+	/** 디버그 도형이 화면에 남는 시간(초). */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Debug",
+		meta = (EditCondition = "bDrawDebugExplosion", ClampMin = "0.0", Units = "s"))
+	float DebugDrawDuration = 1.0f;
 
 	bool UsesFuse() const;
 	bool ExplodesOnImpact() const;
