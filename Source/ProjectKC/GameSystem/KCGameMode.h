@@ -11,6 +11,7 @@ class UDataTable;
 struct FKCIngredientSubmittedStruct;
 struct FKCDishFinishedStruct;
 struct FKCRecipeStruct;
+class AKCPlayerState;
 
 /**
  * L_GasRange 레벨 전용 GameMode
@@ -47,6 +48,9 @@ public:
 	// 이탈/재접속
 	virtual void Logout(AController* Exiting) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	
+	// 결과화면 조기 스킵 요청 (클라이언트 RPC가 호출함)
+	void RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer);
 	
 protected:
 	// GameMode Methods
@@ -121,4 +125,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AKCGameState> KCGameState;
+	
+	/** 결과화면에서 스킵을 누른 플레이어 목록 (UniqueNetId 또는 PlayerState 포인터로 추적) */
+	UPROPERTY()
+	TSet<TWeakObjectPtr<AKCPlayerState>> SkippedResultScreenPlayers;
 };
