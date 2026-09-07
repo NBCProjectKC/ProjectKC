@@ -11,6 +11,7 @@
 #include "ProjectKC/ProjectKC.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -78,11 +79,32 @@ void AKCLobbyCharacter::RefreshCustomizationPresentation()
 {
 	UKCPlayerCustomizationComponent* CustomizationComponent =
 		GetPlayerCustomizationComponent();
-	AKCPlayerState* PresentationPlayerState =
-		Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get());
 	if (!CustomizationComponent)
 	{
 		return;
+	}
+
+	AKCPlayerState* PresentationPlayerState =
+		Cast<AKCPlayerState>(PlayerInfo.PlayerState.Get());
+
+	// 만약 PlayerInfo.PlayerState 복제가 지연되어 아직 비어있다면 GameState->PlayerArray에서 탐색
+	if (!PresentationPlayerState && !PlayerInfo.PlayerName.IsEmpty())
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			if (const AGameStateBase* GS = World->GetGameState())
+			{
+				for (APlayerState* PS : GS->PlayerArray)
+				{
+					if (PS && PS->GetPlayerName() == PlayerInfo.PlayerName)
+					{
+						PresentationPlayerState = Cast<AKCPlayerState>(PS);
+						PlayerInfo.PlayerState = PresentationPlayerState;
+						break;
+					}
+				}
+			}
+		}
 	}
 
 	APlayerController* LocalPlayerController =
