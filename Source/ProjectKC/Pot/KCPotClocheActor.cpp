@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 #include "ProjectKC/GameSystem/KCGameState.h"
 #include "TimerManager.h"
 
@@ -19,6 +20,8 @@ AKCPotClocheActor::AKCPotClocheActor()
 void AKCPotClocheActor::BeginPlay()
 {
 	Super::BeginPlay();
+	ClosedLocation = GetActorLocation();
+	OpenLocation = ClosedLocation + FVector::UpVector * LiftHeight;
 
 	if (HasAuthority())
 	{
@@ -29,6 +32,13 @@ void AKCPotClocheActor::BeginPlay()
 			OpenDelay,
 			false);
 	}
+}
+
+void AKCPotClocheActor::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AKCPotClocheActor, OpenStartedServerTime);
 }
 
 void AKCPotClocheActor::Tick(float DeltaSeconds)
@@ -60,16 +70,43 @@ void AKCPotClocheActor::StartOpening()
 	if (AKCGameState* GameState = GetWorld()->GetGameState<AKCGameState>())
 	{
 		GameState->SetFarmingOpen(true);
+		OpenStartedServerTime = GameState->GetServerWorldTimeSeconds();
+		ApplyOpeningState();
+		ForceNetUpdate();
 	}
-
-	MulticastStartOpening();
 }
 
-void AKCPotClocheActor::MulticastStartOpening_Implementation()
+void AKCPotClocheActor::OnRep_OpenStartedServerTime()
 {
-	ClosedLocation = GetActorLocation();
-	OpenLocation = ClosedLocation + FVector::UpVector * LiftHeight;
-	LiftElapsedTime = 0.0f;
+	ApplyOpeningState();
+}
+
+void AKCPotClocheActor::ApplyOpeningState()
+{
+	if (OpenStartedServerTime < 0.0f)
+	{
+		return;
+	}
+
+	const AKCGameState* GameState = GetWorld()->GetGameState<AKCGameState>();
+	if (!GameState)
+	{
+		return;
+	}
+
+	LiftElapsedTime = FMath::Max(
+		0.0f,
+		GameState->GetServerWorldTimeSeconds() - OpenStartedServerTime);
+	if (LiftElapsedTime >= LiftDuration)
+	{
+		FinishOpening();
+		return;
+	}
+
+	SetActorLocation(FMath::Lerp(
+		ClosedLocation,
+		OpenLocation,
+		LiftElapsedTime / LiftDuration));
 	bIsOpening = true;
 	SetActorTickEnabled(true);
 }
