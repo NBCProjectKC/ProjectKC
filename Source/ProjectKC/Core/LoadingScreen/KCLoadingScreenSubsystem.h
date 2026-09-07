@@ -12,12 +12,13 @@ struct FKCLevelChangedStruct;
 class UKCLoadingTipDataAsset;
 class UKCUserWidget;
 
-UCLASS()
+UCLASS(Blueprintable)
 class PROJECTKC_API UKCLoadingScreenSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
  
 public:
+	UKCLoadingScreenSubsystem();
 	
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
@@ -27,14 +28,20 @@ public:
 	 *                      나중에 "GasRange → 결과화면" 같은 다른 전환에도 이 함수를
 	 *                      재사용할 수 있도록 함
 	 * @param AssetTypes    pre-load할 PrimaryAssetType 목록 (예: {"Item"})
-	 * @param ScreenClass   표시할 로딩화면 위젯 클래스
 	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Loading")
-	void BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes,
-	TSubclassOf<UKCLoadingScreen> ScreenClass, const UKCLoadingTipDataAsset* TipsAsset);
+	void BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes);
  
 	UPROPERTY(Transient)
 	TObjectPtr<UKCUserWidget> ActiveLoadingWidget;
+	
+	/** 로딩화면에 항상 쓰이는 기본 위젯 클래스 (에디터에서 지정) */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TSubclassOf<UKCLoadingScreen> DefaultLoadingScreenClass;
+
+	/** 로딩화면에 항상 쓰이는 기본 팁 데이터 애셋 (에디터에서 지정, 없으면 nullptr) */
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
+	TObjectPtr<UKCLoadingTipDataAsset> DefaultTipsAsset;
 private:
 	//Message_Level_Changed 받는 콜백
 	void OnLevelChangedMessage(FGameplayTag Channel, const FKCLevelChangedStruct& Message);

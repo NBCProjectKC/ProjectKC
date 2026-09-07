@@ -10,11 +10,23 @@
 #include "View/MVVMView.h"
 #include "Blueprint/GameViewportSubsystem.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
+#include "UObject/ConstructorHelpers.h"
+#include "ProjectKC/UI/Loading/Tip/KCLoadingTipDataAsset.h"
+
+UKCLoadingScreenSubsystem::UKCLoadingScreenSubsystem()
+{
+	static ConstructorHelpers::FClassFinder<UKCLoadingScreen> ScreenClassFinder(TEXT("/Game/KC/UI/Screens/WBP_Loading"));
+	if (ScreenClassFinder.Succeeded())
+	{
+		DefaultLoadingScreenClass = ScreenClassFinder.Class;
+	}
+}
 
 void UKCLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-
+	DefaultTipsAsset = LoadObject<UKCLoadingTipDataAsset>(nullptr, TEXT("/Game/KC/UI/Screens/DA_LoadingTips.DA_LoadingTips"));
+	UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG] DefaultTipsAsset 로드 결과: %s"), *GetNameSafe(DefaultTipsAsset));
 	LevelChangedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCLevelChangedStruct>(
 		KCGameplayTags::Message_Level_Changed, this, &UKCLoadingScreenSubsystem::OnLevelChangedMessage);
 }
@@ -25,8 +37,7 @@ void UKCLoadingScreenSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes,
-	TSubclassOf<UKCLoadingScreen> ScreenClass, const UKCLoadingTipDataAsset* TipsAsset)
+void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes)
 {
 	if (WaitingForLevel != EKCLevelType::None)
 	{
@@ -47,7 +58,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 		LoadingViewModel = NewObject<UKCLoadingViewModel>(this);
 	}
 	LoadingViewModel->SetProgress(0.0f);
-	LoadingViewModel->PickRandomTip(TipsAsset);
+	LoadingViewModel->PickRandomTip(DefaultTipsAsset);
 	UpdateLoadingText();
 	
 	PreloadStartTimeSeconds = FPlatformTime::Seconds();
@@ -59,7 +70,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	{
 		if (APlayerController* PC = LocalPlayer->GetPlayerController(GetGameInstance()->GetWorld()))
 		{
-			ActiveLoadingWidget = CreateWidget<UKCUserWidget>(PC, ScreenClass);
+			ActiveLoadingWidget = CreateWidget<UKCUserWidget>(PC, DefaultLoadingScreenClass);
 			if (ActiveLoadingWidget)
 			{
 				if (UGameViewportSubsystem* ViewportSubsystem = UGameViewportSubsystem::Get())
