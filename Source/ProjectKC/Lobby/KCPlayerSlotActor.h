@@ -75,6 +75,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	APlayerState* GetOccupyingPlayerState() const { return CurrentPlayerInfo.PlayerState.Get(); }
 
+	/** @brief 현재 슬롯에 배정된 플레이어 정보 구조체를 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	const FKCPlayerInfoStruct& GetCurrentPlayerInfo() const { return CurrentPlayerInfo; }
+
 	/** @brief 현재 슬롯의 상태 열거형을 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	EKCLobbySlotStateType GetSlotState() const { return SlotState; }

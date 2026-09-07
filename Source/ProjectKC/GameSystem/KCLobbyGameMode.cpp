@@ -233,7 +233,7 @@ void AKCLobbyGameMode::PostSeamlessTravel()
 	// 2. 슬롯 액터 수집 보장
 	EnsureSlotsCollected();
 
-	// 3. 모든 플레이어 레디 리셋 및 슬롯 재배정
+	// 3. 모든 플레이어 레디 리셋
 	if (GameState)
 	{
 		for (APlayerState* PS : GameState->PlayerArray)
@@ -245,15 +245,22 @@ void AKCLobbyGameMode::PostSeamlessTravel()
 		}
 	}
 
-	if (UWorld* World = GetWorld())
+	UpdateLobbyReadyState();
+}
+
+void AKCLobbyGameMode::HandleSeamlessTravelPlayer(AController*& C)
+{
+	Super::HandleSeamlessTravelPlayer(C);
+
+	EnsureSlotsCollected();
+
+	if (APlayerController* PC = Cast<APlayerController>(C))
 	{
-		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
-		{
-			if (APlayerController* PC = It->Get())
-			{
-				AssignPlayerToAvailableSlot(PC);
-			}
-		}
+		const FString PlayerName = (PC->PlayerState) ? PC->PlayerState->GetPlayerName() : TEXT("Unknown");
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] HandleSeamlessTravelPlayer - Player: %s (Controller: %s)"),
+			*PlayerName, *PC->GetName());
+
+		AssignPlayerToAvailableSlot(PC);
 	}
 
 	UpdateLobbyReadyState();
@@ -379,14 +386,14 @@ void AKCLobbyGameMode::AssignPlayerToAvailableSlot(APlayerController* NewPlayer)
 	{
 		if (AKCPlayerSlotActor* Slot = FindSlotByIndex(NewPS->GetSlotIndex()))
 		{
-			if (!Slot->IsOccupied())
+			if (!Slot->IsOccupied() || Slot->GetCurrentPlayerInfo().PlayerName == NewPS->GetPlayerName())
 			{
 				const FKCPlayerInfoStruct Info(NewPS->GetPlayerName(), NewPS->IsReady(), NewPS);
 				Slot->AssignPlayer(Info);
 				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Player '%s' already had SlotIndex %d. Synchronized slot data."),
 					*NewPS->GetPlayerName(), NewPS->GetSlotIndex());
+				return;
 			}
-			return;
 		}
 	}
 

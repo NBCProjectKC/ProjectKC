@@ -18,6 +18,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(
+		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Pot|Cloche")
 	TObjectPtr<UStaticMeshComponent> ClocheMesh;
@@ -36,10 +38,15 @@ protected:
 
 private:
 	void StartOpening();
+	void ApplyOpeningState();
 	void FinishOpening();
 
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastStartOpening();
+	UFUNCTION()
+	void OnRep_OpenStartedServerTime();
+
+	/** 음수면 아직 열리지 않았고, 그 외에는 서버 기준 열림 시작 시각이다. */
+	UPROPERTY(ReplicatedUsing = OnRep_OpenStartedServerTime)
+	float OpenStartedServerTime = -1.0f;
 
 	FVector ClosedLocation = FVector::ZeroVector;
 	FVector OpenLocation = FVector::ZeroVector;
