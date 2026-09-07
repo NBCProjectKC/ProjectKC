@@ -2,17 +2,15 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/ProjectileMovementComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
-#include "NiagaraFunctionLibrary.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCActionFragment.h"
-#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCActionProjectile, Log, All);
@@ -123,6 +121,7 @@ bool AKCActionProjectile::InitializeProjectile(
 	const FKCProjectileLaunchConfigStruct& LaunchConfig,
 	const FKCProjectileExplosionConfigStruct& ExplosionConfig,
 	const TArray<TObjectPtr<UKCActionFragment>>& ExplosionTargetFragments,
+	const TArray<TObjectPtr<UKCActionFragment>>& ExplosionPresentationFragments,
 	UAbilitySystemComponent* SourceAbilitySystem,
 	UObject* EffectSourceObject,
 	AActor* SourceActor,
@@ -139,19 +138,31 @@ bool AKCActionProjectile::InitializeProjectile(
 		return false;
 	}
 
-	FString TargetFragmentsError;
-	if (!InitializeExplosionTargetFragments(
-		ExplosionTargetFragments,
-		SourceAbilitySystem,
-		EffectSourceObject,
-		SourceActor,
-		TargetFragmentsError))
+	FString FragmentsError;
+	if (!InitializeExplosionFragments(
+			ExplosionTargetFragments,
+			EKCActionScope::Target,
+			TEXT("ExplosionTargetFragments"),
+			SourceAbilitySystem,
+			EffectSourceObject,
+			SourceActor,
+			ActiveExplosionTargetFragments,
+			FragmentsError) ||
+		!InitializeExplosionFragments(
+			ExplosionPresentationFragments,
+			EKCActionScope::Source,
+			TEXT("ExplosionPresentationFragments"),
+			SourceAbilitySystem,
+			EffectSourceObject,
+			SourceActor,
+			ActiveExplosionPresentationFragments,
+			FragmentsError))
 	{
 		UE_LOG(
 			LogKCActionProjectile,
 			Warning,
-			TEXT("투사체 Target Fragment 초기화에 실패했습니다: %s"),
-			*TargetFragmentsError);
+			TEXT("투사체 폭발 Fragment 초기화에 실패했습니다: %s"),
+			*FragmentsError);
 		return false;
 	}
 
@@ -214,11 +225,12 @@ bool AKCActionProjectile::Detonate()
 		ApplyExplosionToTarget(Target);
 	}
 
-	MulticastPlayExplosionEffects(
-		GetActorLocation(),
-		GetActorRotation(),
-		ActiveExplosionConfig.ExplosionSound,
-		ActiveExplosionConfig.ExplosionVFX);
+	if (ActiveExplosionConfig.bDrawDebugExplosion)
+	{
+		DrawDebugExplosion(Targets);
+	}
+
+	PlayExplosionPresentation();
 	Destroy();
 	return true;
 }
@@ -260,30 +272,6 @@ void AKCActionProjectile::HandleBlockingHit(
 void AKCActionProjectile::OnRep_Presentation()
 {
 	ApplyPresentation();
-}
-
-void AKCActionProjectile::MulticastPlayExplosionEffects_Implementation(
-	FVector_NetQuantize ExplosionLocation,
-	FRotator ExplosionRotation,
-	USoundBase* ExplosionSound,
-	UNiagaraSystem* ExplosionVFX)
-{
-	if (ExplosionSound)
-	{
-		UGameplayStatics::PlaySoundAtLocation(
-			this,
-			ExplosionSound,
-			ExplosionLocation);
-	}
-
-	if (ExplosionVFX)
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			this,
-			ExplosionVFX,
-			ExplosionLocation,
-			ExplosionRotation);
-	}
 }
 
 void AKCActionProjectile::ApplyPresentation()
@@ -352,21 +340,115 @@ bool AKCActionProjectile::HasLineOfSightTo(const AActor* TargetActor) const
 
 void AKCActionProjectile::ApplyExplosionToTarget(AActor* TargetActor) const
 {
-	UAbilitySystemComponent* TargetAbilitySystem =
+	FKCActionExecutionContext Context;
+	Context.SourceAbilitySystem = ActiveSourceAbilitySystem;
+	Context.TargetAbilitySystem =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-	ExecuteExplosionTargetFragments(TargetActor, TargetAbilitySystem);
+	// 지연 Fragment의 Source는 원본 Ability가 아니라 실제 효과 원점인 투사체다.
+	Context.SourceActor = const_cast<AKCActionProjectile*>(this);
+	Context.TargetActor = TargetActor;
+	Context.EffectSourceObject = ActiveEffectSourceObject;
+	ExecuteExplosionFragments(ActiveExplosionTargetFragments, Context);
 }
 
-bool AKCActionProjectile::InitializeExplosionTargetFragments(
+void AKCActionProjectile::PlayExplosionPresentation() const
+{
+	// 연출도 투사체를 원점으로 삼아 폭발 지점에서 Cue가 재생되게 한다.
+	// 클라이언트 전파는 Cue를 실행하는 소스 ASC가 맡는다.
+	FKCActionExecutionContext Context;
+	Context.SourceAbilitySystem = ActiveSourceAbilitySystem;
+	Context.SourceActor = const_cast<AKCActionProjectile*>(this);
+	Context.EffectSourceObject = ActiveEffectSourceObject;
+	ExecuteExplosionFragments(ActiveExplosionPresentationFragments, Context);
+}
+
+void AKCActionProjectile::DrawDebugExplosion(
+	const TArray<AActor*>& Targets) const
+{
+#if ENABLE_DRAW_DEBUG
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const FVector ExplosionCenter = GetActorLocation();
+	const float Duration = ActiveExplosionConfig.DebugDrawDuration;
+	::DrawDebugSphere(
+		World,
+		ExplosionCenter,
+		ActiveExplosionConfig.ExplosionRadius,
+		24,
+		Targets.IsEmpty() ? FColor::Silver : FColor::Green,
+		false,
+		Duration);
+
+	for (const AActor* Target : Targets)
+	{
+		if (!IsValid(Target))
+		{
+			continue;
+		}
+
+		::DrawDebugSphere(
+			World,
+			Target->GetActorLocation(),
+			24.0f,
+			12,
+			FColor::Red,
+			false,
+			Duration);
+		::DrawDebugLine(
+			World,
+			ExplosionCenter,
+			Target->GetActorLocation(),
+			FColor::Red,
+			false,
+			Duration);
+	}
+
+	// 반경 안이면서 제외된 Pawn을 따로 칠한다. 시야 차단이나 대상 수 제한,
+	// 투척자 제외 중 무엇 때문에 안 맞았는지 눈으로 가려내기 위한 것이다.
+	const float RadiusSquared = FMath::Square(
+		ActiveExplosionConfig.ExplosionRadius);
+	for (TActorIterator<APawn> It(World); It; ++It)
+	{
+		APawn* Candidate = *It;
+		if (!IsValid(Candidate) || Targets.Contains(Candidate) ||
+			FVector::DistSquared(ExplosionCenter, Candidate->GetActorLocation()) >
+				RadiusSquared)
+		{
+			continue;
+		}
+
+		::DrawDebugSphere(
+			World,
+			Candidate->GetActorLocation(),
+			24.0f,
+			12,
+			FColor::Yellow,
+			false,
+			Duration);
+	}
+#endif
+}
+bool AKCActionProjectile::InitializeExplosionFragments(
 	const TArray<TObjectPtr<UKCActionFragment>>& SourceFragments,
+	EKCActionScope RequiredScope,
+	const TCHAR* ListName,
 	UAbilitySystemComponent* SourceAbilitySystem,
 	UObject* EffectSourceObject,
 	AActor* SourceActor,
+	TArray<TObjectPtr<UKCActionFragment>>& OutRuntimeFragments,
 	FString& OutError)
 {
 	OutError.Reset();
-	ActiveExplosionTargetFragments.Reset();
-	ActiveExplosionTargetFragments.Reserve(SourceFragments.Num());
+	OutRuntimeFragments.Reset();
+	OutRuntimeFragments.Reserve(SourceFragments.Num());
+
+	const TCHAR* ScopeName = RequiredScope == EKCActionScope::Source
+		? TEXT("Source")
+		: TEXT("Target");
 
 	FKCActionExecutionContext PrepareContext;
 	PrepareContext.SourceAbilitySystem = SourceAbilitySystem;
@@ -379,18 +461,21 @@ bool AKCActionProjectile::InitializeExplosionTargetFragments(
 		if (!IsValid(SourceFragment))
 		{
 			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d]가 비어 있습니다."),
+				TEXT("%s[%d]가 비어 있습니다."),
+				ListName,
 				Index);
 			return false;
 		}
 
-		if (SourceFragment->ApplicationScope != EKCActionScope::Target ||
+		if (SourceFragment->ApplicationScope != RequiredScope ||
 			!SourceFragment->SupportsDeferredExecution())
 		{
 			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'는 Target Scope와 지연 실행을 지원해야 합니다."),
+				TEXT("%s[%d] '%s'는 %s Scope와 지연 실행을 지원해야 합니다."),
+				ListName,
 				Index,
-				*GetNameSafe(SourceFragment));
+				*GetNameSafe(SourceFragment),
+				ScopeName);
 			return false;
 		}
 
@@ -398,7 +483,8 @@ bool AKCActionProjectile::InitializeExplosionTargetFragments(
 		if (!SourceFragment->Validate(FragmentError))
 		{
 			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'가 유효하지 않습니다: %s"),
+				TEXT("%s[%d] '%s'가 유효하지 않습니다: %s"),
+				ListName,
 				Index,
 				*GetNameSafe(SourceFragment),
 				*FragmentError);
@@ -411,7 +497,8 @@ bool AKCActionProjectile::InitializeExplosionTargetFragments(
 		if (!RuntimeFragment)
 		{
 			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'의 Runtime 복제에 실패했습니다."),
+				TEXT("%s[%d] '%s'의 Runtime 복제에 실패했습니다."),
+				ListName,
 				Index,
 				*GetNameSafe(SourceFragment));
 			return false;
@@ -422,38 +509,30 @@ bool AKCActionProjectile::InitializeExplosionTargetFragments(
 			FragmentError))
 		{
 			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'의 지연 실행 준비에 실패했습니다: %s"),
+				TEXT("%s[%d] '%s'의 지연 실행 준비에 실패했습니다: %s"),
+				ListName,
 				Index,
 				*GetNameSafe(SourceFragment),
 				*FragmentError);
 			return false;
 		}
 
-		ActiveExplosionTargetFragments.Add(RuntimeFragment);
+		OutRuntimeFragments.Add(RuntimeFragment);
 	}
 
 	return true;
 }
-
-bool AKCActionProjectile::ExecuteExplosionTargetFragments(
-	AActor* TargetActor,
-	UAbilitySystemComponent* TargetAbilitySystem) const
+bool AKCActionProjectile::ExecuteExplosionFragments(
+	const TArray<TObjectPtr<UKCActionFragment>>& RuntimeFragments,
+	const FKCActionExecutionContext& Context) const
 {
-	if (ActiveExplosionTargetFragments.IsEmpty())
+	if (RuntimeFragments.IsEmpty())
 	{
 		return true;
 	}
 
-	FKCActionExecutionContext Context;
-	Context.SourceAbilitySystem = ActiveSourceAbilitySystem;
-	Context.TargetAbilitySystem = TargetAbilitySystem;
-	// 지연 Fragment의 Source는 원본 Ability가 아니라 실제 효과 원점인 투사체다.
-	Context.SourceActor = const_cast<AKCActionProjectile*>(this);
-	Context.TargetActor = TargetActor;
-	Context.EffectSourceObject = ActiveEffectSourceObject;
-
 	TArray<const UKCActionFragment*, TInlineAllocator<8>> ExecutableFragments;
-	for (const UKCActionFragment* Fragment : ActiveExplosionTargetFragments)
+	for (const UKCActionFragment* Fragment : RuntimeFragments)
 	{
 		if (!IsValid(Fragment))
 		{
@@ -470,9 +549,9 @@ bool AKCActionProjectile::ExecuteExplosionTargetFragments(
 			UE_LOG(
 				LogKCActionProjectile,
 				Warning,
-				TEXT("필수 폭발 Target Fragment '%s'가 대상 '%s'에서 실행 조건을 만족하지 못했습니다: %s"),
+				TEXT("필수 폭발 Fragment '%s'가 '%s'에서 실행 조건을 만족하지 못했습니다: %s"),
 				*GetNameSafe(Fragment),
-				*GetNameSafe(TargetActor),
+				*GetNameSafe(Context.ResolveScopedActor(Fragment->ApplicationScope)),
 				*ExecutionError);
 			return false;
 		}
@@ -485,16 +564,15 @@ bool AKCActionProjectile::ExecuteExplosionTargetFragments(
 			UE_LOG(
 				LogKCActionProjectile,
 				Warning,
-				TEXT("필수 폭발 Target Fragment '%s'가 대상 '%s'에서 실행에 실패했습니다."),
+				TEXT("필수 폭발 Fragment '%s'가 '%s'에서 실행에 실패했습니다."),
 				*GetNameSafe(Fragment),
-				*GetNameSafe(TargetActor));
+				*GetNameSafe(Context.ResolveScopedActor(Fragment->ApplicationScope)));
 			return false;
 		}
 	}
 
 	return true;
 }
-
 void AKCActionProjectile::ClearSourceMovementIgnore()
 {
 	if (AActor* SourceActor = IgnoredSourceActor.Get())

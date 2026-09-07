@@ -2,15 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCActionExecutionContext.h"
 #include "ProjectKC/AbilitySystem/Struct/KCProjectileConfigStruct.h"
 #include "KCActionProjectile.generated.h"
 
 class APawn;
 class UAbilitySystemComponent;
 class UKCActionFragment;
-class UNiagaraSystem;
 class UProjectileMovementComponent;
-class USoundBase;
 class USphereComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -32,6 +31,7 @@ public:
 		const FKCProjectileLaunchConfigStruct& LaunchConfig,
 		const FKCProjectileExplosionConfigStruct& ExplosionConfig,
 		const TArray<TObjectPtr<UKCActionFragment>>& ExplosionTargetFragments,
+		const TArray<TObjectPtr<UKCActionFragment>>& ExplosionPresentationFragments,
 		UAbilitySystemComponent* SourceAbilitySystem,
 		UObject* EffectSourceObject,
 		AActor* SourceActor,
@@ -70,13 +70,6 @@ protected:
 	UFUNCTION()
 	void OnRep_Presentation();
 
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPlayExplosionEffects(
-		FVector_NetQuantize ExplosionLocation,
-		FRotator ExplosionRotation,
-		USoundBase* ExplosionSound,
-		UNiagaraSystem* ExplosionVFX);
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Projectile")
 	TObjectPtr<USphereComponent> CollisionComponent;
 
@@ -92,15 +85,23 @@ private:
 	void GatherExplosionTargets(TArray<AActor*>& OutTargets) const;
 	bool HasLineOfSightTo(const AActor* TargetActor) const;
 	void ApplyExplosionToTarget(AActor* TargetActor) const;
-	bool InitializeExplosionTargetFragments(
+	/** 폭발 위치에서 한 번 실행하는 연출 Fragment다. Cue 복제는 ASC가 맡는다. */
+	void PlayExplosionPresentation() const;
+	/** 폭발 반경, 실제 처리한 대상, 반경 안에서 제외된 Pawn을 구분해 그린다. */
+	void DrawDebugExplosion(const TArray<AActor*>& Targets) const;
+	/** 원본 Fragment를 투사체 소유 Runtime 복제본으로 만들어 지연 실행을 준비한다. */
+	bool InitializeExplosionFragments(
 		const TArray<TObjectPtr<UKCActionFragment>>& SourceFragments,
+		EKCActionScope RequiredScope,
+		const TCHAR* ListName,
 		UAbilitySystemComponent* SourceAbilitySystem,
 		UObject* EffectSourceObject,
 		AActor* SourceActor,
+		TArray<TObjectPtr<UKCActionFragment>>& OutRuntimeFragments,
 		FString& OutError);
-	bool ExecuteExplosionTargetFragments(
-		AActor* TargetActor,
-		UAbilitySystemComponent* TargetAbilitySystem) const;
+	bool ExecuteExplosionFragments(
+		const TArray<TObjectPtr<UKCActionFragment>>& RuntimeFragments,
+		const FKCActionExecutionContext& Context) const;
 	void RefreshSourceMovementIgnore(AActor* SourceActor, APawn* SourcePawn);
 	void ClearSourceMovementIgnore();
 
@@ -125,6 +126,10 @@ private:
 	/** 원본 DA와 Ability 수명에서 분리한 투사체 소유 Runtime 복제본이다. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKCActionFragment>> ActiveExplosionTargetFragments;
+
+	/** 폭발 위치에서 한 번만 실행하는 Source Scope 연출 복제본이다. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UKCActionFragment>> ActiveExplosionPresentationFragments;
 
 	TWeakObjectPtr<AActor> IgnoredSourceActor;
 	TWeakObjectPtr<APawn> IgnoredSourcePawn;
