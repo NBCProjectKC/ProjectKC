@@ -30,6 +30,7 @@ public:
 	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual void BeginPlay() override;
 	virtual void PostSeamlessTravel() override;
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 	//~End of AGameModeBase Interface
