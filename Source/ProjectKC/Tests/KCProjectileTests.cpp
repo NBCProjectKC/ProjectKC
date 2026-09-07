@@ -17,6 +17,7 @@
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Damage.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCDropHeldItemFragment.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCExecuteGameplayCueFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCThrowProjectileFragment.h"
 #include "ProjectKC/AbilitySystem/Projectile/KCActionProjectile.h"
@@ -107,6 +108,13 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("투사체 클래스·메시와 폭발 범위를 갖춘 설정은 유효하다."),
 		Fragment->Validate(Error));
 	TestTrue(
+		TEXT("연출 Fragment를 하나도 넣지 않은 설정도 유효하다."),
+		Fragment->ExplosionPresentationFragments.IsEmpty() &&
+			Fragment->Validate(Error));
+	TestFalse(
+		TEXT("폭발 디버그 드로는 기본으로 꺼져 있다."),
+		Fragment->ExplosionConfig.bDrawDebugExplosion);
+	TestTrue(
 		TEXT("Throw Projectile은 성공 여부가 소비를 확정하도록 기본 필수 Fragment다."),
 		Fragment->bRequired);
 	TestEqual(
@@ -165,6 +173,24 @@ bool FKCProjectileDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("지연 실행 가능한 Target Fragment는 Throw Projectile 아래 중첩할 수 있다."),
 		Fragment->Validate(Error));
+
+	UKCExecuteGameplayCueFragment* ExplosionCue =
+		NewObject<UKCExecuteGameplayCueFragment>(Fragment);
+	ExplosionCue->CueTag = TAG_KC_GameplayCue_Impact_Metal;
+	ExplosionCue->ApplicationScope = EKCActionScope::Target;
+	Fragment->ExplosionPresentationFragments.Add(ExplosionCue);
+	TestFalse(
+		TEXT("폭발 연출 Fragment는 Target Scope를 사용할 수 없다."),
+		Fragment->Validate(Error));
+	ExplosionCue->ApplicationScope = EKCActionScope::Source;
+	TestTrue(
+		TEXT("Source Scope Gameplay Cue Fragment는 폭발 연출로 중첩할 수 있다."),
+		Fragment->Validate(Error));
+	ExplosionCue->CueTag = FGameplayTag::EmptyTag;
+	TestFalse(
+		TEXT("Cue 태그가 없는 폭발 연출 Fragment는 거부한다."),
+		Fragment->Validate(Error));
+	ExplosionCue->CueTag = TAG_KC_GameplayCue_Impact_Metal;
 
 	Fragment->ExplosionConfig.FuseDuration =
 		Fragment->ExplosionConfig.MaximumLifetime;
@@ -278,6 +304,27 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 		DropHeldItem->bRequired = true;
 		ExplosionTargetFragments.Add(DropHeldItem);
 
+		TArray<TObjectPtr<UKCActionFragment>> ExplosionPresentationFragments;
+		UKCExecuteGameplayCueFragment* ExplosionCue =
+			NewObject<UKCExecuteGameplayCueFragment>(TestWorld);
+		ExplosionCue->ApplicationScope = EKCActionScope::Source;
+		ExplosionCue->bRequired = true;
+		ExplosionCue->CueTag = TAG_KC_GameplayCue_Impact_Metal;
+		ExplosionPresentationFragments.Add(ExplosionCue);
+
+		// Cue는 관측 가능한 상태를 남기지 않으므로, 같은 Source Scope 지연 경로를
+		// 타는 Gameplay Effect를 탐침으로 넣어 연출 목록의 실행 자체를 검증한다.
+		UKCApplyGameplayEffectFragment* PresentationProbe =
+			NewObject<UKCApplyGameplayEffectFragment>(TestWorld);
+		PresentationProbe->ApplicationScope = EKCActionScope::Source;
+		PresentationProbe->bRequired = true;
+		PresentationProbe->EffectRecipe.EffectClass = UKCGE_Damage::StaticClass();
+		FKCSetByCallerValueStruct ProbeValue;
+		ProbeValue.DataTag = TAG_KC_Data_Damage_Flat;
+		ProbeValue.Magnitude = -7.0f;
+		PresentationProbe->EffectRecipe.SetByCallers.Add(ProbeValue);
+		ExplosionPresentationFragments.Add(PresentationProbe);
+
 		AKCActionProjectile* Projectile =
 			TestWorld->SpawnActor<AKCActionProjectile>(
 				AKCActionProjectile::StaticClass(),
@@ -287,17 +334,53 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 		{
 			Projectile->SetOwner(SourcePlayer);
 			Projectile->SetInstigator(SourcePlayer);
+
+			TArray<TObjectPtr<UKCActionFragment>> MisscopedPresentation;
+			UKCExecuteGameplayCueFragment* MisscopedCue =
+				NewObject<UKCExecuteGameplayCueFragment>(TestWorld);
+			MisscopedCue->ApplicationScope = EKCActionScope::Target;
+			MisscopedCue->CueTag = ExplosionCue->CueTag;
+			MisscopedPresentation.Add(MisscopedCue);
+			TestFalse(
+				TEXT("Target Scope 연출 Fragment로는 투사체를 초기화하지 않는다."),
+				Projectile->InitializeProjectile(
+					LaunchConfig,
+					ExplosionConfig,
+					ExplosionTargetFragments,
+					MisscopedPresentation,
+					SourcePlayer->GetAbilitySystemComponent(),
+					SourcePlayer,
+					SourcePlayer,
+					SourcePlayer,
+					FVector(1000.0f, 0.0f, 300.0f)));
+
 			TestTrue(
 				TEXT("서버에서 유효한 설정으로 투사체를 초기화한다."),
 				Projectile->InitializeProjectile(
 					LaunchConfig,
 					ExplosionConfig,
 					ExplosionTargetFragments,
+					ExplosionPresentationFragments,
 					SourcePlayer->GetAbilitySystemComponent(),
 					SourcePlayer,
 					SourcePlayer,
 					SourcePlayer,
 					FVector(1000.0f, 0.0f, 300.0f)));
+			// 투척 Ability가 끝난 뒤 투사체를 원점으로 삼는 문맥이다.
+			// 폭발 연출을 Fragment로 둘 수 있는지가 여기서 갈린다.
+			FKCActionExecutionContext DeferredCueContext;
+			DeferredCueContext.SourceAbilitySystem =
+				SourcePlayer->GetAbilitySystemComponent();
+			DeferredCueContext.SourceActor = Projectile;
+			DeferredCueContext.EffectSourceObject = SourcePlayer;
+			FString DeferredCueError;
+			TestTrue(
+				TEXT("Ability 없는 지연 문맥에서도 Cue Fragment는 실행 조건을 만족한다."),
+				ExplosionCue->CanExecute(DeferredCueContext, DeferredCueError));
+			TestTrue(
+				TEXT("Ability 없는 지연 문맥에서 Gameplay Cue 실행이 성공한다."),
+				ExplosionCue->Execute(DeferredCueContext));
+
 			TestTrue(
 				TEXT("투사체 위치는 네트워크로 복제한다."),
 				Projectile->IsReplicatingMovement());
@@ -332,9 +415,9 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 				OtherPlayer->GetCharacterAttributes()->GetHealth();
 			TestTrue(TEXT("서버가 투사체를 폭발시킨다."), Projectile->Detonate());
 			TestEqual(
-				TEXT("투척자는 기본 폭발 대상에서 제외한다."),
+				TEXT("투척자는 폭발 대상에서 빠지고 Source Scope 연출만 적용받는다."),
 				SourcePlayer->GetCharacterAttributes()->GetHealth(),
-				SourceHealthBefore);
+				SourceHealthBefore - 7.0f);
 			TestEqual(
 				TEXT("중첩 Damage Fragment가 설정한 피해만 적용한다."),
 				OtherPlayer->GetCharacterAttributes()->GetHealth(),
@@ -348,6 +431,38 @@ bool FKCProjectileRuntimeTest::RunTest(const FString& Parameters)
 			TestFalse(
 				TEXT("폭발 결과 처리 뒤 투사체 Actor를 제거한다."),
 				IsValid(Projectile));
+
+			// 연출을 하나도 붙이지 않은 투척물도 그대로 쓸 수 있어야 한다.
+			// 디버그 드로까지 켜서 그리기 경로도 함께 지나간다.
+			ExplosionConfig.bDrawDebugExplosion = true;
+			AKCActionProjectile* PlainProjectile =
+				TestWorld->SpawnActor<AKCActionProjectile>(
+					AKCActionProjectile::StaticClass(),
+					FVector(0.0f, 0.0f, 100.0f),
+					FRotator::ZeroRotator);
+			if (TestNotNull(TEXT("연출 없는 투사체를 스폰한다."), PlainProjectile))
+			{
+				PlainProjectile->SetOwner(SourcePlayer);
+				PlainProjectile->SetInstigator(SourcePlayer);
+				TestTrue(
+					TEXT("연출도 대상 Fragment도 없이 투사체를 초기화한다."),
+					PlainProjectile->InitializeProjectile(
+						LaunchConfig,
+						ExplosionConfig,
+						TArray<TObjectPtr<UKCActionFragment>>(),
+						TArray<TObjectPtr<UKCActionFragment>>(),
+						SourcePlayer->GetAbilitySystemComponent(),
+						SourcePlayer,
+						SourcePlayer,
+						SourcePlayer,
+						FVector(1000.0f, 0.0f, 300.0f)));
+				TestTrue(
+					TEXT("Cue 없이 디버그 드로만 켜도 폭발은 정상 수행한다."),
+					PlainProjectile->Detonate());
+				TestFalse(
+					TEXT("Cue 없는 폭발도 투사체 Actor를 제거한다."),
+					IsValid(PlainProjectile));
+			}
 		}
 
 		AKCWorldItemActor* SeaUrchin =

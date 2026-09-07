@@ -63,7 +63,20 @@ public:
 			"DirectionMode != EKCGameplayCueDirectionMode::FromContext"))
 	bool bFlattenDirection = false;
 
-private:
-	/** 설정한 모드로 이펙트가 바라볼 방향을 구한다. 못 구하면 0 벡터다. */
+	/**
+	/**
+	 * 구한 방향을 기준으로 한 로컬 회전이다. 월드 축이 아니라 그 방향의 프레임에서 돈다.
+	 * Yaw 180이나 Pitch 180이면 정반대를 보고, Pitch 90이면 위를 본다.
+	 * Roll은 방향 벡터를 바꾸지 못해 효과가 없다. Cue는 회전이 아니라 방향만 실어 나른다.
+	 */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Cue",
+		meta = (EditCondition =
+			"DirectionMode != EKCGameplayCueDirectionMode::FromContext"))
+	FRotator DirectionOffset = FRotator::ZeroRotator;
+
+	/** 설정한 모드와 오프셋으로 이펙트가 바라볼 방향을 구한다. 못 구하면 0 벡터다. */
 	FVector ResolveDirection(const FKCActionExecutionContext& Context) const;
 };

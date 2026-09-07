@@ -49,6 +49,12 @@ protected:
 	/** 현재 ActionTargeting으로 대상을 다시 수집해 OnExecute를 한 번 실행한다. */
 	void ExecutePulse();
 
+	/**
+	 * 새 실행 구간을 열고, 열렸다면 대상을 모으기 전에 OnExecuteStart Hook을 한 번
+	 * 실행한다. 실행 구간에 진입한 모든 경로가 이 진입점을 지난다.
+	 */
+	bool BeginExecutionWindow();
+
 	/** Single/Channel이 각자의 규칙으로 새 실행 구간을 받을지 결정한다. */
 	virtual bool TryBeginExecutionWindow() PURE_VIRTUAL(
 		UKCGA_ActionRuntimeBase::TryBeginExecutionWindow,
