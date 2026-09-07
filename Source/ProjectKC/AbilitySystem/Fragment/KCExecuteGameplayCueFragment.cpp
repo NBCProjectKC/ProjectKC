@@ -184,20 +184,25 @@ FVector UKCExecuteGameplayCueFragment::ResolveDirection(
 	if (!Direction.Normalize())
 	{
 		// 방향을 못 구했으면 소스 정면으로 물러선다.
-		if (Context.SourceActor)
+		if (!Context.SourceActor)
 		{
-			Direction = Context.SourceActor->GetActorForwardVector();
-			if (bFlattenDirection)
-			{
-				Direction.Z = 0.0f;
-			}
-			if (Direction.Normalize())
-			{
-				return Direction;
-			}
+			return FVector::ZeroVector;
 		}
-		return FVector::ZeroVector;
+
+		Direction = Context.SourceActor->GetActorForwardVector();
+		if (bFlattenDirection)
+		{
+			Direction.Z = 0.0f;
+		}
+		if (!Direction.Normalize())
+		{
+			return FVector::ZeroVector;
+		}
 	}
 
-	return Direction;
+	// 오프셋은 구한 방향의 로컬 프레임에서 돈다. 물러선 방향에도 똑같이 적용한다.
+	return DirectionOffset.IsNearlyZero()
+		? Direction
+		: (Direction.ToOrientationQuat() * DirectionOffset.Quaternion())
+			.GetForwardVector();
 }
