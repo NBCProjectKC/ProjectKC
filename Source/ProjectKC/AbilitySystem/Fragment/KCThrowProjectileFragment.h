@@ -53,6 +53,17 @@ public:
 		Category = "Projectile|Target Effects")
 	TArray<TObjectPtr<UKCActionFragment>> ExplosionTargetFragments;
 
+	/**
+	 * 폭발 순간에 한 번 실행할 Source Scope 연출 Fragment 목록이다.
+	 * 다른 Action과 같게 Execute Gameplay Cue로 VFX·SFX·카메라 셰이크를 재생한다.
+	 */
+	UPROPERTY(
+		EditDefaultsOnly,
+		Instanced,
+		BlueprintReadOnly,
+		Category = "Projectile|Presentation")
+	TArray<TObjectPtr<UKCActionFragment>> ExplosionPresentationFragments;
+
 private:
 	AActor* ResolveLaunchOrigin(const FKCActionExecutionContext& Context) const;
 	UObject* ResolveEffectSourceObject(

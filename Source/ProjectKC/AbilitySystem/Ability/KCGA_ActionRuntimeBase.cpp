@@ -25,6 +25,7 @@ UKCGA_ActionRuntimeBase::UKCGA_ActionRuntimeBase()
 	SetAssetTags(AssetTags);
 
 	AddSupportedActionHook(TAG_KC_ActionHook_OnStart);
+	AddSupportedActionHook(TAG_KC_ActionHook_OnExecuteStart);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnExecute);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnComplete);
 }
@@ -192,12 +193,26 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 		bWasCancelled);
 }
 
+bool UKCGA_ActionRuntimeBase::BeginExecutionWindow()
+{
+	if (!TryBeginExecutionWindow())
+	{
+		return false;
+	}
+
+	// 대상 수집 전에 실행한다. 명중 여부와 무관한 연출이 여기에 온다.
+	ExecuteSourceHook(TAG_KC_ActionHook_OnExecuteStart);
+	// Hook이 Ability를 끝냈다면 이어서 대상 판정을 하지 않는다.
+	return !IsFinishingAction();
+}
+
+
 void UKCGA_ActionRuntimeBase::ExecutePulse()
 {
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
 	const UKCInstantActionTargeting* Targeting = Cast<UKCInstantActionTargeting>(
 		Definition ? Definition->ActionTargeting : nullptr);
-	if (!bActionExecutionStarted || !Targeting || !TryBeginExecutionWindow())
+	if (!bActionExecutionStarted || !Targeting || !BeginExecutionWindow())
 	{
 		return;
 	}

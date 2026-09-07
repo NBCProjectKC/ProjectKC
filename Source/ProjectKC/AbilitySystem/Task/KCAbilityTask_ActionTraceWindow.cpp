@@ -40,7 +40,7 @@ void UKCAbilityTask_ActionTraceWindow::BeginTraceWindow()
 		!ResolvedSource ||
 		!Targeting->GetTraceSegment(
 			*ResolvedSource, PreviousStart, PreviousEnd) ||
-		!RuntimeAbility->TryBeginExecutionWindow())
+		!RuntimeAbility->BeginExecutionWindow())
 	{
 		return;
 	}

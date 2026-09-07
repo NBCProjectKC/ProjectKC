@@ -10,6 +10,68 @@
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
 
+namespace
+{
+	bool ValidateExplosionFragments(
+		const TArray<TObjectPtr<UKCActionFragment>>& Fragments,
+		EKCActionScope RequiredScope,
+		const TCHAR* ListName,
+		FString& OutError)
+	{
+		const TCHAR* ScopeName = RequiredScope == EKCActionScope::Source
+			? TEXT("Source")
+			: TEXT("Target");
+
+		for (int32 Index = 0; Index < Fragments.Num(); ++Index)
+		{
+			const UKCActionFragment* Fragment = Fragments[Index];
+			if (!IsValid(Fragment))
+			{
+				OutError = FString::Printf(
+					TEXT("%s[%d]가 비어 있습니다."),
+					ListName,
+					Index);
+				return false;
+			}
+
+			if (Fragment->ApplicationScope != RequiredScope)
+			{
+				OutError = FString::Printf(
+					TEXT("%s[%d] '%s'는 %s Scope여야 합니다."),
+					ListName,
+					Index,
+					*GetNameSafe(Fragment),
+					ScopeName);
+				return false;
+			}
+
+			if (!Fragment->SupportsDeferredExecution())
+			{
+				OutError = FString::Printf(
+					TEXT("%s[%d] '%s'는 지연 실행을 지원하지 않습니다."),
+					ListName,
+					Index,
+					*GetNameSafe(Fragment));
+				return false;
+			}
+
+			FString FragmentError;
+			if (!Fragment->Validate(FragmentError))
+			{
+				OutError = FString::Printf(
+					TEXT("%s[%d] '%s'가 유효하지 않습니다: %s"),
+					ListName,
+					Index,
+					*GetNameSafe(Fragment),
+					*FragmentError);
+				return false;
+			}
+		}
+
+		return true;
+	}
+}
+
 UKCThrowProjectileFragment::UKCThrowProjectileFragment()
 {
 	ApplicationScope = EKCActionScope::Source;
@@ -37,61 +99,28 @@ bool UKCThrowProjectileFragment::Validate(FString& OutError) const
 		return false;
 	}
 
-	for (int32 Index = 0; Index < ExplosionTargetFragments.Num(); ++Index)
-	{
-		const UKCActionFragment* Fragment = ExplosionTargetFragments[Index];
-		if (!IsValid(Fragment))
-		{
-			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d]가 비어 있습니다."),
-				Index);
-			return false;
-		}
-
-		if (Fragment->ApplicationScope != EKCActionScope::Target)
-		{
-			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'는 Target Scope여야 합니다."),
-				Index,
-				*GetNameSafe(Fragment));
-			return false;
-		}
-
-		if (!Fragment->SupportsDeferredExecution())
-		{
-			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'는 지연 실행을 지원하지 않습니다."),
-				Index,
-				*GetNameSafe(Fragment));
-			return false;
-		}
-
-		FString FragmentError;
-		if (!Fragment->Validate(FragmentError))
-		{
-			OutError = FString::Printf(
-				TEXT("ExplosionTargetFragments[%d] '%s'가 유효하지 않습니다: %s"),
-				Index,
-				*GetNameSafe(Fragment),
-				*FragmentError);
-			return false;
-		}
-	}
-
-	return true;
+	return ValidateExplosionFragments(
+			ExplosionTargetFragments,
+			EKCActionScope::Target,
+			TEXT("ExplosionTargetFragments"),
+			OutError) &&
+		ValidateExplosionFragments(
+			ExplosionPresentationFragments,
+			EKCActionScope::Source,
+			TEXT("ExplosionPresentationFragments"),
+			OutError);
 }
-
 bool UKCThrowProjectileFragment::DeclaresSetByCallerTag(
 	FGameplayTag DataTag) const
 {
-	return ExplosionTargetFragments.ContainsByPredicate(
-		[DataTag](const UKCActionFragment* Fragment)
-		{
-			return IsValid(Fragment) &&
-				Fragment->DeclaresSetByCallerTag(DataTag);
-		});
-}
+	const auto DeclaresTag = [DataTag](const UKCActionFragment* Fragment)
+	{
+		return IsValid(Fragment) && Fragment->DeclaresSetByCallerTag(DataTag);
+	};
 
+	return ExplosionTargetFragments.ContainsByPredicate(DeclaresTag) ||
+		ExplosionPresentationFragments.ContainsByPredicate(DeclaresTag);
+}
 void UKCThrowProjectileFragment::AppendDeclaredSetByCallerTags(
 	FGameplayTagContainer& OutTags) const
 {
@@ -102,8 +131,15 @@ void UKCThrowProjectileFragment::AppendDeclaredSetByCallerTags(
 			Fragment->AppendDeclaredSetByCallerTags(OutTags);
 		}
 	}
-}
 
+	for (const UKCActionFragment* Fragment : ExplosionPresentationFragments)
+	{
+		if (IsValid(Fragment))
+		{
+			Fragment->AppendDeclaredSetByCallerTags(OutTags);
+		}
+	}
+}
 bool UKCThrowProjectileFragment::CanExecute(
 	const FKCActionExecutionContext& Context,
 	FString& OutError) const
@@ -161,6 +197,7 @@ bool UKCThrowProjectileFragment::Execute(
 		LaunchConfig,
 		ExplosionConfig,
 		ExplosionTargetFragments,
+		ExplosionPresentationFragments,
 		Context.SourceAbilitySystem,
 		ResolveEffectSourceObject(Context, LaunchOrigin),
 		Context.SourceActor,
