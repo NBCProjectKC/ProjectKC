@@ -244,6 +244,10 @@ protected:
 		meta = (ClampMin = "0.0"))
 	float CustomizationCameraBlendTime = 0.2f;
 private:
+	/** 로컬 커스터마이징 상태를 서버 슬롯 이동 검증에 동기화합니다. */
+	UFUNCTION(Server, Reliable)
+	void ServerSetCustomizationEditing(bool bEditing);
+
 	AKCLobbyCharacter* ResolveLocalCustomizationCharacter() const;
 	class UKCCustomizationSaveSubsystem* GetCustomizationSaveSubsystem() const;
 	bool OpenCustomizationCamera(AKCLobbyCharacter* TargetCharacter);

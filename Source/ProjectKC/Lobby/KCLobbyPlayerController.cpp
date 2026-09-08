@@ -17,6 +17,7 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraActor.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "EngineUtils.h"
@@ -198,6 +199,12 @@ bool AKCLobbyPlayerController::BeginCustomizationEditing()
 	}
 
 	bCustomizationEditing = true;
+	if (UWidgetComponent* PlayerInfoWidget =
+		TargetCharacter->FindComponentByClass<UWidgetComponent>())
+	{
+		PlayerInfoWidget->SetVisibility(false, true);
+	}
+	ServerSetCustomizationEditing(true);
 	UE_LOG(LogKCLobby, Log,
 		TEXT("[KCLobbyPlayerController] Customization editing started: Target=%s, SaveFound=%s"),
 		*GetNameSafe(PaintTarget),
@@ -520,6 +527,16 @@ void AKCLobbyPlayerController::CloseCustomizationCamera()
 
 void AKCLobbyPlayerController::CloseCustomizationEditingSession()
 {
+	const bool bWasCustomizationEditing = bCustomizationEditing;
+	if (CustomizationCameraTarget)
+	{
+		if (UWidgetComponent* PlayerInfoWidget =
+			CustomizationCameraTarget->FindComponentByClass<UWidgetComponent>())
+		{
+			PlayerInfoWidget->SetVisibility(true, true);
+		}
+	}
+
 	if (CustomizationPaintingController)
 	{
 		CustomizationPaintingController->ExitPaintingMode();
@@ -534,6 +551,10 @@ void AKCLobbyPlayerController::CloseCustomizationEditingSession()
 	CustomizationEditingComponent = nullptr;
 	CustomizationEditingPaintTarget = nullptr;
 	bCustomizationEditing = false;
+	if (bWasCustomizationEditing && IsLocalPlayerController())
+	{
+		ServerSetCustomizationEditing(false);
+	}
 
 	// 페인팅 플러그인이 GameOnly로 바꾼 입력 모드를 로비 전용 GameAndUI로 복구
 	if (IsLocalPlayerController())
@@ -638,6 +659,13 @@ void AKCLobbyPlayerController::ROS_ToggleReadyStatus_Implementation()
 void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 TargetSlotIndex)
 {
 	const FString PlayerName = PlayerState ? PlayerState->GetPlayerName() : GetName();
+	if (bCustomizationEditing)
+	{
+		UE_LOG(LogKCLobby, Warning,
+			TEXT("[KCLobbyPlayerController] ROS_RequestMoveToSlot rejected while Player '%s' is customizing"),
+			*PlayerName);
+		return;
+	}
 
 	if (TargetSlotIndex < 0 || TargetSlotIndex >= AKCLobbyGameMode::MAX_LOBBY_SLOTS)
 	{
@@ -656,6 +684,12 @@ void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 Target
 			GM->MovePlayerToSlot(this, TargetSlotIndex);
 		}
 	}
+}
+
+void AKCLobbyPlayerController::ServerSetCustomizationEditing_Implementation(
+	const bool bEditing)
+{
+	bCustomizationEditing = bEditing;
 }
 
 void AKCLobbyPlayerController::MoveSlot(int32 TargetSlotIndex)
