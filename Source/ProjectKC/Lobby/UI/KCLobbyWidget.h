@@ -6,7 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCLobbyWidget.generated.h"
 
 class UButton;
@@ -20,7 +20,7 @@ class UWidgetAnimation;
  * @brief 기존 WBP_LobbyUI 위젯을 1:1 매핑한 C++ 위젯 클래스
  */
 UCLASS()
-class PROJECTKC_API UKCLobbyWidget : public UUserWidget
+class PROJECTKC_API UKCLobbyWidget : public UKCUserWidget
 {
 	GENERATED_BODY()
 

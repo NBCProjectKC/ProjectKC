@@ -6,8 +6,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "BlueprintDataDefinitions.h"
+#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCFriendWidget.generated.h"
 
 class UButton;
@@ -19,7 +19,7 @@ class UImage;
  * @brief 기존 WBP_Friend 위젯을 1:1 매핑한 C++ 위젯 클래스
  */
 UCLASS()
-class PROJECTKC_API UKCFriendWidget : public UUserWidget
+class PROJECTKC_API UKCFriendWidget : public UKCUserWidget
 {
 	GENERATED_BODY()
 
