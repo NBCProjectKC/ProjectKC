@@ -249,8 +249,9 @@ float UKCItemSlotViewModel::CalculateDurabilityGap(
 		return 1.0f;
 	}
 
-	return ItemDefinition->Durability.ConsumeMode ==
-		EKCItemDurabilityConsumeMode::OnFirstHit ? 0.9f : 1.0f;
+	return (ItemDefinition->Durability.ConsumeMode == EKCItemDurabilityConsumeMode::OnFirstHit 
+		? 0.9f : ItemDefinition->Durability.ConsumeMode == EKCItemDurabilityConsumeMode::OnUse 
+		? 0.9f : 1.0f);
 }
 
 UKCHeldItemComponent* UKCItemSlotViewModel::ResolveHeldItemComponent() const

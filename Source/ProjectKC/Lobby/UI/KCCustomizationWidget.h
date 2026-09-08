@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "Customization/KCCustomizationSaveGame.h"
+#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCCustomizationWidget.generated.h"
 
 class AKCLobbyPlayerController;
@@ -15,7 +15,7 @@ class UTextBlock;
 
 /** 로비 캐릭터 직접 페인팅 UI의 C++ 동작 베이스입니다. */
 UCLASS()
-class PROJECTKC_API UKCCustomizationWidget : public UUserWidget
+class PROJECTKC_API UKCCustomizationWidget : public UKCUserWidget
 {
 	GENERATED_BODY()
 

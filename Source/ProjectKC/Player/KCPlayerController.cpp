@@ -10,6 +10,7 @@
 #include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "Customization/KCCustomizationNetworkComponent.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
+#include "GameSystem/KCGameMode.h"
 #include "Player/KCPlayerCharacter.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 #include "ProjectKC/UI/Common/Core/KCUISettings.h"
@@ -367,4 +368,17 @@ float AKCPlayerController::GetServerTime() const
 void AKCPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
 {
 	InitializeInGameHUD();
+}
+
+void AKCPlayerController::RequestSkipResultScreen()
+{
+	Server_RequestSkipResultScreen();
+}
+
+void AKCPlayerController::Server_RequestSkipResultScreen_Implementation()
+{
+	if (AKCGameMode* GM = GetWorld()->GetAuthGameMode<AKCGameMode>())
+	{
+		GM->RequestEarlyTravelToLobby(GetPlayerState<AKCPlayerState>());
+	}
 }
