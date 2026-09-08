@@ -433,6 +433,8 @@ void AKCPlayerCharacter::BeginPlay()
 		BaseCameraFieldOfView = TopDownCameraComponent->FieldOfView;
 		CurrentDashCameraFOVOffset = 0.0f;
 		DashCameraFOVElapsed = -1.0f;
+		CurrentHitCameraFOVOffset = 0.0f;
+		HitCameraFOVElapsed = -1.0f;
 	}
 
 	InitializeAbilityActorInfo();
@@ -716,9 +718,18 @@ void AKCPlayerCharacter::HandleMoveSpeedChanged(
 void AKCPlayerCharacter::HandleHealthChanged(
 	const FOnAttributeChangeData& ChangeData)
 {
-	if (HasAuthority() && ChangeData.NewValue < ChangeData.OldValue)
+	if (ChangeData.NewValue >= ChangeData.OldValue)
+	{
+		return;
+	}
+
+	if (HasAuthority())
 	{
 		InterruptEmote();
+	}
+	if (IsLocallyControlled())
+	{
+		TriggerHitCameraFeedback();
 	}
 }
 
@@ -941,8 +952,65 @@ void AKCPlayerCharacter::UpdateCameraLookAhead(
 			CurrentDashCameraFOVOffset = 0.0f;
 		}
 
+		if (HitCameraFOVElapsed >= 0.0f)
+		{
+			const float AttackDuration = FMath::Max(
+				HitCameraFOVAttackDuration, 0.0f);
+			const float HoldDuration = FMath::Max(
+				HitCameraFOVHoldDuration, 0.0f);
+			const float ReturnDuration = FMath::Max(
+				HitCameraFOVReturnDuration, 0.0f);
+			const float HoldEndTime = AttackDuration + HoldDuration;
+			const float EffectEndTime = HoldEndTime + ReturnDuration;
+
+			if (AttackDuration > 0.0f &&
+				HitCameraFOVElapsed < AttackDuration)
+			{
+				const float AttackAlpha = FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					HitCameraFOVElapsed / AttackDuration);
+				CurrentHitCameraFOVOffset = FMath::Lerp(
+					HitCameraFOVStartOffset,
+					HitCameraFOVTargetOffset,
+					AttackAlpha);
+			}
+			else if (HitCameraFOVElapsed < HoldEndTime)
+			{
+				CurrentHitCameraFOVOffset = HitCameraFOVTargetOffset;
+			}
+			else if (ReturnDuration > 0.0f &&
+				HitCameraFOVElapsed < EffectEndTime)
+			{
+				const float ReturnAlpha = FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					(HitCameraFOVElapsed - HoldEndTime) / ReturnDuration);
+				CurrentHitCameraFOVOffset = FMath::Lerp(
+					HitCameraFOVTargetOffset,
+					0.0f,
+					ReturnAlpha);
+			}
+			else
+			{
+				CurrentHitCameraFOVOffset = 0.0f;
+				HitCameraFOVElapsed = -1.0f;
+			}
+
+			if (HitCameraFOVElapsed >= 0.0f)
+			{
+				HitCameraFOVElapsed += FMath::Max(DeltaSeconds, 0.0f);
+			}
+		}
+		else
+		{
+			CurrentHitCameraFOVOffset = 0.0f;
+		}
+
 		TopDownCameraComponent->SetFieldOfView(
-			BaseCameraFieldOfView + CurrentDashCameraFOVOffset);
+			BaseCameraFieldOfView +
+			CurrentDashCameraFOVOffset +
+			CurrentHitCameraFOVOffset);
 	}
 }
 
@@ -955,6 +1023,20 @@ void AKCPlayerCharacter::TriggerDashCameraPunch()
 
 	CurrentDashCameraFOVOffset = 0.0f;
 	DashCameraFOVElapsed = 0.0f;
+}
+
+void AKCPlayerCharacter::TriggerHitCameraFeedback()
+{
+	if (!IsLocallyControlled() || !TopDownCameraComponent)
+	{
+		return;
+	}
+
+	HitCameraFOVStartOffset = CurrentHitCameraFOVOffset;
+	HitCameraFOVTargetOffset = -FMath::Max(
+		FMath::Max(HitCameraFOVKick, 0.0f),
+		FMath::Abs(CurrentHitCameraFOVOffset));
+	HitCameraFOVElapsed = 0.0f;
 }
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)

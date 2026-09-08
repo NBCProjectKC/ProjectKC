@@ -131,6 +131,7 @@ private:
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData);
 	void ApplyMoveSpeed(float MoveSpeed);
 	void InterruptEmote();
+	void TriggerHitCameraFeedback();
 	void ApplyFacingYaw(float FacingYaw);
 	void ApplyAcceptedServerFacingYaw(
 		float FacingYaw,
@@ -201,12 +202,33 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float DashCameraFOVReturnDuration = 0.42f;
 
+	/** 최대 강도 피격 시 기본 시야각에서 줄어드는 값이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "30.0"))
+	float HitCameraFOVKick = 12.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraFOVAttackDuration = 0.13f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraFOVHoldDuration = 0.06f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraFOVReturnDuration = 0.28f;
+
 	FVector BaseCameraTargetOffset = FVector::ZeroVector;
 	FVector CurrentCameraLookAheadOffset = FVector::ZeroVector;
 	FVector CurrentCameraMovementLagOffset = FVector::ZeroVector;
 	float BaseCameraFieldOfView = 90.0f;
 	float CurrentDashCameraFOVOffset = 0.0f;
 	float DashCameraFOVElapsed = -1.0f;
+	float CurrentHitCameraFOVOffset = 0.0f;
+	float HitCameraFOVStartOffset = 0.0f;
+	float HitCameraFOVTargetOffset = 0.0f;
+	float HitCameraFOVElapsed = -1.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))
