@@ -4,6 +4,8 @@
 #include "GameFramework/PlayerController.h"
 #include "KCMainMenuPlayerController.generated.h"
 
+class UUserWidget;
+
 UCLASS()
 class PROJECTKC_API AKCMainMenuPlayerController : public APlayerController
 {
@@ -16,5 +18,9 @@ protected:
 private:
 	void InitializeMainMenuInput();
 	void ApplyMainMenuCamera();
+	void ShowSplashScreen();
 	void ClearMainMenuUI();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> ActiveSplashScreen;
 };
