@@ -8,6 +8,7 @@
 #include "KCResultScreen.generated.h"
 
 class UTextBlock;
+class UButton;
 class UKCResultViewModel;
 
 UCLASS(Abstract, Blueprintable)
@@ -28,15 +29,20 @@ public:
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
-	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
 	TObjectPtr<UTextBlock> BackToLobbySecondText;
+
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
+	TObjectPtr<UButton> BackToLobbyButton;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|UI")
 	TObjectPtr<UKCResultViewModel> ResultViewModel;
 
 private:
+	UFUNCTION()
+	void HandleBackToLobbyButtonClicked();
+
 	void StartBackToLobbyTimer();
 	void StopBackToLobbyTimer();
 	void UpdateBackToLobbyTimer();
