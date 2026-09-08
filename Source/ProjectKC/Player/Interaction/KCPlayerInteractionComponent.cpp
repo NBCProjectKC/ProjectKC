@@ -185,8 +185,6 @@ bool UKCPlayerInteractionComponent::IsValidInteractionComponent(
 		{
 			return false;
 		}
-
-		ClosestInteractionPoint = WorldItem->GetActorLocation();
 	}
 
 	const FVector ToTarget =
@@ -232,7 +230,25 @@ bool UKCPlayerInteractionComponent::HasLineOfSightTo(
 		return false;
 	}
 
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PlayerInteractionLineTrace), false, OwnerActor);
+	FCollisionQueryParams QueryParams(
+		SCENE_QUERY_STAT(PlayerInteractionLineTrace),
+		false,
+		OwnerActor);
+	if (TargetActor->IsA<AKCWorldItemActor>())
+	{
+		TArray<AActor*> OverlappingWorldItems;
+		GetOverlappingActors(
+			OverlappingWorldItems,
+			AKCWorldItemActor::StaticClass());
+		for (AActor* OverlappingWorldItem : OverlappingWorldItems)
+		{
+			if (OverlappingWorldItem != TargetActor)
+			{
+				QueryParams.AddIgnoredActor(OverlappingWorldItem);
+			}
+		}
+	}
+
 	FHitResult HitResult;
 	const bool bBlockingHit = World->LineTraceSingleByChannel(
 		HitResult,
