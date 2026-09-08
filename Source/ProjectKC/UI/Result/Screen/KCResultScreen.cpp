@@ -1,5 +1,6 @@
 #include "ProjectKC/UI/Result/Screen/KCResultScreen.h"
 
+#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "GameSystem/KCGameState.h"
 #include "Player/KCPlayerController.h"
@@ -12,6 +13,11 @@ void UKCResultScreen::NativeConstruct()
 	SetIsFocusable(true);
 	SetKeyboardFocus();
 
+	if (BackToLobbyButton)
+	{
+		BackToLobbyButton->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleBackToLobbyButtonClicked);
+	}
+
 	if (!ResultViewModel)
 	{
 		ResultViewModel = NewObject<UKCResultViewModel>(this);
@@ -23,20 +29,22 @@ void UKCResultScreen::NativeConstruct()
 
 void UKCResultScreen::NativeDestruct()
 {
+	if (BackToLobbyButton)
+	{
+		BackToLobbyButton->OnClicked.RemoveDynamic(this, &ThisClass::HandleBackToLobbyButtonClicked);
+	}
+
 	StopBackToLobbyTimer();
 
 	Super::NativeDestruct();
 }
 
-FReply UKCResultScreen::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+void UKCResultScreen::HandleBackToLobbyButtonClicked()
 {
 	if (AKCPlayerController* PlayerController = Cast<AKCPlayerController>(GetOwningPlayer()))
 	{
 		PlayerController->RequestSkipResultScreen();
-		return FReply::Handled();
 	}
-
-	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
 void UKCResultScreen::RefreshResultScreen()
