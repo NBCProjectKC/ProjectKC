@@ -51,8 +51,5 @@ private:
 	void StopFixedIntervalExecution();
 	void HandleFixedIntervalPulse();
 
-	UPROPERTY(Transient)
-	TObjectPtr<UKCAbilityTask_PlayActionMontage> ActiveMontageTask;
-
 	FTimerHandle FixedIntervalTimerHandle;
 };

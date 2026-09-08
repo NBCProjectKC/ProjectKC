@@ -5,11 +5,13 @@
 #include "KCGA_ActionRuntimeBase.generated.h"
 
 class UKCAbilityTask_ActionTraceWindow;
+class UKCAbilityTask_PlayActionMontage;
 class AKCWorldItemActor;
 enum class EKCItemDurabilityConsumeMode : uint8;
 struct FKCActionTarget;
 struct FKCActionTargetingContext;
 struct FKCLoopingCueStruct;
+struct FKCMontageHitLagConfigStruct;
 
 /** Targeting, Hook 실행, 종료 정리를 공유하는 Action GA 런타임 기반이다. */
 UCLASS(Abstract)
@@ -19,6 +21,9 @@ class PROJECTKC_API UKCGA_ActionRuntimeBase : public UKCGA_Base
 
 public:
 	UKCGA_ActionRuntimeBase();
+
+	bool CanApplyMontageHitLag() const;
+	bool ApplyMontageHitLag(const FKCMontageHitLagConfigStruct& HitLag);
 
 	/** 현재 몽타주의 Socket Trace NotifyState가 호출하는 정확한 Ability 진입점이다. */
 	void NotifySocketTraceWindowBegin();
@@ -77,6 +82,10 @@ protected:
 	 */
 	virtual const FKCLoopingCueStruct* GetLoopingCueConfig() const;
 
+	/** 현재 공격 몽타주의 재생과 일시적인 재생률 변경을 함께 소유한다. */
+	UPROPERTY(Transient)
+	TObjectPtr<UKCAbilityTask_PlayActionMontage> ActiveMontageTask;
+
 private:
 	friend class UKCAbilityTask_ActionTraceWindow;
 
@@ -100,6 +109,7 @@ private:
 	bool bHasActivationHitResult = false;
 	bool bFinishingAction = false;
 	bool bActionExecutionStarted = false;
+	bool bConfirmedHitHookExecuted = false;
 	bool bDurabilityConsumedThisActivation = false;
 	bool bUseConsumptionPendingThisActivation = false;
 	bool bDurabilityDrainActive = false;
