@@ -1,4 +1,6 @@
 ﻿#include "KCLevelTypeLibrary.h"
+#include "KCLevelInfoRow.h"
+#include "Engine/DataTable.h"
 
 FName UKCLevelTypeLibrary::GetLevelName(EKCLevelType LevelType)
 {
@@ -41,4 +43,20 @@ EKCLevelType UKCLevelTypeLibrary::GetLevelTypeFromWorld(const UWorld* World)
 	MapName.RemoveFromStart(World->StreamingLevelsPrefix);
 
 	return GetLevelType(FName(*MapName));
+}
+
+const FKCLevelInfoRow* UKCLevelTypeLibrary::GetLevelInfoRow(EKCLevelType LevelType)
+{
+	const TSoftObjectPtr<UDataTable> LevelInfoTablePath(
+		FSoftObjectPath(TEXT("/Game/KC/GameSystem/DT_LevelInfo.DT_LevelInfo")));   // static 제거
+
+	UDataTable* Table = LevelInfoTablePath.LoadSynchronous();
+	if (!Table)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UKCLevelTypeLibrary::GetLevelInfoRow - DT_LevelInfo를 로드하지 못했습니다."));
+		return nullptr;
+	}
+
+	const FName RowName = GetLevelName(LevelType);
+	return Table->FindRow<FKCLevelInfoRow>(RowName, TEXT("GetLevelInfoRow"));
 }

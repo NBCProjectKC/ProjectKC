@@ -677,7 +677,7 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	{
 		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
 		{
-			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange, GasRangePreloadAssetTypes);
+			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange);
 		}
 	}
 }

@@ -12,6 +12,8 @@
 #include "Messages/Struct/KCEmptyMessageStruct.h"
 #include "UObject/ConstructorHelpers.h"
 #include "ProjectKC/UI/Loading/Tip/KCLoadingTipDataAsset.h"
+#include "ProjectKC/GameSystem/KCLevelTypeLibrary.h"
+#include "ProjectKC/GameSystem/KCLevelInfoRow.h"
 
 UKCLoadingScreenSubsystem::UKCLoadingScreenSubsystem()
 {
@@ -37,7 +39,7 @@ void UKCLoadingScreenSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes)
+void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel)
 {
 	if (WaitingForLevel != EKCLevelType::None)
 	{
@@ -46,6 +48,14 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 		return;
 	}
 
+	const FKCLevelInfoRow* Row = UKCLevelTypeLibrary::GetLevelInfoRow(TargetLevel);
+	if (!Row)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KCLoadingScreenSubsystem::BeginPreload - DT_LevelInfo에서 레벨 정보를 찾지 못했습니다."));
+		return;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG] DT 조회 성공. MapName=%s, AssetTypesToPreload 개수=%d"),
+		*Row->MapName.ToString(), Row->AssetTypesToPreload.Num());
 	WaitingForLevel = TargetLevel;
 	bAssetsReady = false;
 	bLevelReady = false;
@@ -92,7 +102,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	TWeakObjectPtr<UKCLoadingScreenSubsystem> WeakThis(this);
 
 	UKCAssetManager::Get().PreloadAssetsByTypes(
-		AssetTypes,
+		Row->AssetTypesToPreload,
 		[WeakThis](float NewProgress)
 		{
 			// TODO : 현재 에셋매니저의 부하가 적어 가짜 진행률로 대체. 추후 수정할 예정

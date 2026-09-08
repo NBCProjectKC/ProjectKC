@@ -30,7 +30,7 @@ public:
 	 * @param AssetTypes    pre-load할 PrimaryAssetType 목록 (예: {"Item"})
 	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Loading")
-	void BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes);
+	void BeginPreload(EKCLevelType TargetLevel);
  
 	UPROPERTY(Transient)
 	TObjectPtr<UKCUserWidget> ActiveLoadingWidget;

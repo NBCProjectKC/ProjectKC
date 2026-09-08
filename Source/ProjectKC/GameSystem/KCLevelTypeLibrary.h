@@ -5,6 +5,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "KCLevelTypeLibrary.generated.h"
 
+struct FKCLevelInfoRow;
 /**
  * EKCLevelType과 실제 레벨 이름(FName) 사이의 변환을 관리합니다.
  * 레벨 이름이 바뀌어도 이 파일만 고치면 됨.
@@ -23,4 +24,6 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "KC|Level")
 	static EKCLevelType GetLevelTypeFromWorld(const UWorld* World);
+	
+	static const FKCLevelInfoRow* GetLevelInfoRow(EKCLevelType LevelType);
 };
