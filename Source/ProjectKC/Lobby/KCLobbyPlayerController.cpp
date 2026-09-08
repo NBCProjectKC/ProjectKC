@@ -659,7 +659,21 @@ void AKCLobbyPlayerController::ROS_UpdatePlayerInfo_Implementation()
 	}
 }
 
-void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
+void AKCLobbyPlayerController::ROS_ApplyGameSettings_Implementation(int32 InPlayerCount, EKCLevelType InMapType, float InMatchDurationSeconds)
+{
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerController] ROS_ApplyGameSettings received from %s: Players=%d, Map=%s, Duration=%.0fs"),
+		*GetName(), InPlayerCount, *UKCLevelTypeLibrary::GetLevelName(InMapType).ToString(), InMatchDurationSeconds);
+
+	if (UWorld* World = GetWorld())
+	{
+		if (AKCLobbyGameMode* GM = World->GetAuthGameMode<AKCLobbyGameMode>())
+		{
+			GM->ApplyGameSettings(InPlayerCount, InMapType, InMatchDurationSeconds);
+		}
+	}
+}
+
+void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation(EKCLevelType TargetMap)
 {
 	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerController] Client_OnMatchBegin received. Playing match start animation and locking inputs."));
 
@@ -677,7 +691,7 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	{
 		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
 		{
-			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange);
+			LoadingScreenSubsystem->BeginPreload(TargetMap);
 		}
 	}
 }

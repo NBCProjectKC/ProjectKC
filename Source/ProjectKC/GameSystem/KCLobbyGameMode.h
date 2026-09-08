@@ -43,6 +43,26 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetRequiredPlayerCount() const { return RequiredPlayerCount; }
 
+	/** @brief 선택된 게임 맵(전투 레벨)을 설정합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Settings")
+	void SetSelectedMap(EKCLevelType InLevelType);
+
+	/** @brief 현재 선택된 게임 맵을 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Settings")
+	EKCLevelType GetSelectedMap() const { return SelectedLevelType; }
+
+	/** @brief 매치 제한 시간(초)을 설정합니다. (기본값: 300초 / 5분) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Settings")
+	void SetMatchDuration(float InSeconds);
+
+	/** @brief 현재 설정된 매치 제한 시간(초)을 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby|Settings")
+	float GetMatchDuration() const { return MatchDurationSeconds; }
+
+	/** @brief 방장 게임 세팅 일괄 적용 (인원수, 맵, 게임 시간) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|Settings")
+	void ApplyGameSettings(int32 InPlayerCount, EKCLevelType InMapType, float InMatchDurationSeconds);
+
 	/** @brief 정규 팀 슬롯 개수 (0~5: Team 0은 0~2, Team 1은 3~5) */
 	static constexpr int32 REGULAR_SLOT_COUNT = 6;
 
@@ -99,10 +119,13 @@ public:
 	TArray<FKCPlayerInfoStruct> ConnectedPlayers;
 
 protected:
-	/** @brief 게임 시작 시 ServerTravel 대상이 될 전투 레벨 맵 이름 (기본값: Lvl_Main 추후 L_GasRange로 변경 예정) */
-	// LevelTypeLibrary 사용
-	UPROPERTY(EditDefaultsOnly, Category = "KC|Lobby")
-	FString TravelURL = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::GasRange).ToString() + TEXT("?listen");
+	/** @brief 선택된 전투 레벨 맵 타입 (기본값: GasRange) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby|Settings")
+	EKCLevelType SelectedLevelType = EKCLevelType::GasRange;
+
+	/** @brief 인게임 매치 제한 시간 (초 단위, 기본값: 300초 = 5분) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby|Settings")
+	float MatchDurationSeconds = 300.0f;
 
 	/** @brief 로비 레벨에 배치된 슬롯 액터 목록 (0~2: Team 0, 3~5: Team 1) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby")

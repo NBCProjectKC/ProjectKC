@@ -6,9 +6,11 @@
 #include "ProjectKC/Lobby/UI/KCLobbyWidget.h"
 #include "ProjectKC/Lobby/UI/KCCustomizationWidget.h"
 #include "ProjectKC/Lobby/UI/KCFriendListWidget.h"
+#include "ProjectKC/Lobby/UI/KCLobbyGameSettingsWidget.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -40,6 +42,14 @@ void UKCLobbyWidget::NativeConstruct()
 		const bool bIsServer = UKismetSystemLibrary::IsServer(this);
 		Button_StartGame->SetVisibility(bIsServer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 		Button_StartGame->SetIsEnabled(false);
+	}
+
+	if (Button_GameSettings)
+	{
+		Button_GameSettings->OnClicked.AddDynamic(this, &UKCLobbyWidget::OnGameSettingsClicked);
+		const bool bIsServer = UKismetSystemLibrary::IsServer(this);
+		Button_GameSettings->SetVisibility(bIsServer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		Button_GameSettings->SetIsEnabled(true);
 	}
 
 	if (Button_Customization)
@@ -80,6 +90,16 @@ void UKCLobbyWidget::NativeDestruct()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PlayerStateBindRetryTimerHandle);
+	}
+	if (Button_GameSettings)
+	{
+		Button_GameSettings->OnClicked.RemoveDynamic(
+			this, &UKCLobbyWidget::OnGameSettingsClicked);
+	}
+	if (GameSettingsWidgetInstance)
+	{
+		GameSettingsWidgetInstance->CloseSettings();
+		GameSettingsWidgetInstance = nullptr;
 	}
 	if (Button_Customization)
 	{
@@ -244,8 +264,83 @@ void UKCLobbyWidget::OnCustomizationClicked()
 	SetVisibility(ESlateVisibility::Collapsed);
 }
 
+void UKCLobbyWidget::OnGameSettingsClicked()
+{
+	BP_OnGameSettingsClicked();
+
+	if (GameSettingsWidgetInstance && GameSettingsWidgetInstance->IsInViewport())
+	{
+		return;
+	}
+
+	AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(GetOwningPlayer());
+	if (!LobbyPC)
+	{
+		return;
+	}
+
+	if (!GameSettingsWidgetClass)
+	{
+		GameSettingsWidgetClass = StaticLoadClass(
+			UKCLobbyGameSettingsWidget::StaticClass(),
+			nullptr,
+			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_GameSettings.WBP_GameSettings_C"));
+	}
+
+	if (!GameSettingsWidgetClass)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyWidget] WBP_GameSettings class was not found. Please create it or set GameSettingsWidgetClass."));
+		return;
+	}
+
+	GameSettingsWidgetInstance = CreateWidget<UKCLobbyGameSettingsWidget>(LobbyPC, GameSettingsWidgetClass);
+	if (!GameSettingsWidgetInstance)
+	{
+		UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyWidget] Failed to create WBP_GameSettings instance."));
+		return;
+	}
+
+	int32 CurrentCount = 6;
+	EKCLevelType CurrentMap = EKCLevelType::GasRange;
+	float CurrentDuration = 300.0f;
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (const AKCLobbyGameMode* GM = World->GetAuthGameMode<AKCLobbyGameMode>())
+		{
+			CurrentCount = GM->GetRequiredPlayerCount();
+			CurrentMap = GM->GetSelectedMap();
+			CurrentDuration = GM->GetMatchDuration();
+		}
+		else if (const UGameInstance* GI = World->GetGameInstance())
+		{
+			if (const UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+			{
+				CurrentCount = SessionSub->GetExpectedPlayerCount() > 0 ? SessionSub->GetExpectedPlayerCount() : 6;
+				CurrentMap = SessionSub->GetSelectedMapType();
+				CurrentDuration = SessionSub->GetMatchDurationSeconds() > 0.0f ? SessionSub->GetMatchDurationSeconds() : 300.0f;
+			}
+		}
+	}
+
+	GameSettingsWidgetInstance->InitializeGameSettings(this, CurrentCount, CurrentMap, CurrentDuration);
+	GameSettingsWidgetInstance->AddToViewport(25);
+}
+
+void UKCLobbyWidget::NotifyGameSettingsWidgetClosed(UKCLobbyGameSettingsWidget* ClosedWidget)
+{
+	if (GameSettingsWidgetInstance == ClosedWidget)
+	{
+		GameSettingsWidgetInstance = nullptr;
+	}
+}
+
 void UKCLobbyWidget::OnReadyStatusUpdated(bool bIsReady)
 {
+	if (Button_GameSettings)
+	{
+		Button_GameSettings->SetIsEnabled(!bIsReady);
+	}
 	if (Button_Customization)
 	{
 		Button_Customization->SetIsEnabled(!bIsReady);
