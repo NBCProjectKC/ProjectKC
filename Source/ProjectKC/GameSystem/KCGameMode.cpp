@@ -52,6 +52,18 @@ void AKCGameMode::HandleMatchHasStarted()
 		KCGameState->InitializeTeamCount(TeamCount);
 		KCGameState->SetActiveRecipes(SelectActiveRecipes()); // 그 판의 레시피 룰렛
 		KCGameState->SetGamePhase(EKCGamePhaseType::Playing); // phase 변경
+		
+		// KCSessionSubsystem에서 로비 설정 매치 시간 복원
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+			{
+				if (SessionSub->GetMatchDurationSeconds() > 0.0f)
+				{
+					MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
+				}
+			}
+		}
 	
 		/*
 		 * TODO : 로비에서 그 판의 타이머를 세팅하는 코드입니다.

@@ -13,6 +13,7 @@ class UButton;
 class UTextBlock;
 class UKCCustomizationWidget;
 class UKCFriendListWidget;
+class UKCLobbyGameSettingsWidget;
 class UWidgetAnimation;
 
 /**
@@ -36,8 +37,11 @@ public:
 	/** @brief PlayerState에 안전하게 바인딩을 시도합니다. 바인딩 성공 시 true 반환 */
 	bool TryBindPlayerState();
 
-	/** 커스터마이징 위젯이 닫힐 때 로비 UI를 복원합니다. */
+	/** @brief 커스터마이징 위젯이 닫힐 때 로비 UI를 복원합니다. */
 	void NotifyCustomizationWidgetClosed(UKCCustomizationWidget* ClosedWidget);
+
+	/** @brief 게임 세팅 팝업 위젯이 닫힐 때 호출 */
+	void NotifyGameSettingsWidgetClosed(UKCLobbyGameSettingsWidget* ClosedWidget);
 
 protected:
 	//~UUserWidget interface
@@ -57,7 +61,11 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UButton> Button_StartGame;
 
-	/** 이름만 맞춰 배치하면 C++에서 자동으로 커스터마이징 UI를 엽니다. */
+	/** @brief 방장 전용 게임 세팅(인원, 맵, 시간) 버튼 바인딩 */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UButton> Button_GameSettings;
+
+	/** @brief 이름만 맞춰 배치하면 C++에서 자동으로 커스터마이징 UI를 엽니다. */
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UButton> Button_Customization;
 
@@ -77,12 +85,19 @@ protected:
 	UPROPERTY(Transient, meta = (BindWidgetAnimOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UWidgetAnimation> MatchStartAnim;
 
-	/** 비워두면 기본 경로의 WBP_Customization을 자동 탐색합니다. */
+	/** @brief 비워두면 기본 경로의 WBP_Customization을 자동 탐색합니다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization")
 	TSubclassOf<UKCCustomizationWidget> CustomizationWidgetClass;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Lobby|Customization")
 	TObjectPtr<UKCCustomizationWidget> CustomizationWidgetInstance;
+
+	/** @brief 비워두면 기본 경로의 WBP_GameSettings를 자동 탐색합니다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Settings")
+	TSubclassOf<UKCLobbyGameSettingsWidget> GameSettingsWidgetClass;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Lobby|Settings")
+	TObjectPtr<UKCLobbyGameSettingsWidget> GameSettingsWidgetInstance;
 
 	/** @brief 소셜 버튼 클릭 핸들러 */
 	UFUNCTION()
@@ -95,6 +110,14 @@ protected:
 	/** @brief 게임 시작 버튼 클릭 핸들러 */
 	UFUNCTION()
 	virtual void OnStartGameClicked();
+
+	/** @brief 게임 세팅 버튼 클릭 핸들러 */
+	UFUNCTION()
+	virtual void OnGameSettingsClicked();
+
+	/** @brief 블루프린트에서 세팅 버튼 클릭 시 호출되는 이벤트 (커스텀 연출/사운드용) */
+	UFUNCTION(BlueprintImplementableEvent, Category = "KC|Lobby|UI")
+	void BP_OnGameSettingsClicked();
 
 	UFUNCTION()
 	virtual void OnCustomizationClicked();
