@@ -427,6 +427,8 @@ void AKCPlayerCharacter::BeginPlay()
 		BaseCameraTargetOffset = CameraBoomComponent->TargetOffset;
 		CurrentCameraLookAheadOffset = FVector::ZeroVector;
 		CurrentCameraMovementLagOffset = FVector::ZeroVector;
+		CurrentHitCameraShakeOffset = FVector::ZeroVector;
+		HitCameraShakeElapsed = -1.0f;
 	}
 	if (TopDownCameraComponent)
 	{
@@ -896,10 +898,45 @@ void AKCPlayerCharacter::UpdateCameraLookAhead(
 		CameraMovementLagInterpSpeed);
 	CurrentCameraMovementLagOffset.Z = 0.0f;
 
+	if (HitCameraShakeElapsed >= 0.0f)
+	{
+		const float ShakeDuration = FMath::Max(HitCameraShakeDuration, 0.0f);
+		if (ShakeDuration > 0.0f && HitCameraShakeElapsed < ShakeDuration)
+		{
+			const float NormalizedTime = FMath::Clamp(
+				HitCameraShakeElapsed / ShakeDuration,
+				0.0f,
+				1.0f);
+			const float Envelope = 1.0f - FMath::SmoothStep(
+				0.0f,
+				1.0f,
+				NormalizedTime);
+			const float Phase = HitCameraShakeElapsed *
+				FMath::Max(HitCameraShakeFrequency, 0.0f) * 2.0f * PI;
+			const float Amplitude =
+				FMath::Max(HitCameraShakeAmplitude, 0.0f) * Envelope;
+			CurrentHitCameraShakeOffset = FVector(
+				FMath::Sin(Phase),
+				FMath::Sin(Phase * 1.37f),
+				0.0f) * Amplitude;
+			HitCameraShakeElapsed += FMath::Max(DeltaSeconds, 0.0f);
+		}
+		else
+		{
+			CurrentHitCameraShakeOffset = FVector::ZeroVector;
+			HitCameraShakeElapsed = -1.0f;
+		}
+	}
+	else
+	{
+		CurrentHitCameraShakeOffset = FVector::ZeroVector;
+	}
+
 	CameraBoomComponent->TargetOffset =
 		BaseCameraTargetOffset +
 		CurrentCameraLookAheadOffset +
-		CurrentCameraMovementLagOffset;
+		CurrentCameraMovementLagOffset +
+		CurrentHitCameraShakeOffset;
 
 	if (TopDownCameraComponent)
 	{
@@ -1037,6 +1074,7 @@ void AKCPlayerCharacter::TriggerHitCameraFeedback()
 		FMath::Max(HitCameraFOVKick, 0.0f),
 		FMath::Abs(CurrentHitCameraFOVOffset));
 	HitCameraFOVElapsed = 0.0f;
+	HitCameraShakeElapsed = 0.0f;
 }
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)

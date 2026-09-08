@@ -219,9 +219,25 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float HitCameraFOVReturnDuration = 0.28f;
 
+	/** 피격 흔들림이 카메라 중심을 밀어내는 최대 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit|Shake",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraShakeAmplitude = 12.0f;
+
+	/** 피격 흔들림의 초당 진동 횟수다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit|Shake",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraShakeFrequency = 18.0f;
+
+	/** 피격 흔들림이 감쇠하며 사라지는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit|Shake",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraShakeDuration = 0.18f;
+
 	FVector BaseCameraTargetOffset = FVector::ZeroVector;
 	FVector CurrentCameraLookAheadOffset = FVector::ZeroVector;
 	FVector CurrentCameraMovementLagOffset = FVector::ZeroVector;
+	FVector CurrentHitCameraShakeOffset = FVector::ZeroVector;
 	float BaseCameraFieldOfView = 90.0f;
 	float CurrentDashCameraFOVOffset = 0.0f;
 	float DashCameraFOVElapsed = -1.0f;
@@ -229,6 +245,7 @@ private:
 	float HitCameraFOVStartOffset = 0.0f;
 	float HitCameraFOVTargetOffset = 0.0f;
 	float HitCameraFOVElapsed = -1.0f;
+	float HitCameraShakeElapsed = -1.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))
