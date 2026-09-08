@@ -48,13 +48,11 @@ protected:
 
 private:
 	UFUNCTION()
-	void HandleDashFinished();
-
-	UFUNCTION()
-	void HandleDashInterrupted();
+	void HandleDashMovementFinished();
 
 	void FinishDash(bool bWasCancelled);
 	void StartDashMontage();
+	void ExecuteDashFeedback(const FVector& DashDirection);
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Dash", meta = (ClampMin = "1.0"))
 	float DashDistance = 400.0f;
