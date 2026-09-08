@@ -422,6 +422,23 @@ void AKCPlayerCharacter::PostEditChangeProperty(
 void AKCPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (CameraBoomComponent)
+	{
+		BaseCameraTargetOffset = CameraBoomComponent->TargetOffset;
+		CurrentCameraLookAheadOffset = FVector::ZeroVector;
+		CurrentCameraMovementLagOffset = FVector::ZeroVector;
+		CurrentHitCameraShakeOffset = FVector::ZeroVector;
+		HitCameraShakeElapsed = -1.0f;
+	}
+	if (TopDownCameraComponent)
+	{
+		BaseCameraFieldOfView = TopDownCameraComponent->FieldOfView;
+		CurrentDashCameraFOVOffset = 0.0f;
+		DashCameraFOVElapsed = -1.0f;
+		CurrentHitCameraFOVOffset = 0.0f;
+		HitCameraFOVElapsed = -1.0f;
+	}
+
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
 	if (PlayerCustomizationComponent)
@@ -703,9 +720,18 @@ void AKCPlayerCharacter::HandleMoveSpeedChanged(
 void AKCPlayerCharacter::HandleHealthChanged(
 	const FOnAttributeChangeData& ChangeData)
 {
-	if (HasAuthority() && ChangeData.NewValue < ChangeData.OldValue)
+	if (ChangeData.NewValue >= ChangeData.OldValue)
+	{
+		return;
+	}
+
+	if (HasAuthority())
 	{
 		InterruptEmote();
+	}
+	if (IsLocallyControlled())
+	{
+		TriggerHitCameraFeedback();
 	}
 }
 
@@ -829,6 +855,226 @@ void AKCPlayerCharacter::UpdateFacingDirection(const FVector& WorldDirection, co
 		LastSentFacingYaw = FacingYaw;
 		FacingReplicationElapsed = 0.0f;
 	}
+}
+
+void AKCPlayerCharacter::UpdateCameraLookAhead(
+	const FVector& CursorWorldOffset,
+	const float DeltaSeconds)
+{
+	if (!IsLocallyControlled() || !CameraBoomComponent)
+	{
+		return;
+	}
+
+	FVector FlatOffset(CursorWorldOffset.X, CursorWorldOffset.Y, 0.0f);
+	const float CursorDistance = FlatOffset.Size2D();
+	FVector DesiredOffset = FVector::ZeroVector;
+	if (CursorDistance > CameraLookAheadDeadZone &&
+		CameraLookAheadStrength > 0.0f &&
+		CameraLookAheadMaxDistance > 0.0f)
+	{
+		const float LookAheadDistance = FMath::Min(
+			(CursorDistance - CameraLookAheadDeadZone) * CameraLookAheadStrength,
+			CameraLookAheadMaxDistance);
+		DesiredOffset = FlatOffset.GetSafeNormal2D() * LookAheadDistance;
+	}
+
+	CurrentCameraLookAheadOffset = FMath::VInterpTo(
+		CurrentCameraLookAheadOffset,
+		DesiredOffset,
+		FMath::Max(DeltaSeconds, 0.0f),
+		CameraLookAheadInterpSpeed);
+
+	FVector FlatVelocity = GetVelocity();
+	FlatVelocity.Z = 0.0f;
+	FVector DesiredMovementLagOffset =
+		-FlatVelocity * FMath::Max(CameraMovementLagStrength, 0.0f);
+	DesiredMovementLagOffset = DesiredMovementLagOffset.GetClampedToMaxSize2D(
+		FMath::Max(CameraMovementLagMaxDistance, 0.0f));
+	CurrentCameraMovementLagOffset = FMath::VInterpTo(
+		CurrentCameraMovementLagOffset,
+		DesiredMovementLagOffset,
+		FMath::Max(DeltaSeconds, 0.0f),
+		CameraMovementLagInterpSpeed);
+	CurrentCameraMovementLagOffset.Z = 0.0f;
+
+	if (HitCameraShakeElapsed >= 0.0f)
+	{
+		const float ShakeDuration = FMath::Max(HitCameraShakeDuration, 0.0f);
+		if (ShakeDuration > 0.0f && HitCameraShakeElapsed < ShakeDuration)
+		{
+			const float NormalizedTime = FMath::Clamp(
+				HitCameraShakeElapsed / ShakeDuration,
+				0.0f,
+				1.0f);
+			const float Envelope = 1.0f - FMath::SmoothStep(
+				0.0f,
+				1.0f,
+				NormalizedTime);
+			const float Phase = HitCameraShakeElapsed *
+				FMath::Max(HitCameraShakeFrequency, 0.0f) * 2.0f * PI;
+			const float Amplitude =
+				FMath::Max(HitCameraShakeAmplitude, 0.0f) * Envelope;
+			CurrentHitCameraShakeOffset = FVector(
+				FMath::Sin(Phase),
+				FMath::Sin(Phase * 1.37f),
+				0.0f) * Amplitude;
+			HitCameraShakeElapsed += FMath::Max(DeltaSeconds, 0.0f);
+		}
+		else
+		{
+			CurrentHitCameraShakeOffset = FVector::ZeroVector;
+			HitCameraShakeElapsed = -1.0f;
+		}
+	}
+	else
+	{
+		CurrentHitCameraShakeOffset = FVector::ZeroVector;
+	}
+
+	CameraBoomComponent->TargetOffset =
+		BaseCameraTargetOffset +
+		CurrentCameraLookAheadOffset +
+		CurrentCameraMovementLagOffset +
+		CurrentHitCameraShakeOffset;
+
+	if (TopDownCameraComponent)
+	{
+		if (DashCameraFOVElapsed >= 0.0f)
+		{
+			const float AttackDuration = FMath::Max(
+				DashCameraFOVAttackDuration, 0.0f);
+			const float HoldDuration = FMath::Max(
+				DashCameraFOVHoldDuration, 0.0f);
+			const float ReturnDuration = FMath::Max(
+				DashCameraFOVReturnDuration, 0.0f);
+			const float HoldEndTime = AttackDuration + HoldDuration;
+			const float EffectEndTime = HoldEndTime + ReturnDuration;
+
+			float Envelope = 0.0f;
+			if (AttackDuration > 0.0f &&
+				DashCameraFOVElapsed < AttackDuration)
+			{
+				Envelope = FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					DashCameraFOVElapsed / AttackDuration);
+			}
+			else if (DashCameraFOVElapsed < HoldEndTime)
+			{
+				Envelope = 1.0f;
+			}
+			else if (ReturnDuration > 0.0f &&
+				DashCameraFOVElapsed < EffectEndTime)
+			{
+				Envelope = 1.0f - FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					(DashCameraFOVElapsed - HoldEndTime) / ReturnDuration);
+			}
+			else
+			{
+				DashCameraFOVElapsed = -1.0f;
+			}
+
+			CurrentDashCameraFOVOffset =
+				FMath::Max(DashCameraFOVKick, 0.0f) * Envelope;
+			if (DashCameraFOVElapsed >= 0.0f)
+			{
+				DashCameraFOVElapsed += FMath::Max(DeltaSeconds, 0.0f);
+			}
+		}
+		else
+		{
+			CurrentDashCameraFOVOffset = 0.0f;
+		}
+
+		if (HitCameraFOVElapsed >= 0.0f)
+		{
+			const float AttackDuration = FMath::Max(
+				HitCameraFOVAttackDuration, 0.0f);
+			const float HoldDuration = FMath::Max(
+				HitCameraFOVHoldDuration, 0.0f);
+			const float ReturnDuration = FMath::Max(
+				HitCameraFOVReturnDuration, 0.0f);
+			const float HoldEndTime = AttackDuration + HoldDuration;
+			const float EffectEndTime = HoldEndTime + ReturnDuration;
+
+			if (AttackDuration > 0.0f &&
+				HitCameraFOVElapsed < AttackDuration)
+			{
+				const float AttackAlpha = FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					HitCameraFOVElapsed / AttackDuration);
+				CurrentHitCameraFOVOffset = FMath::Lerp(
+					HitCameraFOVStartOffset,
+					HitCameraFOVTargetOffset,
+					AttackAlpha);
+			}
+			else if (HitCameraFOVElapsed < HoldEndTime)
+			{
+				CurrentHitCameraFOVOffset = HitCameraFOVTargetOffset;
+			}
+			else if (ReturnDuration > 0.0f &&
+				HitCameraFOVElapsed < EffectEndTime)
+			{
+				const float ReturnAlpha = FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					(HitCameraFOVElapsed - HoldEndTime) / ReturnDuration);
+				CurrentHitCameraFOVOffset = FMath::Lerp(
+					HitCameraFOVTargetOffset,
+					0.0f,
+					ReturnAlpha);
+			}
+			else
+			{
+				CurrentHitCameraFOVOffset = 0.0f;
+				HitCameraFOVElapsed = -1.0f;
+			}
+
+			if (HitCameraFOVElapsed >= 0.0f)
+			{
+				HitCameraFOVElapsed += FMath::Max(DeltaSeconds, 0.0f);
+			}
+		}
+		else
+		{
+			CurrentHitCameraFOVOffset = 0.0f;
+		}
+
+		TopDownCameraComponent->SetFieldOfView(
+			BaseCameraFieldOfView +
+			CurrentDashCameraFOVOffset +
+			CurrentHitCameraFOVOffset);
+	}
+}
+
+void AKCPlayerCharacter::TriggerDashCameraPunch()
+{
+	if (!IsLocallyControlled() || !TopDownCameraComponent)
+	{
+		return;
+	}
+
+	CurrentDashCameraFOVOffset = 0.0f;
+	DashCameraFOVElapsed = 0.0f;
+}
+
+void AKCPlayerCharacter::TriggerHitCameraFeedback()
+{
+	if (!IsLocallyControlled() || !TopDownCameraComponent)
+	{
+		return;
+	}
+
+	HitCameraFOVStartOffset = CurrentHitCameraFOVOffset;
+	HitCameraFOVTargetOffset = -FMath::Max(
+		FMath::Max(HitCameraFOVKick, 0.0f),
+		FMath::Abs(CurrentHitCameraFOVOffset));
+	HitCameraFOVElapsed = 0.0f;
+	HitCameraShakeElapsed = 0.0f;
 }
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)

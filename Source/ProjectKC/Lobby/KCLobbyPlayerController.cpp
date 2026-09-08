@@ -17,6 +17,7 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraActor.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "EngineUtils.h"
@@ -38,9 +39,26 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 	CustomizationPaintingController->bAutoRegister = false;
 	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
 	CustomizationPaintingController->ColorPickerWidgetZOrder = 30;
+	CustomizationPaintingController->bLoadDefaultInputAssets = false;
+	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
+	CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
+}
+
+void AKCLobbyPlayerController::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	if (CustomizationPaintingController)
+	{
+		// 로비 커스터마이징은 UI 버튼을 통해서만 시작합니다. Blueprint에 저장된
+		// 플러그인 기본값이 P 토글 입력을 다시 활성화하지 못하게 보장합니다.
+		CustomizationPaintingController->bLoadDefaultInputAssets = false;
+		CustomizationPaintingController->TogglePaintingModeAction = nullptr;
+		CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+	}
 }
 
 void AKCLobbyPlayerController::BeginPlay()
@@ -181,6 +199,12 @@ bool AKCLobbyPlayerController::BeginCustomizationEditing()
 	}
 
 	bCustomizationEditing = true;
+	if (UWidgetComponent* PlayerInfoWidget =
+		TargetCharacter->FindComponentByClass<UWidgetComponent>())
+	{
+		PlayerInfoWidget->SetVisibility(false, true);
+	}
+	ServerSetCustomizationEditing(true);
 	UE_LOG(LogKCLobby, Log,
 		TEXT("[KCLobbyPlayerController] Customization editing started: Target=%s, SaveFound=%s"),
 		*GetNameSafe(PaintTarget),
@@ -503,6 +527,16 @@ void AKCLobbyPlayerController::CloseCustomizationCamera()
 
 void AKCLobbyPlayerController::CloseCustomizationEditingSession()
 {
+	const bool bWasCustomizationEditing = bCustomizationEditing;
+	if (CustomizationCameraTarget)
+	{
+		if (UWidgetComponent* PlayerInfoWidget =
+			CustomizationCameraTarget->FindComponentByClass<UWidgetComponent>())
+		{
+			PlayerInfoWidget->SetVisibility(true, true);
+		}
+	}
+
 	if (CustomizationPaintingController)
 	{
 		CustomizationPaintingController->ExitPaintingMode();
@@ -517,6 +551,10 @@ void AKCLobbyPlayerController::CloseCustomizationEditingSession()
 	CustomizationEditingComponent = nullptr;
 	CustomizationEditingPaintTarget = nullptr;
 	bCustomizationEditing = false;
+	if (bWasCustomizationEditing && IsLocalPlayerController())
+	{
+		ServerSetCustomizationEditing(false);
+	}
 
 	// 페인팅 플러그인이 GameOnly로 바꾼 입력 모드를 로비 전용 GameAndUI로 복구
 	if (IsLocalPlayerController())
@@ -621,6 +659,13 @@ void AKCLobbyPlayerController::ROS_ToggleReadyStatus_Implementation()
 void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 TargetSlotIndex)
 {
 	const FString PlayerName = PlayerState ? PlayerState->GetPlayerName() : GetName();
+	if (bCustomizationEditing)
+	{
+		UE_LOG(LogKCLobby, Warning,
+			TEXT("[KCLobbyPlayerController] ROS_RequestMoveToSlot rejected while Player '%s' is customizing"),
+			*PlayerName);
+		return;
+	}
 
 	if (TargetSlotIndex < 0 || TargetSlotIndex >= AKCLobbyGameMode::MAX_LOBBY_SLOTS)
 	{
@@ -641,6 +686,12 @@ void AKCLobbyPlayerController::ROS_RequestMoveToSlot_Implementation(int32 Target
 	}
 }
 
+void AKCLobbyPlayerController::ServerSetCustomizationEditing_Implementation(
+	const bool bEditing)
+{
+	bCustomizationEditing = bEditing;
+}
+
 void AKCLobbyPlayerController::MoveSlot(int32 TargetSlotIndex)
 {
 	ROS_RequestMoveToSlot(TargetSlotIndex);
@@ -659,7 +710,21 @@ void AKCLobbyPlayerController::ROS_UpdatePlayerInfo_Implementation()
 	}
 }
 
-void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
+void AKCLobbyPlayerController::ROS_ApplyGameSettings_Implementation(int32 InPlayerCount, EKCLevelType InMapType, float InMatchDurationSeconds)
+{
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerController] ROS_ApplyGameSettings received from %s: Players=%d, Map=%s, Duration=%.0fs"),
+		*GetName(), InPlayerCount, *UKCLevelTypeLibrary::GetLevelName(InMapType).ToString(), InMatchDurationSeconds);
+
+	if (UWorld* World = GetWorld())
+	{
+		if (AKCLobbyGameMode* GM = World->GetAuthGameMode<AKCLobbyGameMode>())
+		{
+			GM->ApplyGameSettings(InPlayerCount, InMapType, InMatchDurationSeconds);
+		}
+	}
+}
+
+void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation(EKCLevelType TargetMap)
 {
 	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerController] Client_OnMatchBegin received. Playing match start animation and locking inputs."));
 
@@ -677,7 +742,7 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	{
 		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
 		{
-			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange);
+			LoadingScreenSubsystem->BeginPreload(TargetMap);
 		}
 	}
 }

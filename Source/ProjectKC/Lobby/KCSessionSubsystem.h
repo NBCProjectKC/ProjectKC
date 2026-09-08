@@ -10,6 +10,7 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "FindSessionsCallbackProxy.h"
 #include "ProjectKC/Lobby/Struct/KCLobbySavedPlayerDataStruct.h"
+#include "GameSystem/Enum/KCLevelType.h"
 #include "KCSessionSubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCCreateSessionCompleteDelegate, bool, bWasSuccessful);
@@ -87,6 +88,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	int32 GetExpectedPlayerCount() const { return ExpectedPlayerCount; }
 
+	/** 선택된 게임 맵 타입 설정 및 조회 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void SetSelectedMapType(EKCLevelType InType) { SelectedMapType = InType; }
+
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	EKCLevelType GetSelectedMapType() const { return SelectedMapType; }
+
+	/** 게임 매치 제한 시간(초) 설정 및 조회 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void SetMatchDurationSeconds(float Duration) { MatchDurationSeconds = Duration; }
+
+	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
+	float GetMatchDurationSeconds() const { return MatchDurationSeconds; }
+
 	/** 현재 로비가 만석(정원 초과)인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "KC|Lobby")
 	bool IsLobbyFull() const;
@@ -137,6 +152,12 @@ private:
 
 	UPROPERTY()
 	int32 ExpectedPlayerCount = 0;
+
+	UPROPERTY()
+	EKCLevelType SelectedMapType = EKCLevelType::GasRange;
+
+	UPROPERTY()
+	float MatchDurationSeconds = 300.0f;
 
 	IOnlineSessionPtr SessionInterface;
 	TSharedPtr<FOnlineSessionSettings> LastSessionSettings;

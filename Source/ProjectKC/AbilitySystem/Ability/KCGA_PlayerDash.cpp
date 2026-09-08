@@ -3,10 +3,12 @@
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Animation/AnimMontage.h"
+#include "GameplayEffectTypes.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Dash.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
+#include "ProjectKC/Player/KCPlayerCharacter.h"
 
 namespace KCDashAbility
 {
@@ -152,8 +154,13 @@ void UKCGA_PlayerDash::ActivateAbility(
 
 	ActiveDashTask->OnFinish.AddDynamic(
 		this,
-		&UKCGA_PlayerDash::HandleDashFinished);
+		&UKCGA_PlayerDash::HandleDashMovementFinished);
 	ActiveDashTask->ReadyForActivation();
+	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(Character))
+	{
+		PlayerCharacter->TriggerDashCameraPunch();
+	}
+	ExecuteDashFeedback(DashDirection);
 	StartDashMontage();
 }
 
@@ -198,30 +205,37 @@ void UKCGA_PlayerDash::StartDashMontage()
 			0.0f);
 	if (ActiveDashMontageTask)
 	{
-		ActiveDashMontageTask->OnBlendOut.AddDynamic(
-			this,
-			&UKCGA_PlayerDash::HandleDashFinished);
-		ActiveDashMontageTask->OnCompleted.AddDynamic(
-			this,
-			&UKCGA_PlayerDash::HandleDashFinished);
-		ActiveDashMontageTask->OnInterrupted.AddDynamic(
-			this,
-			&UKCGA_PlayerDash::HandleDashInterrupted);
-		ActiveDashMontageTask->OnCancelled.AddDynamic(
-			this,
-			&UKCGA_PlayerDash::HandleDashInterrupted);
+		// 몽타주는 표현 전용이다. 길이와 Blend Out이 실제 대시 거리·시간을
+		// 바꾸지 않도록 Ability 종료는 이동 Task만 결정한다.
 		ActiveDashMontageTask->ReadyForActivation();
 	}
 }
 
-void UKCGA_PlayerDash::HandleDashFinished()
+void UKCGA_PlayerDash::ExecuteDashFeedback(const FVector& DashDirection)
 {
-	FinishDash(false);
+	AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	if (!IsValid(AvatarActor))
+	{
+		return;
+	}
+
+	FGameplayCueParameters CueParameters;
+	CueParameters.Instigator = AvatarActor;
+	CueParameters.EffectCauser = AvatarActor;
+	CueParameters.Location = AvatarActor->GetActorLocation();
+	CueParameters.Normal = DashDirection.GetSafeNormal();
+	CueParameters.AbilityLevel = GetAbilityLevel();
+	CueParameters.bReplicateLocationWhenUsingMinimalRepProxy = true;
+
+	// 일회성 Cue가 대시 시작 이펙트와 소리를 함께 재생한다.
+	K2_ExecuteGameplayCueWithParams(
+		TAG_KC_GameplayCue_Player_Dash,
+		CueParameters);
 }
 
-void UKCGA_PlayerDash::HandleDashInterrupted()
+void UKCGA_PlayerDash::HandleDashMovementFinished()
 {
-	FinishDash(true);
+	FinishDash(false);
 }
 
 void UKCGA_PlayerDash::FinishDash(const bool bWasCancelled)
