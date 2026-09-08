@@ -427,6 +427,12 @@ void AKCPlayerCharacter::BeginPlay()
 		BaseCameraTargetOffset = CameraBoomComponent->TargetOffset;
 		CurrentCameraLookAheadOffset = FVector::ZeroVector;
 	}
+	if (TopDownCameraComponent)
+	{
+		BaseCameraFieldOfView = TopDownCameraComponent->FieldOfView;
+		CurrentDashCameraFOVOffset = 0.0f;
+		DashCameraFOVElapsed = -1.0f;
+	}
 
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
@@ -866,6 +872,72 @@ void AKCPlayerCharacter::UpdateCameraLookAhead(
 		CameraLookAheadInterpSpeed);
 	CameraBoomComponent->TargetOffset =
 		BaseCameraTargetOffset + CurrentCameraLookAheadOffset;
+
+	if (TopDownCameraComponent)
+	{
+		if (DashCameraFOVElapsed >= 0.0f)
+		{
+			const float AttackDuration = FMath::Max(
+				DashCameraFOVAttackDuration, 0.0f);
+			const float HoldDuration = FMath::Max(
+				DashCameraFOVHoldDuration, 0.0f);
+			const float ReturnDuration = FMath::Max(
+				DashCameraFOVReturnDuration, 0.0f);
+			const float HoldEndTime = AttackDuration + HoldDuration;
+			const float EffectEndTime = HoldEndTime + ReturnDuration;
+
+			float Envelope = 0.0f;
+			if (AttackDuration > 0.0f &&
+				DashCameraFOVElapsed < AttackDuration)
+			{
+				Envelope = FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					DashCameraFOVElapsed / AttackDuration);
+			}
+			else if (DashCameraFOVElapsed < HoldEndTime)
+			{
+				Envelope = 1.0f;
+			}
+			else if (ReturnDuration > 0.0f &&
+				DashCameraFOVElapsed < EffectEndTime)
+			{
+				Envelope = 1.0f - FMath::SmoothStep(
+					0.0f,
+					1.0f,
+					(DashCameraFOVElapsed - HoldEndTime) / ReturnDuration);
+			}
+			else
+			{
+				DashCameraFOVElapsed = -1.0f;
+			}
+
+			CurrentDashCameraFOVOffset =
+				FMath::Max(DashCameraFOVKick, 0.0f) * Envelope;
+			if (DashCameraFOVElapsed >= 0.0f)
+			{
+				DashCameraFOVElapsed += FMath::Max(DeltaSeconds, 0.0f);
+			}
+		}
+		else
+		{
+			CurrentDashCameraFOVOffset = 0.0f;
+		}
+
+		TopDownCameraComponent->SetFieldOfView(
+			BaseCameraFieldOfView + CurrentDashCameraFOVOffset);
+	}
+}
+
+void AKCPlayerCharacter::TriggerDashCameraPunch()
+{
+	if (!IsLocallyControlled() || !TopDownCameraComponent)
+	{
+		return;
+	}
+
+	CurrentDashCameraFOVOffset = 0.0f;
+	DashCameraFOVElapsed = 0.0f;
 }
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)

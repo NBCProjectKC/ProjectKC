@@ -8,6 +8,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_Dash.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
+#include "ProjectKC/Player/KCPlayerCharacter.h"
 
 namespace KCDashAbility
 {
@@ -155,6 +156,10 @@ void UKCGA_PlayerDash::ActivateAbility(
 		this,
 		&UKCGA_PlayerDash::HandleDashMovementFinished);
 	ActiveDashTask->ReadyForActivation();
+	if (AKCPlayerCharacter* PlayerCharacter = Cast<AKCPlayerCharacter>(Character))
+	{
+		PlayerCharacter->TriggerDashCameraPunch();
+	}
 	ExecuteDashFeedback(DashDirection);
 	StartDashMontage();
 }

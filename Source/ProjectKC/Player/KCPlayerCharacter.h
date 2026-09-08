@@ -52,6 +52,7 @@ public:
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
 	void UpdateCameraLookAhead(const FVector& CursorWorldOffset, float DeltaSeconds);
+	void TriggerDashCameraPunch();
 	bool RequestDash();
 	bool RequestPlayEmote(int32 EmoteIndex = 0);
 	bool RequestPlayNextEmote();
@@ -165,8 +166,31 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float CameraLookAheadInterpSpeed = 7.5f;
 
+	/** 대시 시작 순간 기본 시야각에 더할 값이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "30.0"))
+	float DashCameraFOVKick = 5.0f;
+
+	/** 대시 카메라 시야각이 최대치까지 부드럽게 커지는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DashCameraFOVAttackDuration = 0.05f;
+
+	/** 최대 시야각을 유지해 대시 속도감을 읽을 수 있게 하는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DashCameraFOVHoldDuration = 0.08f;
+
+	/** 최대 시야각에서 기본값까지 부드럽게 돌아오는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DashCameraFOVReturnDuration = 0.22f;
+
 	FVector BaseCameraTargetOffset = FVector::ZeroVector;
 	FVector CurrentCameraLookAheadOffset = FVector::ZeroVector;
+	float BaseCameraFieldOfView = 90.0f;
+	float CurrentDashCameraFOVOffset = 0.0f;
+	float DashCameraFOVElapsed = -1.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))
