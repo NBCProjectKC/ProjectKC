@@ -65,6 +65,21 @@ void AKCGameMode::HandleMatchHasStarted()
 			}
 		}
 	
+		/*
+		 * TODO : 로비에서 그 판의 타이머를 세팅하는 코드입니다.
+		 * KCSessionSubsystem에서 로비 설정 매치 시간 복원
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+			{
+				if (SessionSub->GetMatchDurationSeconds() > 0.0f)
+				{
+					MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
+				}
+			}
+		}
+		*/
+		
 		// TODO 임시 코드
 		// GameState의 서버시간 설정
 		const float ServerNow = GetWorld()->GetTimeSeconds();
@@ -379,6 +394,14 @@ int32 AKCGameMode::GetLeadingTeamId() const
 
 void AKCGameMode::TravelBackToLobby()
 {
+	// 트래블 직전, 아직 로딩화면 안 뜬 사람들(전원)한테 방송
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AKCPlayerController* KCPC = Cast<AKCPlayerController>(It->Get()))
+		{
+			KCPC->Client_ShowResultToLobbyLoadingScreen();
+		}
+	}
 	GetWorld()->ServerTravel(UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString());
 }
 
@@ -504,6 +527,12 @@ void AKCGameMode::RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer)
 	}
 
 	SkippedResultScreenPlayers.Add(RequestingPlayer); // 누른 플레이어를 배열에 추가
+	
+	// 스킵을 누른 그 사람한테만 즉시 로딩화면 표시
+	if (AKCPlayerController* RequestingPC = Cast<AKCPlayerController>(RequestingPlayer->GetOwningController()))
+	{
+		RequestingPC->Client_ShowResultToLobbyLoadingScreen();
+	}
 
 	// 지금 접속해있는 전원(스펙테이터 제외하고 싶으면 조건 추가 가능)이 다 스킵했는지 확인
 	const int32 ConnectedPlayerCount = GetNumPlayers(); // 현재 서버에 접속한 인원 수
