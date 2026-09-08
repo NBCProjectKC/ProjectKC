@@ -51,6 +51,7 @@ public:
 
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
+	void UpdateCameraLookAhead(const FVector& CursorWorldOffset, float DeltaSeconds);
 	bool RequestDash();
 	bool RequestPlayEmote(int32 EmoteIndex = 0);
 	bool RequestPlayNextEmote();
@@ -143,6 +144,29 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> TopDownCameraComponent;
+
+	/** 커서의 월드 거리 중 카메라 선행 오프셋으로 반영할 비율이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float CameraLookAheadStrength = 0.25f;
+
+	/** 카메라 중심이 캐릭터로부터 이동할 수 있는 최대 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraLookAheadMaxDistance = 220.0f;
+
+	/** 커서가 캐릭터 중심 근처에 있을 때 미세 진동을 막는 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraLookAheadDeadZone = 80.0f;
+
+	/** 목표 오프셋을 따라가고 중앙으로 복귀하는 보간 속도다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraLookAheadInterpSpeed = 7.5f;
+
+	FVector BaseCameraTargetOffset = FVector::ZeroVector;
+	FVector CurrentCameraLookAheadOffset = FVector::ZeroVector;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))

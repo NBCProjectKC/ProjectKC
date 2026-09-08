@@ -310,11 +310,13 @@ void AKCPlayerController::UpdateCharacterFacing(const float DeltaSeconds)
 	FVector MouseWorldDirection;
 	if (!DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection))
 	{
+		PlayerCharacter->UpdateCameraLookAhead(FVector::ZeroVector, DeltaSeconds);
 		return;
 	}
 
 	if (FMath::IsNearlyZero(MouseWorldDirection.Z))
 	{
+		PlayerCharacter->UpdateCameraLookAhead(FVector::ZeroVector, DeltaSeconds);
 		return;
 	}
 
@@ -323,12 +325,15 @@ void AKCPlayerController::UpdateCharacterFacing(const float DeltaSeconds)
 		(CharacterLocation.Z - MouseWorldLocation.Z) / MouseWorldDirection.Z;
 	if (DistanceToCharacterPlane <= 0.0f)
 	{
+		PlayerCharacter->UpdateCameraLookAhead(FVector::ZeroVector, DeltaSeconds);
 		return;
 	}
 
 	const FVector MousePlaneLocation =
 		MouseWorldLocation + MouseWorldDirection * DistanceToCharacterPlane;
-	PlayerCharacter->UpdateFacingDirection(MousePlaneLocation - CharacterLocation, DeltaSeconds);
+	const FVector CursorWorldOffset = MousePlaneLocation - CharacterLocation;
+	PlayerCharacter->UpdateFacingDirection(CursorWorldOffset, DeltaSeconds);
+	PlayerCharacter->UpdateCameraLookAhead(CursorWorldOffset, DeltaSeconds);
 }
 
 void AKCPlayerController::ReceivedPlayer()

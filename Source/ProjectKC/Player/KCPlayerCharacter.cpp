@@ -422,6 +422,12 @@ void AKCPlayerCharacter::PostEditChangeProperty(
 void AKCPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (CameraBoomComponent)
+	{
+		BaseCameraTargetOffset = CameraBoomComponent->TargetOffset;
+		CurrentCameraLookAheadOffset = FVector::ZeroVector;
+	}
+
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
 	if (PlayerCustomizationComponent)
@@ -829,6 +835,37 @@ void AKCPlayerCharacter::UpdateFacingDirection(const FVector& WorldDirection, co
 		LastSentFacingYaw = FacingYaw;
 		FacingReplicationElapsed = 0.0f;
 	}
+}
+
+void AKCPlayerCharacter::UpdateCameraLookAhead(
+	const FVector& CursorWorldOffset,
+	const float DeltaSeconds)
+{
+	if (!IsLocallyControlled() || !CameraBoomComponent)
+	{
+		return;
+	}
+
+	FVector FlatOffset(CursorWorldOffset.X, CursorWorldOffset.Y, 0.0f);
+	const float CursorDistance = FlatOffset.Size2D();
+	FVector DesiredOffset = FVector::ZeroVector;
+	if (CursorDistance > CameraLookAheadDeadZone &&
+		CameraLookAheadStrength > 0.0f &&
+		CameraLookAheadMaxDistance > 0.0f)
+	{
+		const float LookAheadDistance = FMath::Min(
+			(CursorDistance - CameraLookAheadDeadZone) * CameraLookAheadStrength,
+			CameraLookAheadMaxDistance);
+		DesiredOffset = FlatOffset.GetSafeNormal2D() * LookAheadDistance;
+	}
+
+	CurrentCameraLookAheadOffset = FMath::VInterpTo(
+		CurrentCameraLookAheadOffset,
+		DesiredOffset,
+		FMath::Max(DeltaSeconds, 0.0f),
+		CameraLookAheadInterpSpeed);
+	CameraBoomComponent->TargetOffset =
+		BaseCameraTargetOffset + CurrentCameraLookAheadOffset;
 }
 
 void AKCPlayerCharacter::ApplyFacingYaw(const float FacingYaw)
