@@ -43,7 +43,7 @@ bool FKCDashSystemContractTest::RunTest(const FString& Parameters)
 			Modifier.ModifierMagnitude.GetStaticMagnitudeIfPossible(
 				1.0f,
 				CostMagnitude));
-		TestEqual(TEXT("대시는 Stamina 20을 소모한다."), CostMagnitude, -20.0f);
+		TestEqual(TEXT("대시는 Stamina 40을 소모한다."), CostMagnitude, -40.0f);
 	}
 
 	const UKCGE_DashCooldown* CooldownEffect =
@@ -76,6 +76,9 @@ bool FKCDashSystemContractTest::RunTest(const FString& Parameters)
 		TEXT("대시는 캐릭터마다 인스턴스를 유지한다."),
 		DashAbility->GetInstancingPolicy() ==
 			EGameplayAbilityInstancingPolicy::InstancedPerActor);
+	TestTrue(
+		TEXT("대시는 시작 순간의 일회성 GameplayCue 태그를 가진다."),
+		TAG_KC_GameplayCue_Player_Dash.GetTag().IsValid());
 	TestTrue(
 		TEXT("대시 Ability가 Stamina 비용 GE를 사용한다."),
 		DashAbility->GetCostGameplayEffect()->IsA<UKCGE_DashCost>());

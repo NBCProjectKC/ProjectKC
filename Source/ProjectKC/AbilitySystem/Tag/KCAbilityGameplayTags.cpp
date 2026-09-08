@@ -13,6 +13,9 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Ability_Player_Dash, "Ability.Player.Dash");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Ability_Attack, "Ability.Attack");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Cooldown_Ability_Dash, "Cooldown.Ability.Dash");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_State_Dashing, "State.Dashing");
+UE_DEFINE_GAMEPLAY_TAG(
+	TAG_KC_GameplayCue_Player_Dash,
+	"GameplayCue.Player.Dash");
 
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_Data_Damage_Flat, "Data.Damage.Flat");
 UE_DEFINE_GAMEPLAY_TAG(

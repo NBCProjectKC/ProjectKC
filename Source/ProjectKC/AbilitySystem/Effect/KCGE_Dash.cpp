@@ -6,7 +6,7 @@
 
 namespace KCDashEffect
 {
-	constexpr float StaminaCost = 20.0f;
+	constexpr float StaminaCost = 40.0f;
 	constexpr float CooldownDuration = 0.8f;
 }
 
