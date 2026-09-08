@@ -677,6 +677,7 @@ void AKCLobbyPlayerController::Client_OnMatchBegin_Implementation()
 	{
 		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
 		{
+			// EKCLevelType::가고싶은레벨 파라미터로 넘기면 됩니다.
 			LoadingScreenSubsystem->BeginPreload(EKCLevelType::GasRange);
 		}
 	}

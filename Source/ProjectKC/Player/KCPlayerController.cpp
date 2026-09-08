@@ -17,6 +17,7 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 
 AKCPlayerController::AKCPlayerController()
 {
@@ -375,5 +376,16 @@ void AKCPlayerController::Server_RequestSkipResultScreen_Implementation()
 	if (AKCGameMode* GM = GetWorld()->GetAuthGameMode<AKCGameMode>())
 	{
 		GM->RequestEarlyTravelToLobby(GetPlayerState<AKCPlayerState>());
+	}
+}
+
+void AKCPlayerController::Client_ShowResultToLobbyLoadingScreen_Implementation()
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			LoadingScreenSubsystem->BeginPreload(EKCLevelType::LobbyLevel);
+		}
 	}
 }

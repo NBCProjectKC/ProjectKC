@@ -200,6 +200,12 @@ void UKCLoadingScreenSubsystem::UpdateLoadingText()
 
 	const float CurrentProgress = LoadingViewModel->GetProgress();
 	
+	if (WaitingForLevel == EKCLevelType::LobbyLevel)
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("로비로 돌아가는 중...")));
+		return;
+	}
+	
 	if (CurrentProgress >= 0.97f)
 	{
 		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("맵 불러오는 중...")));
