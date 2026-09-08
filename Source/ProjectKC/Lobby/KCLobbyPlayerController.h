@@ -221,7 +221,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
 		meta = (ClampMin = "0.0"))
-	float CustomizationCameraOrbitSensitivity = 0.25f;
+	float CustomizationCameraOrbitSensitivity = 5.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
 		meta = (ClampMin = "0.0"))
