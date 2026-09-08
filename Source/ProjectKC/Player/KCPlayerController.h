@@ -28,6 +28,11 @@ public:
 		return CustomizationNetworkComponent;
 	}
 	
+	// 결과화면에서 "클릭하여 이동" 같은 버튼 클릭 시 블루프린트에서 호출.
+	// 조기 트래블을 서버에 요청합니다.
+	UFUNCTION(BlueprintCallable, Category = "KC|Result")
+    	void RequestSkipResultScreen();
+	
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -80,4 +85,7 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> DropHeldItemAction;
+	
+	UFUNCTION(Server, Reliable)
+	void Server_RequestSkipResultScreen();
 };
