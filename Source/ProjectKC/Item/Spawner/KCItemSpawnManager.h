@@ -128,6 +128,9 @@ private:
 	};
 
 	bool ValidateSettings(FString& OutError) const;
+	void ScheduleInitialSpawns();
+	int32 CountUniqueSpawnPoints(
+		const TArray<TObjectPtr<AKCItemSpawnPoint>>& Points) const;
 	void RefreshRecipes();
 	void HandleRecipesChanged(FGameplayTag Channel, const FKCActiveRecipesChangedStruct& Message);
 	void ServiceSpawns();
