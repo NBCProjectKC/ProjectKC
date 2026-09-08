@@ -5,6 +5,7 @@
 #include "KCUISettings.generated.h"
 
 class UKCColorStyle;
+class UKCUIFontStyle;
 class UKCHUDWidget;
 class UKCToastWidget;
 class UKCModalWidget;
@@ -21,6 +22,9 @@ class PROJECTKC_API UKCUISettings : public UDeveloperSettings
 public:
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Style")
 	TSoftObjectPtr<UKCColorStyle> DefaultColorStyle;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Style")
+	TSoftObjectPtr<UKCUIFontStyle> DefaultFontStyle;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
 	TSoftClassPtr<UKCUserWidget> LoadingScreenClass;
