@@ -426,6 +426,7 @@ void AKCPlayerCharacter::BeginPlay()
 	{
 		BaseCameraTargetOffset = CameraBoomComponent->TargetOffset;
 		CurrentCameraLookAheadOffset = FVector::ZeroVector;
+		CurrentCameraMovementLagOffset = FVector::ZeroVector;
 	}
 	if (TopDownCameraComponent)
 	{
@@ -870,8 +871,24 @@ void AKCPlayerCharacter::UpdateCameraLookAhead(
 		DesiredOffset,
 		FMath::Max(DeltaSeconds, 0.0f),
 		CameraLookAheadInterpSpeed);
+
+	FVector FlatVelocity = GetVelocity();
+	FlatVelocity.Z = 0.0f;
+	FVector DesiredMovementLagOffset =
+		-FlatVelocity * FMath::Max(CameraMovementLagStrength, 0.0f);
+	DesiredMovementLagOffset = DesiredMovementLagOffset.GetClampedToMaxSize2D(
+		FMath::Max(CameraMovementLagMaxDistance, 0.0f));
+	CurrentCameraMovementLagOffset = FMath::VInterpTo(
+		CurrentCameraMovementLagOffset,
+		DesiredMovementLagOffset,
+		FMath::Max(DeltaSeconds, 0.0f),
+		CameraMovementLagInterpSpeed);
+	CurrentCameraMovementLagOffset.Z = 0.0f;
+
 	CameraBoomComponent->TargetOffset =
-		BaseCameraTargetOffset + CurrentCameraLookAheadOffset;
+		BaseCameraTargetOffset +
+		CurrentCameraLookAheadOffset +
+		CurrentCameraMovementLagOffset;
 
 	if (TopDownCameraComponent)
 	{

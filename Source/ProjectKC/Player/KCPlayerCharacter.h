@@ -166,6 +166,21 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float CameraLookAheadInterpSpeed = 7.5f;
 
+	/** 이동 속도 중 진행 방향 반대편 카메라 오프셋으로 반영할 비율이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Movement Lag",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraMovementLagStrength = 0.06f;
+
+	/** 이동 관성으로 카메라 중심이 밀릴 수 있는 최대 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Movement Lag",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraMovementLagMaxDistance = 90.0f;
+
+	/** 현재 이동 관성 오프셋이 목표를 따라가는 속도다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Movement Lag",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraMovementLagInterpSpeed = 10.0f;
+
 	/** 대시 시작 순간 기본 시야각에 더할 값이다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "30.0"))
@@ -188,6 +203,7 @@ private:
 
 	FVector BaseCameraTargetOffset = FVector::ZeroVector;
 	FVector CurrentCameraLookAheadOffset = FVector::ZeroVector;
+	FVector CurrentCameraMovementLagOffset = FVector::ZeroVector;
 	float BaseCameraFieldOfView = 90.0f;
 	float CurrentDashCameraFOVOffset = 0.0f;
 	float DashCameraFOVElapsed = -1.0f;
