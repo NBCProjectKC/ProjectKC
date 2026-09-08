@@ -16,5 +16,7 @@ enum class EKCLevelType : uint8
 	LoadInLevel		UMETA(DisplayName = "로드인(세션생성)"),
 	LobbyLevel		UMETA(DisplayName = "로비"),
 	Loading			UMETA(DisplayName = "로딩"),
-	GasRange		UMETA(DisplayName = "가스레인지(전투)")
+	GasRange		UMETA(DisplayName = "가스레인지"),
+	MicroWaveOven	UMETA(DisplayName = "전자레인지"),
+	FryingPan		UMETA(DisplayName = "후라이팬")
 };
