@@ -75,6 +75,11 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 		return;
 	}
 	ActiveSourceItem = ResolveSourceItem(Handle, ActorInfo);
+	if (AKCWorldItemActor* SourceItem = ActiveSourceItem.Get())
+	{
+		// 이 Ability가 끝나기 전에는 내구도 파손으로 아이템이 사라지지 않게 잡아 둔다.
+		SourceItem->HoldBreakDestruction();
+	}
 
 	const UKCAbilityDefinition* Definition = GetActiveDefinition();
 	const UKCActionTargeting* Targeting =
@@ -165,6 +170,7 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	// 정상 종료·취소·몽타주 중단이 모두 여기를 지난다. Cue 정리를 Hook에 두면 샌다.
 	StopLoopingCue();
 	StopActiveDurabilityDrain(true);
+	AKCWorldItemActor* HeldBreakItem = ActiveSourceItem.Get();
 	AKCWorldItemActor* PendingConsumptionItem =
 		bUseConsumptionPendingThisActivation
 			? ActiveSourceItem.Get()
@@ -183,6 +189,12 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	if (IsValid(PendingConsumptionItem))
 	{
 		PendingConsumptionItem->FinalizePendingUseConsumption();
+	}
+
+	// 보류를 푸는 건 잔여 내구도 소모까지 끝난 뒤여야 한다.
+	if (IsValid(HeldBreakItem))
+	{
+		HeldBreakItem->ReleaseBreakDestruction();
 	}
 
 	Super::EndAbility(

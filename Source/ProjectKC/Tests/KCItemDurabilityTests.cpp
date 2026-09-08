@@ -146,4 +146,95 @@ bool FKCItemDurabilityRuntimeTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FKCItemBreakDeferralTest,
+	"ProjectKC.Item.Durability.BreakDeferral",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FKCItemBreakDeferralTest::RunTest(const FString& Parameters)
+{
+	const FName TestWorldName = MakeUniqueObjectName(
+		nullptr,
+		UWorld::StaticClass(),
+		TEXT("KCItemBreakDeferralTestWorld"),
+		EUniqueObjectNameOptions::GloballyUnique);
+	UWorld* TestWorld = UWorld::CreateWorld(
+		EWorldType::Game,
+		false,
+		TestWorldName,
+		GetTransientPackage());
+	if (!TestNotNull(TEXT("파손 보류 검증용 World를 만든다."), TestWorld))
+	{
+		return false;
+	}
+
+	FWorldContext& WorldContext =
+		GEngine->CreateNewWorldContext(EWorldType::Game);
+	WorldContext.SetCurrentWorld(TestWorld);
+
+	// FTimerManager는 프레임당 한 번만 돌고 자동화 테스트는 한 프레임 안에서 끝난다.
+	// 그래서 파괴 예약을 모두 걸어 둔 뒤 타이머를 한 번만 돌려 결과를 비교한다.
+	AKCWorldItemActor* FreeItem = TestWorld->SpawnActor<AKCWorldItemActor>();
+	AKCWorldItemActor* HeldItem = TestWorld->SpawnActor<AKCWorldItemActor>();
+	if (TestNotNull(TEXT("보류 없는 비교용 아이템을 스폰한다."), FreeItem) &&
+		TestNotNull(TEXT("보류 검증용 아이템을 스폰한다."), HeldItem))
+	{
+		for (AKCWorldItemActor* Item : { FreeItem, HeldItem })
+		{
+			UKCItemDefinition* Definition =
+				KCItemDurabilityTests::MakeOnUseDefinition(Item);
+			Definition->Durability.ConsumeAmount = 100.0f;
+			Definition->Durability.BreakBehavior =
+				EKCItemBreakBehavior::Destroy;
+			TestTrue(
+				TEXT("Destroy 정책 Definition으로 아이템을 초기화한다."),
+				Item->InitializeItem(Definition));
+		}
+
+		// 한쪽만 Ability가 사용 중인 상태로 둔다.
+		HeldItem->HoldBreakDestruction();
+
+		TestTrue(
+			TEXT("보류 없는 아이템의 마지막 사용은 성공한다."),
+			FreeItem->TryConsumeDurability(
+				EKCItemDurabilityConsumeMode::OnUse));
+		TestTrue(
+			TEXT("보류 중에도 내구도 소모 자체는 성공한다."),
+			HeldItem->TryConsumeDurability(
+				EKCItemDurabilityConsumeMode::OnUse));
+		TestTrue(
+			TEXT("보류 중에도 파손 상태로는 즉시 들어간다."),
+			HeldItem->IsBroken());
+		TestTrue(
+			TEXT("보류 중 파손은 나중에 처리하도록 예약해 둔다."),
+			HeldItem->IsBreakDestructionPending());
+		TestFalse(
+			TEXT("보류가 없으면 예약 없이 곧바로 파괴 경로로 간다."),
+			FreeItem->IsBreakDestructionPending());
+
+		TestWorld->GetTimerManager().Tick(1.0f / 60.0f);
+
+		TestFalse(
+			TEXT("보류가 없는 아이템은 파손 다음 틱에 파괴된다."),
+			IsValid(FreeItem));
+		TestTrue(
+			TEXT("사용 중인 아이템은 같은 틱에도 파괴하지 않는다."),
+			IsValid(HeldItem));
+
+		// Ability가 끝나면서 보류를 푼다. 이후는 보류 없는 아이템과 같은 경로다.
+		HeldItem->ReleaseBreakDestruction();
+		TestFalse(
+			TEXT("보류를 풀면 미뤄 둔 파손을 일반 경로로 넘긴다."),
+			HeldItem->IsBreakDestructionPending());
+		TestTrue(
+			TEXT("보류 해제 자체가 아이템을 즉시 파괴하지는 않는다."),
+			IsValid(HeldItem));
+	}
+
+	TestWorld->DestroyWorld(false);
+	GEngine->DestroyWorldContext(TestWorld);
+	return true;
+}
+
+
 #endif

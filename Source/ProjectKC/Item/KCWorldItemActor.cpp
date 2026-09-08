@@ -658,11 +658,48 @@ void AKCWorldItemActor::BroadcastDurabilityChanged(float PreviousDurability)
 	}
 }
 
+bool AKCWorldItemActor::IsBreakDestructionPending() const
+{
+	return bBreakDestructionPending;
+}
+
+void AKCWorldItemActor::HoldBreakDestruction()
+{
+	if (HasAuthority())
+	{
+		bBreakDestructionHeld = true;
+	}
+}
+
+void AKCWorldItemActor::ReleaseBreakDestruction()
+{
+	if (!HasAuthority() || !bBreakDestructionHeld)
+	{
+		return;
+	}
+
+	bBreakDestructionHeld = false;
+	if (bBreakDestructionPending)
+	{
+		bBreakDestructionPending = false;
+		HandleBroken();
+	}
+}
+
+
 void AKCWorldItemActor::HandleBroken()
 {
 	if (!HasAuthority() || !ShouldDestroyWhenBroken() ||
 		bBreakDestructionScheduled)
 	{
+		return;
+	}
+
+	// 사용 중인 Ability가 있으면 그 Ability가 끝날 때까지 미룬다. 다음 틱만 미루면
+	// 몽타주가 도중에 잘려 마지막 사용이 통째로 사라진다.
+	if (bBreakDestructionHeld)
+	{
+		bBreakDestructionPending = true;
 		return;
 	}
 
