@@ -1,15 +1,16 @@
 #include "ProjectKC/UI/MainMenu/Core/KCMainMenuPlayerController.h"
 
+#include "Camera/CameraActor.h"
 #include "Engine/LocalPlayer.h"
+#include "EngineUtils.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
-#include "ProjectKC/UI/Common/Core/KCUISettings.h"
-#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 
 void AKCMainMenuPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InitializeMainMenuUI();
+	InitializeMainMenuInput();
+	ApplyMainMenuCamera();
 }
 
 void AKCMainMenuPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -19,7 +20,7 @@ void AKCMainMenuPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReas
 	Super::EndPlay(EndPlayReason);
 }
 
-void AKCMainMenuPlayerController::InitializeMainMenuUI()
+void AKCMainMenuPlayerController::InitializeMainMenuInput()
 {
 	if (!IsLocalController())
 	{
@@ -27,36 +28,25 @@ void AKCMainMenuPlayerController::InitializeMainMenuUI()
 	}
 
 	bShowMouseCursor = true;
+	bEnableClickEvents = true;
+	bEnableMouseOverEvents = true;
 
-	FInputModeUIOnly InputMode;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
+}
 
-	ULocalPlayer* LocalPlayer = GetLocalPlayer();
-	if (!LocalPlayer)
+void AKCMainMenuPlayerController::ApplyMainMenuCamera()
+{
+	if (!IsLocalController())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("KC MainMenu UI failed: LocalPlayer is null on %s."), *GetName());
 		return;
 	}
 
-	UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>();
-	if (!UISubsystem)
+	for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("KC MainMenu UI failed: KCLocalPlayerUISubsystem is null on %s."), *GetName());
+		SetViewTarget(*It);
 		return;
-	}
-
-	const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
-	const TSubclassOf<UKCUserWidget> MainMenuScreenClass =
-		UISettings ? UISettings->MainMenuScreenClass.LoadSynchronous() : nullptr;
-	if (!MainMenuScreenClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("KC MainMenu UI failed: MainMenuScreenClass is not configured in ProjectKC UI settings."));
-		return;
-	}
-
-	if (!UISubsystem->SetScreenWidget(MainMenuScreenClass))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("KC MainMenu UI failed: SetScreenWidget returned null for %s."), *GetNameSafe(MainMenuScreenClass));
 	}
 }
 

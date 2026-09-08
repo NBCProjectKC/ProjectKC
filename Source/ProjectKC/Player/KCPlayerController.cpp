@@ -10,14 +10,17 @@
 #include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "Customization/KCCustomizationNetworkComponent.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
+#include "GameSystem/KCGameState.h"
 #include "GameSystem/KCGameMode.h"
 #include "Player/KCPlayerCharacter.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 #include "ProjectKC/UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
+#include "ProjectKC/UI/Result/Screen/KCResultScreen.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
-#include "ProjectKC/Player/KCPlayerState.h"
+#include "Messages/Struct/KCGamePhaseChangedStruct.h"
 
 AKCPlayerController::AKCPlayerController()
 {
@@ -43,8 +46,21 @@ void AKCPlayerController::BeginPlay()
 		}
 	}
 	// 로딩화면 내려가고 안전하게 HUD 세팅 이벤트 : Host 전용 로직
-	UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
+	LoadingScreenHiddenListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
 		KCGameplayTags::Message_LoadingScreen_Hidden, this, &AKCPlayerController::HandleLoadingScreenHidden);
+	GamePhaseChangedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCGamePhaseChangedStruct>(
+		KCGameplayTags::Message_Game_PhaseChanged, this, &AKCPlayerController::HandleGamePhaseChanged);
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (const AKCGameState* GameState = World->GetGameState<AKCGameState>())
+		{
+			if (GameState->GetGamePhase() == EKCGamePhaseType::Ending)
+			{
+				ShowResultScreen();
+			}
+		}
+	}
 	
 	// BeginPlay() 호출 시점 고려하여 로딩화면 직접 조회 후 실행
 	if (UGameInstance* GI = GetGameInstance())
@@ -61,6 +77,10 @@ void AKCPlayerController::BeginPlay()
 
 void AKCPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
+	MessageSubsystem.UnregisterListener(LoadingScreenHiddenListenerHandle);
+	MessageSubsystem.UnregisterListener(GamePhaseChangedListenerHandle);
+
 	ClearInGameHUD();
 
 	Super::EndPlay(EndPlayReason);
@@ -121,6 +141,46 @@ void AKCPlayerController::ClearInGameHUD()
 			UISubsystem->ClearHUDWidget();
 		}
 	}
+}
+
+void AKCPlayerController::ShowResultScreen()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC Result failed: LocalPlayer is null on %s."), *GetName());
+		return;
+	}
+
+	UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>();
+	if (!UISubsystem)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC Result failed: KCLocalPlayerUISubsystem is null on %s."), *GetName());
+		return;
+	}
+
+	const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
+	const TSubclassOf<UKCUserWidget> ResultScreenClass = UISettings ? UISettings->ResultScreenClass.LoadSynchronous() : nullptr;
+	if (!ResultScreenClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KC Result failed: ResultScreenClass is not configured in ProjectKC UI settings."));
+		return;
+	}
+
+	UKCUserWidget* ResultWidget = UISubsystem->SetScreenWidget(ResultScreenClass);
+	if (UKCResultScreen* ResultScreen = Cast<UKCResultScreen>(ResultWidget))
+	{
+		ResultScreen->RefreshResultScreen();
+	}
+
+	FInputModeUIOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
 }
 
 void AKCPlayerController::BeginUseHeldItem(const FInputActionValue& InputValue)
@@ -369,6 +429,14 @@ float AKCPlayerController::GetServerTime() const
 void AKCPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
 {
 	InitializeInGameHUD();
+}
+
+void AKCPlayerController::HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message)
+{
+	if (Message.NewPhase == EKCGamePhaseType::Ending)
+	{
+		ShowResultScreen();
+	}
 }
 
 void AKCPlayerController::RequestSkipResultScreen()

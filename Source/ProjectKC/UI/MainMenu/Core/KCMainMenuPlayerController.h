@@ -14,6 +14,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-	void InitializeMainMenuUI();
+	void InitializeMainMenuInput();
+	void ApplyMainMenuCamera();
 	void ClearMainMenuUI();
 };
