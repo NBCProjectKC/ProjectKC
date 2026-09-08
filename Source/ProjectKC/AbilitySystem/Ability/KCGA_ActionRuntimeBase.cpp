@@ -10,9 +10,11 @@
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 #include "ProjectKC/AbilitySystem/Struct/KCLoopingCueStruct.h"
+#include "ProjectKC/AbilitySystem/Struct/KCMontageHitLagConfigStruct.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 #include "ProjectKC/AbilitySystem/Task/KCAbilityTask_ActionTraceWindow.h"
+#include "ProjectKC/AbilitySystem/Task/KCAbilityTask_PlayActionMontage.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
 
@@ -27,7 +29,19 @@ UKCGA_ActionRuntimeBase::UKCGA_ActionRuntimeBase()
 	AddSupportedActionHook(TAG_KC_ActionHook_OnStart);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnExecuteStart);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnExecute);
+	AddSupportedActionHook(TAG_KC_ActionHook_OnConfirmedHit);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnComplete);
+}
+
+bool UKCGA_ActionRuntimeBase::CanApplyMontageHitLag() const
+{
+	return IsValid(ActiveMontageTask) && ActiveMontageTask->CanApplyHitLag();
+}
+
+bool UKCGA_ActionRuntimeBase::ApplyMontageHitLag(
+	const FKCMontageHitLagConfigStruct& HitLag)
+{
+	return CanApplyMontageHitLag() && ActiveMontageTask->ApplyHitLag(HitLag);
 }
 
 bool UKCGA_ActionRuntimeBase::CanActivateAbility(
@@ -62,11 +76,13 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	bHasActivationHitResult = false;
 	bFinishingAction = false;
 	bActionExecutionStarted = false;
+	bConfirmedHitHookExecuted = false;
 	bDurabilityConsumedThisActivation = false;
 	bUseConsumptionPendingThisActivation = false;
 	StopLoopingCue();
 	StopActiveDurabilityDrain(false);
 	ActiveSourceItem = nullptr;
+	ActiveMontageTask = nullptr;
 	ActiveTraceTask = nullptr;
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
@@ -180,7 +196,9 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	bActionExecutionStarted = false;
+	bConfirmedHitHookExecuted = false;
 	// Ability 종료 중에는 GAS가 Task 배열을 순회해 직접 정리한다.
+	ActiveMontageTask = nullptr;
 	ActiveTraceTask = nullptr;
 	ActiveSourceItem = nullptr;
 
@@ -211,6 +229,7 @@ bool UKCGA_ActionRuntimeBase::BeginExecutionWindow()
 	{
 		return false;
 	}
+	bConfirmedHitHookExecuted = false;
 
 	// 대상 수집 전에 실행한다. 명중 여부와 무관한 연출이 여기에 온다.
 	ExecuteSourceHook(TAG_KC_ActionHook_OnExecuteStart);
@@ -310,13 +329,22 @@ bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 {
 	bool bConfirmedHit = false;
 	bool bAnyExecutionSucceeded = false;
-	for (const FKCActionTarget& Target : Targets)
+	int32 FirstConfirmedHitIndex = INDEX_NONE;
+	for (int32 TargetIndex = 0; TargetIndex < Targets.Num(); ++TargetIndex)
 	{
+		const FKCActionTarget& Target = Targets[TargetIndex];
 		if (!IsValid(Target.Actor))
 		{
 			continue;
 		}
-		bConfirmedHit |= Target.bHasHitResult;
+		if (Target.bHasHitResult)
+		{
+			bConfirmedHit = true;
+			if (FirstConfirmedHitIndex == INDEX_NONE)
+			{
+				FirstConfirmedHitIndex = TargetIndex;
+			}
+		}
 
 		UAbilitySystemComponent* TargetAbilitySystem =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target.Actor);
@@ -325,6 +353,20 @@ bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 			TargetAbilitySystem,
 			Target.Actor,
 			Target.bHasHitResult ? &Target.HitResult : nullptr);
+	}
+
+	if (FirstConfirmedHitIndex != INDEX_NONE && !bConfirmedHitHookExecuted)
+	{
+		bConfirmedHitHookExecuted = true;
+		const FKCActionTarget& ConfirmedTarget = Targets[FirstConfirmedHitIndex];
+		UAbilitySystemComponent* TargetAbilitySystem =
+			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(
+				ConfirmedTarget.Actor);
+		bAnyExecutionSucceeded |= ExecuteActionHook(
+			TAG_KC_ActionHook_OnConfirmedHit,
+			TargetAbilitySystem,
+			ConfirmedTarget.Actor,
+			&ConfirmedTarget.HitResult);
 	}
 
 	if (bConfirmedHit && !bDurabilityConsumedThisActivation &&

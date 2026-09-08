@@ -1,6 +1,8 @@
 #include "ProjectKC/AbilitySystem/Definition/KCAbilityDefinition.h"
 
 #include "ProjectKC/AbilitySystem/Ability/KCGA_Base.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCApplyMontageHitLagFragment.h"
+#include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Targeting/KCActionTargeting.h"
 
 const FKCActionHookStruct* UKCAbilityDefinition::FindActionHook(
@@ -118,6 +120,39 @@ bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 	{
 		OutError = TEXT("대응하는 Ability 클래스의 UKCGA_Base CDO를 읽을 수 없습니다.");
 		return false;
+	}
+
+	for (const FKCActionHookStruct& Hook : ActionHooks)
+	{
+		if (Hook.HookTag.MatchesTagExact(TAG_KC_ActionHook_OnConfirmedHit) &&
+			!ActionTargeting->ProducesHitResults())
+		{
+			OutError = TEXT(
+				"OnConfirmedHit Hook은 HitResult를 제공하는 Targeting에서만 사용할 수 있습니다.");
+			return false;
+		}
+
+		for (const UKCActionFragment* Fragment : Hook.Fragments)
+		{
+			if (!Fragment || !Fragment->IsA<UKCApplyMontageHitLagFragment>())
+			{
+				continue;
+			}
+
+			if (!Hook.HookTag.MatchesTagExact(TAG_KC_ActionHook_OnConfirmedHit))
+			{
+				OutError = TEXT(
+					"Montage Hit Lag Fragment는 OnConfirmedHit Hook에만 배치할 수 있습니다.");
+				return false;
+			}
+
+			if (!IsValid(ActionMontage.Montage))
+			{
+				OutError = TEXT(
+					"Montage Hit Lag Fragment를 사용하는 Action에는 Montage가 필요합니다.");
+				return false;
+			}
+		}
 	}
 
 	if (!ActionTargeting->IsA<UKCInstantActionTargeting>() &&

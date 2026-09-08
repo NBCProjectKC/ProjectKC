@@ -10,6 +10,8 @@
 #include "ProjectKC/AbilitySystem/Interface/KCAbilitySourceInterface.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "GameplayAbilitySpec.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCAbilitySystem, Log, All);
 
@@ -363,6 +365,37 @@ void UKCAbilitySystemComponent::StopActionMontageForRemoteOwner(
 	ActiveServerActionRequests.Remove(AbilityHandle);
 }
 
+void UKCAbilitySystemComponent::ApplyActionMontageHitLagForRemoteOwner(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	UAnimMontage* Montage,
+	float EffectivePlayRate,
+	float Duration,
+	uint32 HitLagGeneration)
+{
+	if (!AbilityHandle.IsValid() || !IsValid(Montage) ||
+		!FMath::IsFinite(EffectivePlayRate) || EffectivePlayRate <= 0.0f ||
+		!FMath::IsFinite(Duration) || Duration <= 0.0f ||
+		!IsRemoteOwnerMontageTarget())
+	{
+		return;
+	}
+
+	const uint32* ActiveRequestId =
+		ActiveServerActionRequests.Find(AbilityHandle);
+	const uint32* PendingRequestId = ActiveRequestId
+		? nullptr
+		: PendingServerActionRequests.Find(AbilityHandle);
+	ClientApplyActionMontageHitLag(
+		AbilityHandle,
+		ActiveRequestId
+			? *ActiveRequestId
+			: (PendingRequestId ? *PendingRequestId : 0),
+		Montage,
+		EffectivePlayRate,
+		Duration,
+		HitLagGeneration);
+}
+
 void UKCAbilitySystemComponent::ClientPlayActionMontage_Implementation(
 	FGameplayAbilitySpecHandle AbilityHandle,
 	uint32 ActionRequestId,
@@ -464,6 +497,43 @@ void UKCAbilitySystemComponent::ClientRejectActionMontage_Implementation(
 	}
 }
 
+void UKCAbilitySystemComponent::ClientApplyActionMontageHitLag_Implementation(
+	FGameplayAbilitySpecHandle AbilityHandle,
+	uint32 ActionRequestId,
+	UAnimMontage* Montage,
+	float EffectivePlayRate,
+	float Duration,
+	uint32 HitLagGeneration)
+{
+	if (!IsValid(Montage) || !AbilityActorInfo.IsValid() ||
+		!AbilityActorInfo->IsLocallyControlled() ||
+		!MatchesLocalActionRequest(AbilityHandle, ActionRequestId) ||
+		LocalActionMontage.Get() != Montage ||
+		!FMath::IsFinite(EffectivePlayRate) || EffectivePlayRate <= 0.0f ||
+		!FMath::IsFinite(Duration) || Duration <= 0.0f ||
+		(HitLagGeneration != 0 && LocalActionHitLagGeneration != 0 &&
+			static_cast<int32>(HitLagGeneration - LocalActionHitLagGeneration) <= 0))
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = AbilityActorInfo->GetAnimInstance();
+	UWorld* World = GetWorld();
+	if (!AnimInstance || !World || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	LocalActionHitLagGeneration = HitLagGeneration;
+	AnimInstance->Montage_SetPlayRate(Montage, EffectivePlayRate);
+	World->GetTimerManager().SetTimer(
+		LocalActionHitLagTimerHandle,
+		this,
+		&UKCAbilitySystemComponent::RestoreLocalActionMontagePlayRate,
+		Duration,
+		false);
+}
+
 bool UKCAbilitySystemComponent::IsRemoteOwnerMontageTarget() const
 {
 	// 리슨 서버 호스트는 서버에서 이미 재생하므로 중복 재생을 막는다.
@@ -545,6 +615,7 @@ bool UKCAbilitySystemComponent::PlayActionMontageLocally(
 void UKCAbilitySystemComponent::StopLocalActionMontagePrediction(
 	bool bResetState)
 {
+	ClearLocalActionMontageHitLag();
 	if (UAnimMontage* Montage = LocalActionMontage.Get())
 	{
 		StopMontageIfCurrent(*Montage);
@@ -559,6 +630,7 @@ void UKCAbilitySystemComponent::StopLocalActionMontagePrediction(
 
 void UKCAbilitySystemComponent::ResetLocalActionMontagePrediction()
 {
+	ClearLocalActionMontageHitLag();
 	LocalActionAbilityHandle = FGameplayAbilitySpecHandle();
 	LocalActionRequestId = 0;
 	LocalActionMontage = nullptr;
@@ -567,6 +639,33 @@ void UKCAbilitySystemComponent::ResetLocalActionMontagePrediction()
 	bLocalActionStopOnRelease = false;
 	bLocalActionInputReleased = false;
 	bLocalActionMontagePlayed = false;
+}
+
+void UKCAbilitySystemComponent::RestoreLocalActionMontagePlayRate()
+{
+	LocalActionHitLagTimerHandle.Invalidate();
+	UAnimMontage* Montage = LocalActionMontage.Get();
+	UAnimInstance* AnimInstance = AbilityActorInfo.IsValid()
+		? AbilityActorInfo->GetAnimInstance()
+		: nullptr;
+	if (IsValid(Montage) && AnimInstance &&
+		AnimInstance->Montage_IsPlaying(Montage))
+	{
+		AnimInstance->Montage_SetPlayRate(Montage, LocalActionPlayRate);
+	}
+}
+
+void UKCAbilitySystemComponent::ClearLocalActionMontageHitLag()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(LocalActionHitLagTimerHandle);
+	}
+	else
+	{
+		LocalActionHitLagTimerHandle.Invalidate();
+	}
+	LocalActionHitLagGeneration = 0;
 }
 
 bool UKCAbilitySystemComponent::HasOutstandingLocalAction(

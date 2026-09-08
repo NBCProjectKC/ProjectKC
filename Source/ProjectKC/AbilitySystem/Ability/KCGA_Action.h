@@ -49,6 +49,4 @@ private:
 	bool bWaitingForInputRelease = false;
 	double ChargeStartTimeSeconds = 0.0;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UKCAbilityTask_PlayActionMontage> ActiveMontageTask;
 };

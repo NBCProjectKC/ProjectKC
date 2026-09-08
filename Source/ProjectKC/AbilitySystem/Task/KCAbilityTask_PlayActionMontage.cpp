@@ -4,8 +4,11 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemComponent.h"
+#include "Engine/World.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
+#include "ProjectKC/AbilitySystem/Struct/KCMontageHitLagConfigStruct.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
+#include "TimerManager.h"
 
 UKCAbilityTask_PlayActionMontage* UKCAbilityTask_PlayActionMontage::Create(
 	UGameplayAbility* OwningAbility,
@@ -98,9 +101,97 @@ void UKCAbilityTask_PlayActionMontage::Activate()
 	}
 }
 
+bool UKCAbilityTask_PlayActionMontage::CanApplyHitLag() const
+{
+	const UAbilitySystemComponent* AbilitySystem = Ability
+		? Ability->GetAbilitySystemComponentFromActorInfo()
+		: nullptr;
+	return !bTerminal && !bCleaningUp && IsValid(Montage) &&
+		AbilitySystem && AbilitySystem->IsOwnerActorAuthoritative() &&
+		AbilitySystem->GetCurrentMontage() == Montage;
+}
+
+bool UKCAbilityTask_PlayActionMontage::ApplyHitLag(
+	const FKCMontageHitLagConfigStruct& HitLag)
+{
+	FString ValidationError;
+	if (!CanApplyHitLag() || !HitLag.Validate(ValidationError))
+	{
+		return false;
+	}
+
+	if (bHitLagActive &&
+		HitLag.RetriggerPolicy ==
+			EKCMontageHitLagRetriggerPolicy::IgnoreWhileActive)
+	{
+		return true;
+	}
+
+	UAbilitySystemComponent* AbilitySystem =
+		Ability->GetAbilitySystemComponentFromActorInfo();
+	UWorld* World = GetWorld();
+	if (!AbilitySystem || !World)
+	{
+		return false;
+	}
+
+	do
+	{
+		++HitLagGeneration;
+	}
+	while (HitLagGeneration == 0);
+
+	const float EffectivePlayRate = HitLag.ResolvePlayRate(PlayRate);
+	bHitLagActive = true;
+	AbilitySystem->CurrentMontageSetPlayRate(EffectivePlayRate);
+
+	if (UKCAbilitySystemComponent* KCAbilitySystem =
+		Cast<UKCAbilitySystemComponent>(AbilitySystem))
+	{
+		KCAbilitySystem->ApplyActionMontageHitLagForRemoteOwner(
+			AbilityHandle,
+			Montage,
+			EffectivePlayRate,
+			HitLag.Duration,
+			HitLagGeneration);
+	}
+
+	World->GetTimerManager().SetTimer(
+		HitLagTimerHandle,
+		this,
+		&UKCAbilityTask_PlayActionMontage::RestoreHitLag,
+		HitLag.Duration,
+		false);
+	return true;
+}
+
+void UKCAbilityTask_PlayActionMontage::RestoreHitLag()
+{
+	if (!bHitLagActive)
+	{
+		return;
+	}
+
+	bHitLagActive = false;
+	HitLagTimerHandle.Invalidate();
+	UAbilitySystemComponent* AbilitySystem = Ability
+		? Ability->GetAbilitySystemComponentFromActorInfo()
+		: nullptr;
+	if (AbilitySystem && AbilitySystem->IsOwnerActorAuthoritative() &&
+		AbilitySystem->GetCurrentMontage() == Montage)
+	{
+		AbilitySystem->CurrentMontageSetPlayRate(PlayRate);
+	}
+}
+
 void UKCAbilityTask_PlayActionMontage::OnDestroy(bool bAbilityEnded)
 {
 	bCleaningUp = true;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HitLagTimerHandle);
+	}
+	bHitLagActive = false;
 	UAbilitySystemComponent* AbilitySystem = Ability
 		? Ability->GetAbilitySystemComponentFromActorInfo()
 		: nullptr;

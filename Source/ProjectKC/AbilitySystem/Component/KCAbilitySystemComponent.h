@@ -82,6 +82,14 @@ public:
 		FGameplayAbilitySpecHandle AbilityHandle,
 		UAnimMontage* Montage);
 
+	/** 서버에서 확정한 짧은 재생률 변경을 원격 소유자의 선재생 몽타주에도 적용한다. */
+	void ApplyActionMontageHitLagForRemoteOwner(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		UAnimMontage* Montage,
+		float EffectivePlayRate,
+		float Duration,
+		uint32 HitLagGeneration);
+
 protected:
 	UFUNCTION(Server, Reliable)
 	void ServerPressAbilityInputByHandle(
@@ -110,6 +118,15 @@ protected:
 		FGameplayAbilitySpecHandle AbilityHandle,
 		uint32 ActionRequestId);
 
+	UFUNCTION(Client, Reliable)
+	void ClientApplyActionMontageHitLag(
+		FGameplayAbilitySpecHandle AbilityHandle,
+		uint32 ActionRequestId,
+		UAnimMontage* Montage,
+		float EffectivePlayRate,
+		float Duration,
+		uint32 HitLagGeneration);
+
 private:
 	bool ProcessAbilityInputPressed(FGameplayAbilitySpecHandle AbilityHandle);
 	bool ProcessAbilityInputReleased(FGameplayAbilitySpecHandle AbilityHandle);
@@ -122,6 +139,8 @@ private:
 		FName StartSection);
 	void StopLocalActionMontagePrediction(bool bResetState);
 	void ResetLocalActionMontagePrediction();
+	void RestoreLocalActionMontagePlayRate();
+	void ClearLocalActionMontageHitLag();
 	/** 이 핸들의 액션이 아직 진행 중인지. 중복 Press의 예측 재생을 막는다. */
 	bool HasOutstandingLocalAction(FGameplayAbilitySpecHandle AbilityHandle);
 	bool MatchesLocalActionRequest(
@@ -140,6 +159,8 @@ private:
 	TWeakObjectPtr<UAnimMontage> LocalActionMontage;
 	float LocalActionPlayRate = 1.0f;
 	FName LocalActionStartSection = NAME_None;
+	FTimerHandle LocalActionHitLagTimerHandle;
+	uint32 LocalActionHitLagGeneration = 0;
 	bool bLocalActionStopOnRelease = false;
 	bool bLocalActionInputReleased = false;
 	bool bLocalActionMontagePlayed = false;
