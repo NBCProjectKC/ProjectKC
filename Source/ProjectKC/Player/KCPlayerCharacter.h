@@ -51,6 +51,8 @@ public:
 
 	void MoveInWorldDirection(const FVector& WorldDirection, float ScaleValue);
 	void UpdateFacingDirection(const FVector& WorldDirection, float DeltaSeconds);
+	void UpdateCameraLookAhead(const FVector& CursorWorldOffset, float DeltaSeconds);
+	void TriggerDashCameraPunch();
 	bool RequestDash();
 	bool RequestPlayEmote(int32 EmoteIndex = 0);
 	bool RequestPlayNextEmote();
@@ -129,6 +131,7 @@ private:
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData);
 	void ApplyMoveSpeed(float MoveSpeed);
 	void InterruptEmote();
+	void TriggerHitCameraFeedback();
 	void ApplyFacingYaw(float FacingYaw);
 	void ApplyAcceptedServerFacingYaw(
 		float FacingYaw,
@@ -143,6 +146,106 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> TopDownCameraComponent;
+
+	/** 커서의 월드 거리 중 카메라 선행 오프셋으로 반영할 비율이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float CameraLookAheadStrength = 0.25f;
+
+	/** 카메라 중심이 캐릭터로부터 이동할 수 있는 최대 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraLookAheadMaxDistance = 220.0f;
+
+	/** 커서가 캐릭터 중심 근처에 있을 때 미세 진동을 막는 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraLookAheadDeadZone = 80.0f;
+
+	/** 목표 오프셋을 따라가고 중앙으로 복귀하는 보간 속도다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraLookAheadInterpSpeed = 7.5f;
+
+	/** 이동 속도 중 진행 방향 반대편 카메라 오프셋으로 반영할 비율이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Movement Lag",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraMovementLagStrength = 0.06f;
+
+	/** 이동 관성으로 카메라 중심이 밀릴 수 있는 최대 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Movement Lag",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraMovementLagMaxDistance = 90.0f;
+
+	/** 현재 이동 관성 오프셋이 목표를 따라가는 속도다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Movement Lag",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraMovementLagInterpSpeed = 10.0f;
+
+	/** 대시 시작 순간 기본 시야각에 더할 값이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "30.0"))
+	float DashCameraFOVKick = 8.0f;
+
+	/** 대시 카메라 시야각이 최대치까지 부드럽게 커지는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DashCameraFOVAttackDuration = 0.15f;
+
+	/** 최대 시야각을 유지해 대시 속도감을 읽을 수 있게 하는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DashCameraFOVHoldDuration = 0.18f;
+
+	/** 최대 시야각에서 기본값까지 부드럽게 돌아오는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Dash",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DashCameraFOVReturnDuration = 0.42f;
+
+	/** 최대 강도 피격 시 기본 시야각에서 줄어드는 값이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "30.0"))
+	float HitCameraFOVKick = 12.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraFOVAttackDuration = 0.13f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraFOVHoldDuration = 0.06f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraFOVReturnDuration = 0.28f;
+
+	/** 피격 흔들림이 카메라 중심을 밀어내는 최대 월드 거리다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit|Shake",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraShakeAmplitude = 12.0f;
+
+	/** 피격 흔들림의 초당 진동 횟수다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit|Shake",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraShakeFrequency = 18.0f;
+
+	/** 피격 흔들림이 감쇠하며 사라지는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Hit|Shake",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HitCameraShakeDuration = 0.18f;
+
+	FVector BaseCameraTargetOffset = FVector::ZeroVector;
+	FVector CurrentCameraLookAheadOffset = FVector::ZeroVector;
+	FVector CurrentCameraMovementLagOffset = FVector::ZeroVector;
+	FVector CurrentHitCameraShakeOffset = FVector::ZeroVector;
+	float BaseCameraFieldOfView = 90.0f;
+	float CurrentDashCameraFOVOffset = 0.0f;
+	float DashCameraFOVElapsed = -1.0f;
+	float CurrentHitCameraFOVOffset = 0.0f;
+	float HitCameraFOVStartOffset = 0.0f;
+	float HitCameraFOVTargetOffset = 0.0f;
+	float HitCameraFOVElapsed = -1.0f;
+	float HitCameraShakeElapsed = -1.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Ability",
 		meta = (AllowPrivateAccess = "true"))

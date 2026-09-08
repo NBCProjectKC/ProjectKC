@@ -52,7 +52,34 @@ void AKCGameMode::HandleMatchHasStarted()
 		KCGameState->InitializeTeamCount(TeamCount);
 		KCGameState->SetActiveRecipes(SelectActiveRecipes()); // 그 판의 레시피 룰렛
 		KCGameState->SetGamePhase(EKCGamePhaseType::Playing); // phase 변경
+		
+		// KCSessionSubsystem에서 로비 설정 매치 시간 복원
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+			{
+				if (SessionSub->GetMatchDurationSeconds() > 0.0f)
+				{
+					MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
+				}
+			}
+		}
 	
+		/*
+		 * TODO : 로비에서 그 판의 타이머를 세팅하는 코드입니다.
+		 * KCSessionSubsystem에서 로비 설정 매치 시간 복원
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+			{
+				if (SessionSub->GetMatchDurationSeconds() > 0.0f)
+				{
+					MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
+				}
+			}
+		}
+		*/
+		
 		// TODO 임시 코드
 		// GameState의 서버시간 설정
 		const float ServerNow = GetWorld()->GetTimeSeconds();
@@ -299,12 +326,15 @@ void AKCGameMode::CheckWinCondition()
 
 void AKCGameMode::EndGame(int32 WinningTeamId)
 {
+	// 결과화면 시작할 때 스킵 누른 인원 목록 초기화
+	SkippedResultScreenPlayers.Reset();
+	
 	if (KCGameState)
 	{
 		KCGameState->SetGamePhase(EKCGamePhaseType::Ending);
 	}
 
-	// TODO: 게임 종료 후 처리(결과 화면, 로비 복귀)
+	// 게임 승리 로그
 	UE_LOG(LogTemp, Log, TEXT("Game Ended. Winning Team: %d"), WinningTeamId);
 
 	EndMatch();
@@ -364,6 +394,14 @@ int32 AKCGameMode::GetLeadingTeamId() const
 
 void AKCGameMode::TravelBackToLobby()
 {
+	// 트래블 직전, 아직 로딩화면 안 뜬 사람들(전원)한테 방송
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AKCPlayerController* KCPC = Cast<AKCPlayerController>(It->Get()))
+		{
+			KCPC->Client_ShowResultToLobbyLoadingScreen();
+		}
+	}
 	GetWorld()->ServerTravel(UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString());
 }
 
@@ -474,4 +512,34 @@ void AKCGameMode::Debug_WinMatch(int32 WinningTeamId)
 TArray<FName> AKCGameMode::GetRecipeRowNameOptions() const
 {
 	return DebugRecipeDataTable ? DebugRecipeDataTable->GetRowNames() : TArray<FName>();
+}
+
+void AKCGameMode::RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer)
+{
+	if (!GetWorldTimerManager().IsTimerActive(ResultScreenTimerHandle))
+	{
+		return;   // 결과화면 자체가 안 떠있는 상태 (이미 트래블됐거나 아직 시작하지 않음)
+	}
+
+	if (!RequestingPlayer)
+	{
+		return; // PlayerState 유효성 검사
+	}
+
+	SkippedResultScreenPlayers.Add(RequestingPlayer); // 누른 플레이어를 배열에 추가
+	
+	// 스킵을 누른 그 사람한테만 즉시 로딩화면 표시
+	if (AKCPlayerController* RequestingPC = Cast<AKCPlayerController>(RequestingPlayer->GetOwningController()))
+	{
+		RequestingPC->Client_ShowResultToLobbyLoadingScreen();
+	}
+
+	// 지금 접속해있는 전원(스펙테이터 제외하고 싶으면 조건 추가 가능)이 다 스킵했는지 확인
+	const int32 ConnectedPlayerCount = GetNumPlayers(); // 현재 서버에 접속한 인원 수
+	if (SkippedResultScreenPlayers.Num() >= ConnectedPlayerCount) // 스킵 누른 사람 수 == 접속 인원 수
+	{
+		GetWorldTimerManager().ClearTimer(ResultScreenTimerHandle); // 10초 타이머 취소
+		TravelBackToLobby(); // 트래블 실행
+	}
+	// 안 누른 사람이 한 명이라도 있으면 그대로 함수 종료 -> 10초 타이머가 알아서 트래블
 }

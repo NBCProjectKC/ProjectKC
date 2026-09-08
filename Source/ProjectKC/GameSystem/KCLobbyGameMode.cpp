@@ -177,6 +177,19 @@ void AKCLobbyGameMode::BeginPlay()
 				SetRequiredPlayerCount(ExpectedCount);
 				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Restored RequiredPlayerCount from KCSessionSubsystem: %d"), ExpectedCount);
 			}
+
+			if (SessionSub->GetSelectedMapType() != EKCLevelType::None)
+			{
+				SelectedLevelType = SessionSub->GetSelectedMapType();
+				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Restored SelectedLevelType from KCSessionSubsystem: %s"),
+					*UKCLevelTypeLibrary::GetLevelName(SelectedLevelType).ToString());
+			}
+
+			if (SessionSub->GetMatchDurationSeconds() > 0.0f)
+			{
+				MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
+				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Restored MatchDurationSeconds from KCSessionSubsystem: %.0f"), MatchDurationSeconds);
+			}
 		}
 	}
 
@@ -307,6 +320,45 @@ void AKCLobbyGameMode::SetRequiredPlayerCount(int32 InCount)
 
 	ApplySlotOpenCloseRules();
 	UpdateLobbyReadyState();
+}
+
+void AKCLobbyGameMode::SetSelectedMap(EKCLevelType InLevelType)
+{
+	SelectedLevelType = InLevelType;
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] SetSelectedMap: %s"),
+		*UKCLevelTypeLibrary::GetLevelName(SelectedLevelType).ToString());
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSub->SetSelectedMapType(SelectedLevelType);
+		}
+	}
+}
+
+void AKCLobbyGameMode::SetMatchDuration(float InSeconds)
+{
+	MatchDurationSeconds = FMath::Max(60.0f, InSeconds);
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] SetMatchDuration: %.0f seconds"), MatchDurationSeconds);
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSub->SetMatchDurationSeconds(MatchDurationSeconds);
+		}
+	}
+}
+
+void AKCLobbyGameMode::ApplyGameSettings(int32 InPlayerCount, EKCLevelType InMapType, float InMatchDurationSeconds)
+{
+	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] ApplyGameSettings - Players: %d, Map: %s, Duration: %.0f s"),
+		InPlayerCount, *UKCLevelTypeLibrary::GetLevelName(InMapType).ToString(), InMatchDurationSeconds);
+
+	SetRequiredPlayerCount(InPlayerCount);
+	SetSelectedMap(InMapType);
+	SetMatchDuration(InMatchDurationSeconds);
 }
 
 void AKCLobbyGameMode::Debug_SetLobbyPlayers(int32 InCount)
@@ -722,7 +774,10 @@ void AKCLobbyGameMode::StartGame()
 			}
 		}
 		Subsystem->SetExpectedPlayerCount(ActiveCount);
-		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] StartGame: Saved %d active players data into KCSessionSubsystem"), ActiveCount);
+		Subsystem->SetSelectedMapType(SelectedLevelType);
+		Subsystem->SetMatchDurationSeconds(MatchDurationSeconds);
+		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] StartGame: Saved %d players, Map=%s, Duration=%.0fs into KCSessionSubsystem"),
+			ActiveCount, *UKCLevelTypeLibrary::GetLevelName(SelectedLevelType).ToString(), MatchDurationSeconds);
 	}
 
 	// 2. 클라이언트들에게 매치 시작 알림
@@ -734,7 +789,7 @@ void AKCLobbyGameMode::StartGame()
 			{
 				if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(PS->GetOwner()))
 				{
-					LobbyPC->Client_OnMatchBegin();
+					LobbyPC->Client_OnMatchBegin(SelectedLevelType);
 				}
 			}
 		}
@@ -754,8 +809,15 @@ void AKCLobbyGameMode::StartGame()
 
 			if (UWorld* World = WeakThis->GetWorld())
 			{
-				FString TravelURL = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::GasRange).ToString();
-				TravelURL += TEXT("?listen");
+				FName MapName = UKCLevelTypeLibrary::GetLevelName(WeakThis->SelectedLevelType);
+				if (MapName.IsNone())
+				{
+					MapName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::GasRange);
+				}
+
+				FString TravelURL = FString::Printf(TEXT("%s?listen?MatchTime=%.0f?Players=%d"),
+					*MapName.ToString(), WeakThis->MatchDurationSeconds, WeakThis->RequiredPlayerCount);
+
 				UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyGameMode] Executing ServerTravel to: %s"), *TravelURL);
 				World->ServerTravel(TravelURL);
 			}

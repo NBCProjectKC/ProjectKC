@@ -10,11 +10,25 @@
 #include "View/MVVMView.h"
 #include "Blueprint/GameViewportSubsystem.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
+#include "UObject/ConstructorHelpers.h"
+#include "ProjectKC/UI/Loading/Tip/KCLoadingTipDataAsset.h"
+#include "ProjectKC/GameSystem/KCLevelTypeLibrary.h"
+#include "ProjectKC/GameSystem/KCLevelInfoRow.h"
+
+UKCLoadingScreenSubsystem::UKCLoadingScreenSubsystem()
+{
+	static ConstructorHelpers::FClassFinder<UKCLoadingScreen> ScreenClassFinder(TEXT("/Game/KC/UI/Screens/WBP_Loading"));
+	if (ScreenClassFinder.Succeeded())
+	{
+		DefaultLoadingScreenClass = ScreenClassFinder.Class;
+	}
+}
 
 void UKCLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-
+	DefaultTipsAsset = LoadObject<UKCLoadingTipDataAsset>(nullptr, TEXT("/Game/KC/UI/Screens/DA_LoadingTips.DA_LoadingTips"));
+	UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG] DefaultTipsAsset 로드 결과: %s"), *GetNameSafe(DefaultTipsAsset));
 	LevelChangedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCLevelChangedStruct>(
 		KCGameplayTags::Message_Level_Changed, this, &UKCLoadingScreenSubsystem::OnLevelChangedMessage);
 }
@@ -25,8 +39,7 @@ void UKCLoadingScreenSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TArray<FPrimaryAssetType>& AssetTypes,
-	TSubclassOf<UKCLoadingScreen> ScreenClass, const UKCLoadingTipDataAsset* TipsAsset)
+void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel)
 {
 	if (WaitingForLevel != EKCLevelType::None)
 	{
@@ -35,6 +48,14 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 		return;
 	}
 
+	const FKCLevelInfoRow* Row = UKCLevelTypeLibrary::GetLevelInfoRow(TargetLevel);
+	if (!Row)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("KCLoadingScreenSubsystem::BeginPreload - DT_LevelInfo에서 레벨 정보를 찾지 못했습니다."));
+		return;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG] DT 조회 성공. MapName=%s, AssetTypesToPreload 개수=%d"),
+		*Row->MapName.ToString(), Row->AssetTypesToPreload.Num());
 	WaitingForLevel = TargetLevel;
 	bAssetsReady = false;
 	bLevelReady = false;
@@ -47,7 +68,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 		LoadingViewModel = NewObject<UKCLoadingViewModel>(this);
 	}
 	LoadingViewModel->SetProgress(0.0f);
-	LoadingViewModel->PickRandomTip(TipsAsset);
+	LoadingViewModel->PickRandomTip(DefaultTipsAsset);
 	UpdateLoadingText();
 	
 	PreloadStartTimeSeconds = FPlatformTime::Seconds();
@@ -59,7 +80,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	{
 		if (APlayerController* PC = LocalPlayer->GetPlayerController(GetGameInstance()->GetWorld()))
 		{
-			ActiveLoadingWidget = CreateWidget<UKCUserWidget>(PC, ScreenClass);
+			ActiveLoadingWidget = CreateWidget<UKCUserWidget>(PC, DefaultLoadingScreenClass);
 			if (ActiveLoadingWidget)
 			{
 				if (UGameViewportSubsystem* ViewportSubsystem = UGameViewportSubsystem::Get())
@@ -81,7 +102,7 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel, const TAr
 	TWeakObjectPtr<UKCLoadingScreenSubsystem> WeakThis(this);
 
 	UKCAssetManager::Get().PreloadAssetsByTypes(
-		AssetTypes,
+		Row->AssetTypesToPreload,
 		[WeakThis](float NewProgress)
 		{
 			// TODO : 현재 에셋매니저의 부하가 적어 가짜 진행률로 대체. 추후 수정할 예정
@@ -178,6 +199,12 @@ void UKCLoadingScreenSubsystem::UpdateLoadingText()
 	}
 
 	const float CurrentProgress = LoadingViewModel->GetProgress();
+	
+	if (WaitingForLevel == EKCLevelType::LobbyLevel)
+	{
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("로비로 돌아가는 중...")));
+		return;
+	}
 	
 	if (CurrentProgress >= 0.97f)
 	{

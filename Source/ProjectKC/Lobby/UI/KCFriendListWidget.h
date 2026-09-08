@@ -6,8 +6,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "BlueprintDataDefinitions.h"
+#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCFriendListWidget.generated.h"
 
 class UPanelWidget;
@@ -18,7 +18,7 @@ class UKCFriendWidget;
  * @brief 기존 WBP_FriendList 위젯을 1:1 매핑한 C++ 위젯 클래스
  */
 UCLASS()
-class PROJECTKC_API UKCFriendListWidget : public UUserWidget
+class PROJECTKC_API UKCFriendListWidget : public UKCUserWidget
 {
 	GENERATED_BODY()
 

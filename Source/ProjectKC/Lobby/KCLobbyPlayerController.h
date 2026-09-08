@@ -8,6 +8,7 @@
 #include "CoreMinimal.h"
 #include "Customization/KCCustomizationSaveGame.h"
 #include "GameFramework/PlayerController.h"
+#include "GameSystem/Enum/KCLevelType.h"
 #include "KCLobbyPlayerController.generated.h"
 
 class UKCLobbyWidget;
@@ -55,9 +56,13 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void ROS_UpdatePlayerInfo();
 
+	/** @brief 방장이 서버에 게임 세팅(인원수, 맵, 시간) 변경을 요청하는 Server RPC */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby|Settings")
+	void ROS_ApplyGameSettings(int32 InPlayerCount, EKCLevelType InMapType, float InMatchDurationSeconds);
+
 	/** @brief 게임 시작 시 모든 클라이언트의 입력을 비활성화하고 시작 애니메이션을 재생하는 Client RPC */
 	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "KC|Lobby")
-	void Client_OnMatchBegin();
+	void Client_OnMatchBegin(EKCLevelType TargetMap);
 
 	/** @brief 전원 준비 완료 여부에 따라 방장 UI의 StartGame 버튼 활성화 상태를 동기화하는 Client RPC */
 	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "KC|Lobby")
@@ -159,6 +164,7 @@ public:
 
 protected:
 	//~APlayerController interface
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -220,7 +226,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
 		meta = (ClampMin = "0.0"))
-	float CustomizationCameraOrbitSensitivity = 0.25f;
+	float CustomizationCameraOrbitSensitivity = 5.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Customization|Camera",
 		meta = (ClampMin = "0.0"))
@@ -243,6 +249,10 @@ protected:
 		meta = (ClampMin = "0.0"))
 	float CustomizationCameraBlendTime = 0.2f;
 private:
+	/** 로컬 커스터마이징 상태를 서버 슬롯 이동 검증에 동기화합니다. */
+	UFUNCTION(Server, Reliable)
+	void ServerSetCustomizationEditing(bool bEditing);
+
 	AKCLobbyCharacter* ResolveLocalCustomizationCharacter() const;
 	class UKCCustomizationSaveSubsystem* GetCustomizationSaveSubsystem() const;
 	bool OpenCustomizationCamera(AKCLobbyCharacter* TargetCharacter);

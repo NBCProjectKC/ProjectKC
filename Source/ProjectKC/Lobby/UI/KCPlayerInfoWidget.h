@@ -6,8 +6,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "ProjectKC/Lobby/Struct/KCPlayerInfoStruct.h"
+#include "ProjectKC/UI/Common/Widget/KCUserWidget.h"
 #include "KCPlayerInfoWidget.generated.h"
 
 class UTextBlock;
@@ -17,7 +17,7 @@ class UTextBlock;
  * @brief 기존 WBP_PlayerInfo 블루프린트를 1:1 매핑한 C++ 위젯 클래스
  */
 UCLASS()
-class PROJECTKC_API UKCPlayerInfoWidget : public UUserWidget
+class PROJECTKC_API UKCPlayerInfoWidget : public UKCUserWidget
 {
 	GENERATED_BODY()
 
