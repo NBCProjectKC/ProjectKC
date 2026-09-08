@@ -166,6 +166,7 @@ void AKCItemSpawnManager::BeginPlay()
 	RecipeListener = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCActiveRecipesChangedStruct>(
 		KCGameplayTags::Message_Game_ActiveRecipesChanged, this, &ThisClass::HandleRecipesChanged);
 	RefreshRecipes();
+	ScheduleInitialSpawns();
 	ServiceSpawns();
 }
 
@@ -210,6 +211,66 @@ void AKCItemSpawnManager::Tick(float DeltaSeconds)
 void AKCItemSpawnManager::HandleRecipesChanged(FGameplayTag Channel, const FKCActiveRecipesChangedStruct& Message)
 {
 	RefreshRecipes();
+}
+
+int32 AKCItemSpawnManager::CountUniqueSpawnPoints(
+	const TArray<TObjectPtr<AKCItemSpawnPoint>>& Points) const
+{
+	TSet<const AKCItemSpawnPoint*> UniquePoints;
+	for (const AKCItemSpawnPoint* Point : Points)
+	{
+		if (IsValid(Point) && Point->GetWorld() == GetWorld())
+		{
+			UniquePoints.Add(Point);
+		}
+	}
+	return UniquePoints.Num();
+}
+
+void AKCItemSpawnManager::ScheduleInitialSpawns()
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	const auto ScheduleCategory =
+		[this, Now](bool bIngredient, int32 ImmediateCount, float DelayMin, float DelayMax)
+	{
+		int32 ScheduledCount = 0;
+		double ReadyTime = Now;
+		for (FSpawnSlot& Slot : Slots)
+		{
+			if (Slot.bIngredient != bIngredient)
+			{
+				continue;
+			}
+			if (ScheduledCount >= ImmediateCount)
+			{
+				ReadyTime += FMath::FRandRange(DelayMin, DelayMax);
+			}
+			Slot.ReadyTime = ReadyTime;
+			++ScheduledCount;
+		}
+	};
+
+	ScheduleCategory(
+		false,
+		CountUniqueSpawnPoints(ItemSpawnPoints),
+		ItemRespawnDelayMin,
+		ItemRespawnDelayMax);
+	if (IngredientPlacementMode == EKCIngredientPlacementMode::SpawnPoints)
+	{
+		ScheduleCategory(
+			true,
+			CountUniqueSpawnPoints(IngredientSpawnPoints),
+			IngredientRespawnDelayMin,
+			IngredientRespawnDelayMax);
+	}
+	else
+	{
+		ScheduleCategory(
+			true,
+			MAX_int32,
+			IngredientRespawnDelayMin,
+			IngredientRespawnDelayMax);
+	}
 }
 
 void AKCItemSpawnManager::RefreshRecipes()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameFramework/GameplayMessageSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "KCPlayerController.generated.h"
 
@@ -10,6 +11,7 @@ class UInputMappingContext;
 class UKCCustomizationNetworkComponent;
 struct FGameplayTag;
 struct FKCEmptyMessageStruct;
+struct FKCGamePhaseChangedStruct;
 
 UCLASS()
 class PROJECTKC_API AKCPlayerController : public APlayerController
@@ -43,10 +45,12 @@ protected:
 	virtual void PlayerTick(float DeltaSeconds) override;
 	// 로딩화면 끝 콜백
 	void HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message);
+	void HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message);
 
 private:
 	void InitializeInGameHUD();
 	void ClearInGameHUD();
+	void ShowResultScreen();
 	void Move(const FInputActionValue& InputValue);
 	void Dash(const FInputActionValue& InputValue);
 	void Emote(const FInputActionValue& InputValue);
@@ -88,6 +92,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> DropHeldItemAction;
+
+	FGameplayMessageListenerHandle LoadingScreenHiddenListenerHandle;
+	FGameplayMessageListenerHandle GamePhaseChangedListenerHandle;
 	
 	UFUNCTION(Server, Reliable)
 	void Server_RequestSkipResultScreen();

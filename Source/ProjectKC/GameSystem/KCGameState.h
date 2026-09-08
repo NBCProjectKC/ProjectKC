@@ -37,6 +37,12 @@ public:
 	float GetMatchEndServerTime() const { return MatchEndServerTime; }
 	bool HasMatchTimerStarted() const { return MatchEndServerTime > MatchStartServerTime; }
 	int32 GetRemainingMatchSeconds(float CurrentServerTime) const;
+
+	UPROPERTY(Replicated)
+	float ResultScreenEndServerTime = 0.0f;
+	void SetResultScreenEndServerTime(float InTime) { ResultScreenEndServerTime = InTime; }
+	float GetResultScreenEndServerTime() const { return ResultScreenEndServerTime; }
+	int32 GetRemainingResultScreenSeconds(float CurrentServerTime) const;
 	
 	// setter
 	void SetGamePhase(EKCGamePhaseType NewPhase);

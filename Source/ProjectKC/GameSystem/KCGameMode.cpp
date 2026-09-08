@@ -332,6 +332,7 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 	if (KCGameState)
 	{
 		KCGameState->SetGamePhase(EKCGamePhaseType::Ending);
+		KCGameState->SetResultScreenEndServerTime(GetWorld()->GetTimeSeconds() + ResultScreenDuration);
 	}
 
 	// 게임 승리 로그

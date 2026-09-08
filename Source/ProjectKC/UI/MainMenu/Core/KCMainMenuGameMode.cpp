@@ -5,4 +5,5 @@
 AKCMainMenuGameMode::AKCMainMenuGameMode()
 {
 	PlayerControllerClass = AKCMainMenuPlayerController::StaticClass();
+	DefaultPawnClass = nullptr;
 }

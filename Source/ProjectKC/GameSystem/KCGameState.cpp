@@ -24,6 +24,7 @@ void AKCGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AKCGameState, bIsFarmingOpen);
 	DOREPLIFETIME(AKCGameState, MatchStartServerTime);
 	DOREPLIFETIME(AKCGameState, MatchEndServerTime);
+	DOREPLIFETIME(AKCGameState, ResultScreenEndServerTime);
 }
 
 void AKCGameState::InitializeTeamCount(int32 InTeamCount)
@@ -109,6 +110,16 @@ int32 AKCGameState::GetRemainingMatchSeconds(float CurrentServerTime) const
 	}
 
 	return FMath::Max(0, FMath::CeilToInt(MatchEndServerTime - CurrentServerTime));
+}
+
+int32 AKCGameState::GetRemainingResultScreenSeconds(float CurrentServerTime) const
+{
+	if (ResultScreenEndServerTime <= 0.0f)
+	{
+		return 0;
+	}
+
+	return FMath::Max(0, FMath::CeilToInt(ResultScreenEndServerTime - CurrentServerTime));
 }
 
 FGameplayTagContainer AKCGameState::GetPotIngredients(int32 TeamId) const
