@@ -451,3 +451,14 @@ void AKCPlayerController::Server_RequestSkipResultScreen_Implementation()
 		GM->RequestEarlyTravelToLobby(GetPlayerState<AKCPlayerState>());
 	}
 }
+
+void AKCPlayerController::Client_ShowResultToLobbyLoadingScreen_Implementation()
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			LoadingScreenSubsystem->BeginPreload(EKCLevelType::LobbyLevel);
+		}
+	}
+}

@@ -8,6 +8,7 @@
 
 class UAbilityTask_PlayMontageAndWait;
 class UAbilityTask_WaitGameplayEvent;
+struct FKCMontageHitLagConfigStruct;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FKCActionMontageExecuteDelegate,
@@ -41,6 +42,9 @@ public:
 
 	virtual void Activate() override;
 
+	bool CanApplyHitLag() const;
+	bool ApplyHitLag(const FKCMontageHitLagConfigStruct& HitLag);
+
 protected:
 	virtual void OnDestroy(bool bAbilityEnded) override;
 
@@ -55,6 +59,7 @@ private:
 	void HandleMontageInterrupted();
 
 	void FinishTask(bool bInterrupted);
+	void RestoreHitLag();
 
 	UPROPERTY()
 	TObjectPtr<UAnimMontage> Montage;
@@ -68,6 +73,9 @@ private:
 	FGameplayAbilitySpecHandle AbilityHandle;
 	float PlayRate = 1.0f;
 	FName StartSection = NAME_None;
+	FTimerHandle HitLagTimerHandle;
+	uint32 HitLagGeneration = 0;
+	bool bHitLagActive = false;
 	bool bTerminal = false;
 	bool bCleaningUp = false;
 	bool bListenForExecuteEvent = true;

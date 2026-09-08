@@ -122,6 +122,18 @@ public:
 	/** 활성 Action 정리가 끝난 뒤 예약된 소비 파괴를 다음 틱에 확정한다. */
 	bool FinalizePendingUseConsumption();
 
+	/**
+	 * 사용 중인 Ability가 끝날 때까지 파손 파괴를 미룬다.
+	 * 내구도가 바닥난 마지막 사용도 몽타주와 결과를 끝까지 수행하게 한다.
+	 */
+	void HoldBreakDestruction();
+
+	/** 미뤄 둔 파손이 있으면 지금 진행한다. */
+	void ReleaseBreakDestruction();
+
+	/** 보류 때문에 미뤄 둔 파손이 있는가. */
+	bool IsBreakDestructionPending() const;
+
 	/** 서버의 실제 사용 수명주기가 정확한 소모 시점에 호출한다. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Item|Durability")
 	bool TryConsumeDurability(
@@ -206,6 +218,11 @@ private:
 	void SetCurrentDurability(float NewDurability);
 	void BroadcastDurabilityChanged(float PreviousDurability);
 	void HandleBroken();
+
+	/** Ability가 아이템을 쓰는 동안 참이다. 서버 전용 예약 상태다. */
+	bool bBreakDestructionHeld = false;
+	/** 보류 중에 내구도가 바닥나 파손 처리를 미뤄 둔 상태다. */
+	bool bBreakDestructionPending = false;
 	void DestroyBrokenItem();
 	void DestroyConsumedItem();
 	void DestroyItemActor();

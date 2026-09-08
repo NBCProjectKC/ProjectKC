@@ -14,6 +14,7 @@
 #include "ProjectKC/AbilitySystem/Definition/KCSingleActionDefinition.h"
 #include "ProjectKC/AbilitySystem/Effect/KCGE_ActionCooldown.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCApplyGameplayEffectFragment.h"
+#include "ProjectKC/AbilitySystem/Fragment/KCApplyMontageHitLagFragment.h"
 #include "ProjectKC/AbilitySystem/Fragment/KCKnockbackFragment.h"
 #include "ProjectKC/AbilitySystem/Tag/KCAbilityGameplayTags.h"
 #include "ProjectKC/AbilitySystem/Tag/KCGameplayTagBlueprintLibrary.h"
@@ -76,6 +77,19 @@ namespace KCAbilityDefinitionTests
 		Definition->ActionMontage.Montage = NewObject<UAnimMontage>(Definition);
 		return Definition->ActionMontage.Montage;
 	}
+
+	UKCApplyMontageHitLagFragment* AddHitLagFragment(
+		UKCAbilityDefinition* Definition,
+		FGameplayTag HookTag = TAG_KC_ActionHook_OnConfirmedHit)
+	{
+		FKCActionHookStruct Hook;
+		Hook.HookTag = HookTag;
+		UKCApplyMontageHitLagFragment* Fragment =
+			NewObject<UKCApplyMontageHitLagFragment>(Definition);
+		Hook.Fragments.Add(Fragment);
+		Definition->ActionHooks.Add(MoveTemp(Hook));
+		return Fragment;
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -92,6 +106,11 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("등록된 네이티브 Gameplay Tag를 이름으로 안전하게 조회한다."),
 		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
 			TEXT("ActionHook.OnExecute")) == TAG_KC_ActionHook_OnExecute);
+	TestTrue(
+		TEXT("명중 확정 Hook 태그도 네이티브 태그로 등록되어 있다."),
+		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
+			TEXT("ActionHook.OnConfirmedHit")) ==
+			TAG_KC_ActionHook_OnConfirmedHit);
 
 	// ── 대상 수집 축 ───────────────────────────────────────
 	TestTrue(
@@ -250,6 +269,66 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("Montage에 없는 StartSection은 거부한다."),
 		MissingSection->Validate(Error));
+
+	// ── 명중 역경직 조립 계약 ──────────────────────────────
+	FKCMontageHitLagConfigStruct HitLagConfig;
+	TestTrue(
+		TEXT("기본 역경직 설정은 유효하다."),
+		HitLagConfig.Validate(Error));
+	TestEqual(
+		TEXT("역경직 재생률은 Montage 기본 재생률에 배율을 곱한다."),
+		HitLagConfig.ResolvePlayRate(1.5f),
+		0.3f,
+		0.001f);
+
+	HitLagConfig.PlayRateMultiplier = 1.0f;
+	TestFalse(
+		TEXT("느려지지 않는 역경직 배율은 거부한다."),
+		HitLagConfig.Validate(Error));
+	HitLagConfig.PlayRateMultiplier = 0.2f;
+	HitLagConfig.Duration = 0.0f;
+	TestFalse(
+		TEXT("지속시간이 없는 역경직은 거부한다."),
+		HitLagConfig.Validate(Error));
+
+	UKCAbilityDefinition* ValidHitLag =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontage(ValidHitLag);
+	UKCApplyMontageHitLagFragment* ValidHitLagFragment =
+		AddHitLagFragment(ValidHitLag);
+	TestTrue(
+		TEXT("HitResult Targeting과 Montage를 가진 OnConfirmedHit 역경직은 유효하다."),
+		ValidHitLag->ValidateWithActionContract(Error));
+	TestTrue(
+		TEXT("역경직은 항상 Source Scope로 생성된다."),
+		ValidHitLagFragment->ApplicationScope == EKCActionScope::Source);
+	TestFalse(
+		TEXT("역경직은 지연 실행을 지원하지 않는다."),
+		ValidHitLagFragment->SupportsDeferredExecution());
+
+	UKCAbilityDefinition* HitLagWithoutMontage =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddHitLagFragment(HitLagWithoutMontage);
+	TestFalse(
+		TEXT("Montage가 없는 Action의 역경직은 거부한다."),
+		HitLagWithoutMontage->ValidateWithActionContract(Error));
+
+	UKCAbilityDefinition* HitLagOnWrongHook =
+		MakeDefinition(UKCSweepTargeting::StaticClass());
+	AddMontage(HitLagOnWrongHook);
+	HitLagOnWrongHook->ActionHooks[0].Fragments.Add(
+		NewObject<UKCApplyMontageHitLagFragment>(HitLagOnWrongHook));
+	TestFalse(
+		TEXT("역경직 Fragment를 OnExecute에 배치하면 거부한다."),
+		HitLagOnWrongHook->ValidateWithActionContract(Error));
+
+	UKCAbilityDefinition* ConfirmedHitWithoutHitResults =
+		MakeDefinition(UKCSelfTargeting::StaticClass());
+	AddMontage(ConfirmedHitWithoutHitResults);
+	AddHitLagFragment(ConfirmedHitWithoutHitResults);
+	TestFalse(
+		TEXT("HitResult를 만들지 않는 Targeting의 OnConfirmedHit은 거부한다."),
+		ConfirmedHitWithoutHitResults->ValidateWithActionContract(Error));
 
 	// ── 적용 범위 축: 흡혈 무기가 데이터만으로 조립된다 ────
 	UKCAbilityDefinition* Lifesteal =

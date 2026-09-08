@@ -35,6 +35,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Result")
     	void RequestSkipResultScreen();
 	
+	UFUNCTION(Client, Reliable)
+	void Client_ShowResultToLobbyLoadingScreen();
+	
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
