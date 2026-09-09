@@ -19,6 +19,7 @@ private:
 	void InitializeMainMenuInput();
 	void ApplyMainMenuCamera();
 	void ShowSplashScreen();
+	void CheckPendingSessionNotification();
 	void ClearMainMenuUI();
 
 	UPROPERTY(Transient)

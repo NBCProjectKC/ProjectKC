@@ -6,6 +6,7 @@
 #include "EngineUtils.h"
 #include "ProjectKC/UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
+#include "ProjectKC/Lobby/KCSessionSubsystem.h"
 
 void AKCMainMenuPlayerController::BeginPlay()
 {
@@ -14,6 +15,7 @@ void AKCMainMenuPlayerController::BeginPlay()
 	InitializeMainMenuInput();
 	ApplyMainMenuCamera();
 	ShowSplashScreen();
+	CheckPendingSessionNotification();
 }
 
 void AKCMainMenuPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -74,6 +76,22 @@ void AKCMainMenuPlayerController::ShowSplashScreen()
 	}
 
 	ActiveSplashScreen->AddToViewport(100);
+}
+
+void AKCMainMenuPlayerController::CheckPendingSessionNotification()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			SessionSub->CheckAndShowPendingJoinFailure(this);
+		}
+	}
 }
 
 void AKCMainMenuPlayerController::ClearMainMenuUI()
