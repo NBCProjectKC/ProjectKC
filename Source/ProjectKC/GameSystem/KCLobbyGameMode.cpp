@@ -743,6 +743,13 @@ void AKCLobbyGameMode::StartGame()
 	if (!CheckAllPlayersReady())
 	{
 		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] StartGame Rejected: Not all players are ready!"));
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UKCSessionSubsystem* Subsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+			{
+				Subsystem->ShowLobbyMessageToast(EKCLobbyMessageType::NotAllReady);
+			}
+		}
 		return;
 	}
 
