@@ -37,7 +37,7 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 	CustomizationPaintingController->ControlMode =
 		EPaintingModeControllerControlMode::Simple;
 	CustomizationPaintingController->bAutoRegister = false;
-	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
+	CustomizationPaintingController->bAutoCreateColorPickerWidget = false;
 	CustomizationPaintingController->ColorPickerWidgetZOrder = 30;
 	CustomizationPaintingController->bLoadDefaultInputAssets = false;
 	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
@@ -54,7 +54,8 @@ void AKCLobbyPlayerController::PostInitializeComponents()
 	if (CustomizationPaintingController)
 	{
 		// 로비 커스터마이징은 UI 버튼을 통해서만 시작합니다. Blueprint에 저장된
-		// 플러그인 기본값이 P 토글 입력을 다시 활성화하지 못하게 보장합니다.
+		// 플러그인 기본값이 입력과 ColorPicker UI를 다시 활성화하지 못하게 보장합니다.
+		CustomizationPaintingController->bAutoCreateColorPickerWidget = false;
 		CustomizationPaintingController->bLoadDefaultInputAssets = false;
 		CustomizationPaintingController->TogglePaintingModeAction = nullptr;
 		CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
