@@ -167,6 +167,11 @@ void AKCPotActor::OnInteractionVolumeBeginOverlap(
 	}
 }
 
+TMap<FString, FKCPotIngredientSubmissionStats> AKCPotActor::GetIngredientSubmissionStats() const
+{
+	return IngredientSubmissionStats;
+}
+
 bool AKCPotActor::ResetPot()
 {
 	if (!HasAuthority() || PotState == EKCPotStateType::Cooking)
@@ -247,7 +252,7 @@ bool AKCPotActor::IsRegisteredIngredient(const FGameplayTag& IngredientId) const
 
 bool AKCPotActor::TrySubmitHeldIngredient(AActor& Interactor)
 {
-	if (PotState != EKCPotStateType::Idle)
+	if (!HasAuthority() || PotState != EKCPotStateType::Idle)
 	{
 		return false;
 	}
@@ -289,23 +294,37 @@ bool AKCPotActor::TrySubmitHeldIngredient(AActor& Interactor)
 	FKCIngredientSubmittedStruct Message;
 	Message.TeamId = AssignedTeamId;
 	Message.IngredientId = ItemDefinition->ItemId;
+	FString PlayerId = PlayerState->GetUniquePlayerIdString();
+	if (PlayerId.IsEmpty())
+	{
+		PlayerId = FString::Printf(TEXT("Local:%d"), PlayerState->GetPlayerId());
+	}
+	const FString PlayerName = PlayerState->GetGamePlayerName();
+	if (!ConsumeHeldItem(Interactor))
+	{
+		return false;
+	}
+
+	FKCPotIngredientSubmissionStats& Stats = IngredientSubmissionStats.FindOrAdd(PlayerId);
+	Stats.PlayerName = PlayerName;
+	++Stats.SubmissionCount;
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[Pot] Ingredient submitted: Pot=%s, TeamId=%d, ItemId=%s, PlayerId=%s, PlayerName=%s, SubmissionCount=%d"),
+		*GetName(),
+		AssignedTeamId,
+		*Message.IngredientId.ToString(),
+		*PlayerId,
+		*Stats.PlayerName,
+		Stats.SubmissionCount);
+
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(
 		KCGameplayTags::Message_Ingredient_Submitted,
 		Message);
 
-	const bool bConsumed = ConsumeHeldItem(Interactor);
-	if (bConsumed)
-	{
-		UE_LOG(
-			LogTemp,
-			Log,
-			TEXT("[Pot] Ingredient submitted: Pot=%s, TeamId=%d, ItemId=%s"),
-			*GetName(),
-			AssignedTeamId,
-			*ItemDefinition->ItemId.ToString());
-	}
-
-	return bConsumed;
+	return true;
 }
 
 bool AKCPotActor::ConsumeHeldItem(AActor& Interactor)
