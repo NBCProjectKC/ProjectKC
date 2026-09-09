@@ -490,7 +490,7 @@ void UKCSessionSubsystem::ClearSavedLobbyData()
 {
 	SavedLobbyPlayers.Empty();
 	ExpectedPlayerCount = 0;
-	SelectedMapType = EKCLevelType::GasRange;
+	SelectedMapType = EKCLevelType::PortableGasStove;
 	MatchDurationSeconds = 300.0f;
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Cleared Saved Lobby Player Data"));
 }

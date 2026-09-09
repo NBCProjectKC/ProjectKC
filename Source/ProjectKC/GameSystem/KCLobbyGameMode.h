@@ -119,9 +119,9 @@ public:
 	TArray<FKCPlayerInfoStruct> ConnectedPlayers;
 
 protected:
-	/** @brief 선택된 전투 레벨 맵 타입 (기본값: GasRange) */
+	/** @brief 선택된 전투 레벨 맵 타입 (기본값: 포터블) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby|Settings")
-	EKCLevelType SelectedLevelType = EKCLevelType::GasRange;
+	EKCLevelType SelectedLevelType = EKCLevelType::PortableGasStove;
 
 	/** @brief 인게임 매치 제한 시간 (초 단위, 기본값: 300초 = 5분) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "KC|Lobby|Settings")
