@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "KCGameMode.generated.h"
 
+
 class AKCGameState;
 class UDataTable;
 struct FKCIngredientSubmittedStruct;
@@ -45,9 +46,8 @@ public:
 	UFUNCTION()
 	TArray<FName> GetRecipeRowNameOptions() const;	
 	
-	// 이탈/재접속
+	// 이탈 시 슬롯 정보 저장
 	virtual void Logout(AController* Exiting) override;
-	virtual void PostLogin(APlayerController* NewPlayer) override;
 	
 	// 결과화면 조기 스킵 요청 (클라이언트 RPC가 호출함)
 	void RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer);
@@ -57,7 +57,13 @@ protected:
 	virtual bool ReadyToStartMatch_Implementation() override;
 	virtual void HandleMatchHasStarted() override;
 	virtual void HandleMatchHasEnded() override;
-
+	
+	// 로비 슬롯 번호에 대응하는 인게임 시작점을 선택합니다.
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	// 심리스 트래블 시 타는 경로
+    virtual void InitSeamlessTravelPlayer(AController* NewController) override;
+	virtual bool UpdatePlayerStartSpot(AController* Player, const FString& Portal, FString& OutErrorMessage) override;
+	
 	// Game Rule
 	// 매칭 시 레시피 랜덤 선정
 	virtual TArray<FName> SelectActiveRecipes() const;
@@ -129,4 +135,9 @@ private:
 	/** 결과화면에서 스킵을 누른 플레이어 목록 (UniqueNetId 또는 PlayerState 포인터로 추적) */
 	UPROPERTY()
 	TSet<TWeakObjectPtr<AKCPlayerState>> SkippedResultScreenPlayers;
+	
+	// 두 경로 공통으로 쓰는 슬롯/팀 복원 로직 (위치 계산과 무관, 순수 데이터 세팅만 담당)
+	// 신규/재접속, seamless travel
+	void RestoreSlotDataForController(AController* Controller);
 };
+

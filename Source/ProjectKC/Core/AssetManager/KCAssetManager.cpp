@@ -74,6 +74,7 @@ TSharedPtr<FStreamableHandle> UKCAssetManager::PreloadAssetsByTypes(
 	{
 		TArray<FPrimaryAssetId> AssetIds;
 		GetPrimaryAssetIdList(AssetType, AssetIds);
+		AllAssetIds.Append(AssetIds);
 	}
 
 	if (AllAssetIds.Num() == 0)

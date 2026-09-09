@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
 #include "Engine/DeveloperSettings.h"
 #include "KCUISettings.generated.h"
 
@@ -28,6 +29,9 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
 	TSoftClassPtr<UKCUserWidget> LoadingScreenClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
+	TSoftClassPtr<UUserWidget> SplashScreenClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
 	TSoftClassPtr<UKCUserWidget> MainMenuScreenClass;

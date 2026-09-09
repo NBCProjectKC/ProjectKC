@@ -89,5 +89,6 @@ private:
 	* bAssetsReady/bLevelReady 둘 다 true일 때 : 준비 완료!
 	*/
     void UpdateLoadingText();
+	void RefreshActiveLoadingWidget();
 };
  

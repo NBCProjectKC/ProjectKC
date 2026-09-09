@@ -94,6 +94,11 @@ void UKCLoadingScreenSubsystem::BeginPreload(EKCLevelType TargetLevel)
 				{
 					View->SetViewModel(TEXT("LoadingViewModel"), LoadingViewModel);
 				}
+
+				if (UKCLoadingScreen* LoadingScreen = Cast<UKCLoadingScreen>(ActiveLoadingWidget))
+				{
+					LoadingScreen->SetLoadingViewModel(LoadingViewModel);
+				}
 			}
 		}
 	}
@@ -149,6 +154,7 @@ void UKCLoadingScreenSubsystem::TryHide()
 	{
 		LoadingViewModel->SetProgress(1.0f);
 		UpdateLoadingText(); // Loading Text : "준비 완료!"
+		RefreshActiveLoadingWidget();
 	}
 
 	// 100%가 화면에 실제로 그려질 시간을 준 다음에 위젯 떼어냄
@@ -181,6 +187,7 @@ bool UKCLoadingScreenSubsystem::TickProgressAnimation(float DeltaTime)
 	const float FakeProgress = FMath::Min(static_cast<float>(Elapsed / MinDisplayDurationSeconds) * 0.97f, 0.97f);
 	LoadingViewModel->SetProgress(FakeProgress);
 	UpdateLoadingText(); // 진행률 오를 때마다 체크해서 조건 맞으면 갱신
+	RefreshActiveLoadingWidget();
 
 	return true;
 }
@@ -224,5 +231,13 @@ void UKCLoadingScreenSubsystem::UpdateLoadingText()
 	else
 	{
 		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("사운드 준비 중...")));
+	}
+}
+
+void UKCLoadingScreenSubsystem::RefreshActiveLoadingWidget()
+{
+	if (UKCLoadingScreen* LoadingScreen = Cast<UKCLoadingScreen>(ActiveLoadingWidget))
+	{
+		LoadingScreen->RefreshFromViewModel();
 	}
 }
