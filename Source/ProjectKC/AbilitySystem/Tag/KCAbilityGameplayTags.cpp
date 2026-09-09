@@ -3,7 +3,7 @@
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_OnStart, "ActionHook.OnStart");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_OnExecuteStart, "ActionHook.OnExecuteStart");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_OnExecute, "ActionHook.OnExecute");
-UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_OnConfirmedHit, "ActionHook.OnConfirmedHit");
+UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_OnFirstHit, "ActionHook.OnFirstHit");
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_ActionHook_OnComplete, "ActionHook.OnComplete");
 
 UE_DEFINE_GAMEPLAY_TAG(TAG_KC_GameplayEvent_AbilitySource_Trigger, "GameplayEvent.AbilitySource.Trigger");

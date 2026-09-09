@@ -39,7 +39,7 @@ namespace KCActionHookTests
 
 	/**
 	 * 몽타주 없이 즉시 판정하고, 빈 World라 Sweep이 아무도 잡지 못하는 Definition이다.
-	 * OnExecuteStart, OnExecute, OnConfirmedHit의 실행 조건 차이를 가른다.
+	 * OnExecuteStart, OnExecute, OnFirstHit의 실행 조건 차이를 가른다.
 	 */
 	UKCItemDefinition* MakeSwingDefinition(UObject* Outer)
 	{
@@ -69,11 +69,11 @@ namespace KCActionHookTests
 			MakeSelfDamageFragment(Action, -50.0f));
 		Action->ActionHooks.Add(MoveTemp(ExecuteHook));
 
-		FKCActionHookStruct ConfirmedHitHook;
-		ConfirmedHitHook.HookTag = TAG_KC_ActionHook_OnConfirmedHit;
-		ConfirmedHitHook.Fragments.Add(
+		FKCActionHookStruct FirstHitHook;
+		FirstHitHook.HookTag = TAG_KC_ActionHook_OnFirstHit;
+		FirstHitHook.Fragments.Add(
 			MakeSelfDamageFragment(Action, -7.0f));
-		Action->ActionHooks.Add(MoveTemp(ConfirmedHitHook));
+		Action->ActionHooks.Add(MoveTemp(FirstHitHook));
 
 		Definition->UseAction = Action;
 		return Definition;
@@ -176,16 +176,16 @@ bool FKCActionExecuteStartHookTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FKCActionConfirmedHitHookTest,
-	"ProjectKC.GAS.Action.ConfirmedHitHook",
+	FKCActionFirstHitHookTest,
+	"ProjectKC.GAS.Action.FirstHitHook",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FKCActionConfirmedHitHookTest::RunTest(const FString& Parameters)
+bool FKCActionFirstHitHookTest::RunTest(const FString& Parameters)
 {
 	const FName TestWorldName = MakeUniqueObjectName(
 		nullptr,
 		UWorld::StaticClass(),
-		TEXT("KCConfirmedHitHookTestWorld"),
+		TEXT("KCFirstHitHookTestWorld"),
 		EUniqueObjectNameOptions::GloballyUnique);
 	UWorld* TestWorld = UWorld::CreateWorld(
 		EWorldType::Game,
@@ -241,9 +241,9 @@ bool FKCActionConfirmedHitHookTest::RunTest(const FString& Parameters)
 				TEXT("대상이 있는 곳을 향해 휘두른다."),
 				HeldItemComponent->PressHeldItemUse());
 
-			// OnExecuteStart -5, 대상 OnExecute -50, 최초 확정 명중 -7이다.
+			// OnExecuteStart -5, 대상 OnExecute -50, 최초 명중 OnFirstHit -7이다.
 			TestEqual(
-				TEXT("명중한 실행 구간에는 OnConfirmedHit이 정확히 한 번 실행된다."),
+				TEXT("명중한 실행 구간에는 OnFirstHit이 정확히 한 번 실행된다."),
 				Holder->GetCharacterAttributes()->GetHealth(),
 				HealthBefore - 62.0f);
 		}
