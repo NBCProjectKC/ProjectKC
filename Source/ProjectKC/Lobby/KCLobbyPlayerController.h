@@ -43,6 +43,10 @@ class PROJECTKC_API AKCLobbyPlayerController : public APlayerController
 public:
 	AKCLobbyPlayerController();
 
+	/** @brief 채팅 등에서 포커스 해제 시 마우스 클릭 없이 게임/로비 UI로 키보드 포커스를 복구합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void ResetFocusToGame();
+
 	/** @brief 클라이언트가 서버에 준비(Ready) 상태 토글을 요청하는 Server RPC */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
 	void ROS_ToggleReadyStatus();
@@ -169,11 +173,15 @@ protected:
 	//~APlayerController interface
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostSeamlessTravel() override;
 	virtual void OnRep_PlayerState() override;
 	//~End of APlayerController interface
+
+	/** @brief Enter 키 입력 처리 (채팅창 포커스 활성화/토글) */
+	void HandleEnterKey();
 
 	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
 	void SetupLobbyUI();
