@@ -24,9 +24,41 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "Painting/PaintingModeControllerComponent.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
+
+namespace
+{
+void EnsureLobbyPaintingInputAssets(
+	UPaintingModeControllerComponent* PaintingController)
+{
+	if (!PaintingController)
+	{
+		return;
+	}
+
+	if (!PaintingController->PaintAction)
+	{
+		PaintingController->PaintAction = LoadObject<UInputAction>(
+			nullptr,
+			TEXT("/MeshPaintingCore/Input/IA_Paint.IA_Paint"));
+	}
+	if (!PaintingController->AdjustBrushSizeAction)
+	{
+		PaintingController->AdjustBrushSizeAction = LoadObject<UInputAction>(
+			nullptr,
+			TEXT("/MeshPaintingCore/Input/IA_AdjustBrushSize.IA_AdjustBrushSize"));
+	}
+	if (!PaintingController->MouseDeltaAction)
+	{
+		PaintingController->MouseDeltaAction = LoadObject<UInputAction>(
+			nullptr,
+			TEXT("/MeshPaintingCore/Input/IA_MouseDelta.IA_MouseDelta"));
+	}
+}
+}
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
@@ -37,9 +69,10 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 	CustomizationPaintingController->ControlMode =
 		EPaintingModeControllerControlMode::Simple;
 	CustomizationPaintingController->bAutoRegister = false;
-	CustomizationPaintingController->bAutoCreateColorPickerWidget = false;
+	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
 	CustomizationPaintingController->ColorPickerWidgetZOrder = 30;
 	CustomizationPaintingController->bLoadDefaultInputAssets = false;
+	EnsureLobbyPaintingInputAssets(CustomizationPaintingController);
 	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
 	CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
 	bShowMouseCursor = true;
@@ -54,9 +87,10 @@ void AKCLobbyPlayerController::PostInitializeComponents()
 	if (CustomizationPaintingController)
 	{
 		// 로비 커스터마이징은 UI 버튼을 통해서만 시작합니다. Blueprint에 저장된
-		// 플러그인 기본값이 입력과 ColorPicker UI를 다시 활성화하지 못하게 보장합니다.
-		CustomizationPaintingController->bAutoCreateColorPickerWidget = false;
+		// 플러그인 기본값이 P 토글 입력을 다시 활성화하지 못하게 보장합니다.
+		CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
 		CustomizationPaintingController->bLoadDefaultInputAssets = false;
+		EnsureLobbyPaintingInputAssets(CustomizationPaintingController);
 		CustomizationPaintingController->TogglePaintingModeAction = nullptr;
 		CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
 	}
