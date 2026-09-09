@@ -124,11 +124,11 @@ bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 
 	for (const FKCActionHookStruct& Hook : ActionHooks)
 	{
-		if (Hook.HookTag.MatchesTagExact(TAG_KC_ActionHook_OnConfirmedHit) &&
+		if (Hook.HookTag.MatchesTagExact(TAG_KC_ActionHook_OnFirstHit) &&
 			!ActionTargeting->ProducesHitResults())
 		{
 			OutError = TEXT(
-				"OnConfirmedHit Hook은 HitResult를 제공하는 Targeting에서만 사용할 수 있습니다.");
+				"OnFirstHit Hook은 HitResult를 제공하는 Targeting에서만 사용할 수 있습니다.");
 			return false;
 		}
 
@@ -139,10 +139,10 @@ bool UKCAbilityDefinition::ValidateWithActionContract(FString& OutError) const
 				continue;
 			}
 
-			if (!Hook.HookTag.MatchesTagExact(TAG_KC_ActionHook_OnConfirmedHit))
+			if (!Hook.HookTag.MatchesTagExact(TAG_KC_ActionHook_OnFirstHit))
 			{
 				OutError = TEXT(
-					"Montage Hit Lag Fragment는 OnConfirmedHit Hook에만 배치할 수 있습니다.");
+					"Montage Hit Lag Fragment는 OnFirstHit Hook에만 배치할 수 있습니다.");
 				return false;
 			}
 

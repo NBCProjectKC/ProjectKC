@@ -11,6 +11,8 @@
 #include "GameSystem/Enum/KCLevelType.h"
 #include "KCLobbyPlayerController.generated.h"
 
+struct FGameplayTag;
+struct FKCEmptyMessageStruct;
 class UKCLobbyWidget;
 class ACameraActor;
 class AKCLobbyCharacter;
@@ -18,6 +20,7 @@ class UKCCustomizationNetworkComponent;
 class UKCLoadingScreen;
 class UKCLoadingTipDataAsset;
 class UKCPlayerCustomizationComponent;
+class UInputAction;
 class UPaintingModeControllerComponent;
 class URuntimeMeshPaintTargetComponent;
 
@@ -255,6 +258,8 @@ private:
 
 	AKCLobbyCharacter* ResolveLocalCustomizationCharacter() const;
 	class UKCCustomizationSaveSubsystem* GetCustomizationSaveSubsystem() const;
+	void ConfigureCustomizationPaintingController();
+	bool ValidateCustomizationPaintingSetup() const;
 	bool OpenCustomizationCamera(AKCLobbyCharacter* TargetCharacter);
 	void UpdateCustomizationCameraTransform();
 	void CloseCustomizationCamera();
@@ -272,6 +277,16 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AKCLobbyCharacter> CustomizationCameraTarget;
 
+	/** 패키징에서도 Simple 페인팅 입력 생성에 필요한 에셋을 강하게 참조합니다. */
+	UPROPERTY()
+	TObjectPtr<UInputAction> CustomizationPaintActionAsset;
+
+	UPROPERTY()
+	TObjectPtr<UInputAction> CustomizationMouseDeltaActionAsset;
+
+	UPROPERTY()
+	TObjectPtr<UInputAction> CustomizationAdjustBrushSizeActionAsset;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> PreviousCustomizationViewTarget;
 
@@ -288,4 +303,6 @@ private:
 
 	/** @brief 1회 전송 가능한 최대 글자 수 */
 	static constexpr int32 MaxChatMessageLength = 100;
+	
+	void HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message);
 };

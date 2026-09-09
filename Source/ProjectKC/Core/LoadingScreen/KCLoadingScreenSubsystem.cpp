@@ -9,6 +9,7 @@
 #include "ProjectKC/UI/Loading/ViewModel/KCLoadingViewModel.h"
 #include "View/MVVMView.h"
 #include "Blueprint/GameViewportSubsystem.h"
+#include "Lobby/KCSessionSubsystem.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
 #include "UObject/ConstructorHelpers.h"
 #include "ProjectKC/UI/Loading/Tip/KCLoadingTipDataAsset.h"
@@ -27,6 +28,20 @@ UKCLoadingScreenSubsystem::UKCLoadingScreenSubsystem()
 void UKCLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	
+	Collection.InitializeDependency<UKCSessionSubsystem>();   // KCSessionSubsystem이 먼저 초기화되도록 강제
+	
+	if (UKCSessionSubsystem* SessionSubsystem = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG11] KCSessionSubsystem 참조 획득 성공, 델리게이트 바인딩 완료"));
+		SessionSubsystem->OnJoinSessionComplete.AddDynamic(this,&UKCLoadingScreenSubsystem::HandleSessionJoinComplete);
+		SessionSubsystem->OnCreateSessionComplete.AddDynamic(this,&UKCLoadingScreenSubsystem::HandleSessionCreateComplete);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[KC_DEBUG11] KCSessionSubsystem 참조 획득 실패! 델리게이트 바인딩 안 됨"));
+	}
+	
 	DefaultTipsAsset = LoadObject<UKCLoadingTipDataAsset>(nullptr, TEXT("/Game/KC/UI/Screens/DA_LoadingTips.DA_LoadingTips"));
 	UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG] DefaultTipsAsset 로드 결과: %s"), *GetNameSafe(DefaultTipsAsset));
 	LevelChangedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCLevelChangedStruct>(
@@ -35,6 +50,12 @@ void UKCLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UKCLoadingScreenSubsystem::Deinitialize()
 {
+	if (UKCSessionSubsystem* SessionSubsystem = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
+	{
+		SessionSubsystem->OnJoinSessionComplete.RemoveDynamic(this, &UKCLoadingScreenSubsystem::HandleSessionJoinComplete);
+		SessionSubsystem->OnCreateSessionComplete.RemoveDynamic(this, &UKCLoadingScreenSubsystem::HandleSessionCreateComplete);
+	}
+	
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(LevelChangedListenerHandle);
 	Super::Deinitialize();
 }
@@ -209,7 +230,7 @@ void UKCLoadingScreenSubsystem::UpdateLoadingText()
 	
 	if (WaitingForLevel == EKCLevelType::LobbyLevel)
 	{
-		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("로비로 돌아가는 중...")));
+		LoadingViewModel->SetLoadingText(FText::FromString(TEXT("로비로 이동하는 중...")));
 		return;
 	}
 	
@@ -240,4 +261,73 @@ void UKCLoadingScreenSubsystem::RefreshActiveLoadingWidget()
 	{
 		LoadingScreen->RefreshFromViewModel();
 	}
+}
+
+void UKCLoadingScreenSubsystem::CancelPreload()
+{
+	UE_LOG(LogTemp, Warning, TEXT("UKCLoadingScreenSubsystem::CancelPreload() : 로딩화면 강제종료 요청됨"));
+	
+	// 1. 진행 중인 애니메이션/지연 티커 제거
+	if (ProgressAnimTickerHandle.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(ProgressAnimTickerHandle);
+		ProgressAnimTickerHandle.Reset();
+	}
+	if (HideDelayTickerHandle.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(HideDelayTickerHandle);
+		HideDelayTickerHandle.Reset();
+	}
+	
+	// 2. 화면의 로딩위젯 즉시 제거
+	if (ActiveLoadingWidget)
+	{
+		ActiveLoadingWidget->RemoveFromParent();
+		ActiveLoadingWidget = nullptr;
+	}
+	
+	// 3. 뷰모델 및 서브시스템 상태 초기화
+	WaitingForLevel = EKCLevelType::None;
+	bAssetsReady = false;
+	bLevelReady = false;
+	LoadingViewModel = nullptr;
+}
+
+void UKCLoadingScreenSubsystem::HandleSessionJoinComplete(bool bWasSuccessful, const FString& ConnectString)
+{
+	if (!bWasSuccessful)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[KCLoadingScreenSubsystem] JoinSession 실패 감지 -> 로딩화면 취소"));
+		CancelPreload();
+	}
+}
+
+void UKCLoadingScreenSubsystem::HandleSessionCreateComplete(bool bWasSuccessful)
+{
+	if (!bWasSuccessful)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[KCLoadingScreenSubsystem] CreateSession 실패 감지 -> 로딩화면 취소"));
+		CancelPreload();
+	}
+}
+
+void UKCLoadingScreenSubsystem::RunAfterLoadingScreenHidden(UObject* WorldContextObject, FSimpleDelegate Callback)
+{
+	if (!ActiveLoadingWidget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG13] RunAfterLoadingScreenHidden - 이미 로딩화면 없음, 즉시 실행"));
+		Callback.ExecuteIfBound();
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG13] RunAfterLoadingScreenHidden - 로딩화면 대기, 리스너 등록"));
+
+	UGameplayMessageSubsystem::Get(WorldContextObject).RegisterListener<FKCEmptyMessageStruct>(
+		KCGameplayTags::Message_LoadingScreen_Hidden,
+		[Callback](FGameplayTag, const FKCEmptyMessageStruct&)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[KC_DEBUG13] RunAfterLoadingScreenHidden - 로딩화면 종료 감지, 실행"));
+			Callback.ExecuteIfBound();
+		}
+	);
 }

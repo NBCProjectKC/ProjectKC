@@ -45,6 +45,12 @@ void AKCPlayerController::BeginPlay()
 			}
 		}
 	}
+	
+	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate::CreateUObject(this, &AKCPlayerController::InitializeInGameHUD));
+	}
+	/*
 	// 로딩화면 내려가고 안전하게 HUD 세팅 이벤트 : Host 전용 로직
 	LoadingScreenHiddenListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
 		KCGameplayTags::Message_LoadingScreen_Hidden, this, &AKCPlayerController::HandleLoadingScreenHidden);
@@ -73,6 +79,7 @@ void AKCPlayerController::BeginPlay()
 			}
 		}
 	}
+	*/
 }
 
 void AKCPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)

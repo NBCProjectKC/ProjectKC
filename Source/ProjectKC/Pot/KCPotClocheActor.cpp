@@ -11,6 +11,7 @@ AKCPotClocheActor::AKCPotClocheActor()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
+	bAlwaysRelevant = true;
 
 	ClocheMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ClocheMesh"));
 	ClocheMesh->SetMobility(EComponentMobility::Movable);
@@ -39,6 +40,7 @@ void AKCPotClocheActor::GetLifetimeReplicatedProps(
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AKCPotClocheActor, OpenStartedServerTime);
+	DOREPLIFETIME(AKCPotClocheActor, bOpeningFinished);
 }
 
 void AKCPotClocheActor::Tick(float DeltaSeconds)
@@ -81,8 +83,22 @@ void AKCPotClocheActor::OnRep_OpenStartedServerTime()
 	ApplyOpeningState();
 }
 
+void AKCPotClocheActor::OnRep_OpeningFinished()
+{
+	if (bOpeningFinished)
+	{
+		FinishOpening();
+	}
+}
+
 void AKCPotClocheActor::ApplyOpeningState()
 {
+	if (bOpeningFinished)
+	{
+		FinishOpening();
+		return;
+	}
+
 	if (OpenStartedServerTime < 0.0f)
 	{
 		return;
@@ -113,6 +129,12 @@ void AKCPotClocheActor::ApplyOpeningState()
 
 void AKCPotClocheActor::FinishOpening()
 {
+	if (HasAuthority() && !bOpeningFinished)
+	{
+		bOpeningFinished = true;
+		ForceNetUpdate();
+	}
+
 	bIsOpening = false;
 	SetActorLocation(OpenLocation);
 	SetActorHiddenInGame(true);

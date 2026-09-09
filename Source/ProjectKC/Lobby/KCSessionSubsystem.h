@@ -11,13 +11,18 @@
 #include "FindSessionsCallbackProxy.h"
 #include "ProjectKC/Lobby/Struct/KCLobbySavedPlayerDataStruct.h"
 #include "GameSystem/Enum/KCLevelType.h"
+#include "ProjectKC/Lobby/Enum/KCLobbyMessageType.h"
+#include "ProjectKC/Lobby/KCLobbyStringTable.h"
 #include "KCSessionSubsystem.generated.h"
+
+class UKCLobbyToastWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCCreateSessionCompleteDelegate, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnKCJoinSessionCompleteDelegate, bool, bWasSuccessful, const FString&, ConnectString);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCDestroySessionCompleteDelegate, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnKCSessionInviteAcceptedDelegate, bool, bWasSuccessful, const FBlueprintSessionResult&, SessionToJoin);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCSessionTerminatedByHostDelegate, const FString&, Reason);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKCJoinFailedDelegate, const FText&, FailureReason);
 
 /**
  * @brief 기존 BP_GameInstance의 세션 관리(생성/참가/파괴/초대) 및 로비<->인게임 영구 데이터 보존을 전담하는 서브시스템
@@ -146,6 +151,24 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "KC|Session|Events")
 	FOnKCSessionTerminatedByHostDelegate OnSessionTerminatedByHost;
 
+	/**
+	 * @brief 정원 초과 등 세션 참가 실패 시 호출되는 델리게이트
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "KC|Session|Events")
+	FOnKCJoinFailedDelegate OnJoinFailed;
+
+	/** 세션 관련 토스트 알림 표시 (기본 로컬 플레이어 대상, 지정 시간 후 자동 소멸) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Session|UI")
+	void ShowToastNotification(const FText& InMessage, float Duration = 3.0f, APlayerController* PC = nullptr);
+
+	/** 상황별 로비 메시지 토스트 알림 표시 (스트링 테이블 기반) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Session|UI")
+	void ShowLobbyMessageToast(EKCLobbyMessageType MessageType, float Duration = 3.0f, APlayerController* PC = nullptr);
+
+	/** 메인 메뉴 진입 시 보류 중인 알림이 있다면 토스트로 표시 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Session|UI")
+	void CheckAndShowPendingJoinFailure(APlayerController* PC);
+
 private:
 	UPROPERTY()
 	TMap<FString, FKCLobbySavedPlayerDataStruct> SavedLobbyPlayers;
@@ -168,18 +191,27 @@ private:
 	FDelegateHandle DestroySessionCompleteDelegateHandle;
 	FDelegateHandle SessionUserInviteAcceptedDelegateHandle;
 	FDelegateHandle NetworkFailureDelegateHandle;
+	FDelegateHandle TravelFailureDelegateHandle;
 
 	// Pending Termination Actions
 	bool bPendingReturnToMainMenu = false;
 	bool bSessionTerminationNotified = false;
 
+	// Toast Notification UI State
+	UPROPERTY()
+	TSubclassOf<UKCLobbyToastWidget> LobbyToastWidgetClass;
+
+	FText PendingJoinFailureMessage;
+
 	void PerformReturnToMainMenu();
 	void BroadcastSessionTerminatedToClients(const FString& Reason);
 	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
+	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
 
 	// Pending Join State (이전 세션 정리 후 자동 참가를 위한 상태값)
 	FBlueprintSessionResult PendingSessionToJoin;
 	bool bJoiningPendingSessionAfterDestroy = false;
+	bool bIsJoiningSession = false;
 
 	// Cached Session for Direct Reconnect
 	UPROPERTY()
