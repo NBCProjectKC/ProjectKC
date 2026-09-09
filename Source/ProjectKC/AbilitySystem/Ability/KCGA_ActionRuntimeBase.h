@@ -109,7 +109,7 @@ private:
 	bool bHasActivationHitResult = false;
 	bool bFinishingAction = false;
 	bool bActionExecutionStarted = false;
-	bool bConfirmedHitHookExecuted = false;
+	bool bFirstHitHookExecuted = false;
 	bool bDurabilityConsumedThisActivation = false;
 	bool bUseConsumptionPendingThisActivation = false;
 	bool bDurabilityDrainActive = false;
