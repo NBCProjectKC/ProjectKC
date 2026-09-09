@@ -401,4 +401,12 @@ void UKCLobbyWidget::ResetFocusToGame()
 	}
 }
 
+void UKCLobbyWidget::LeaveLobby()
+{
+	if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LobbyPC->LeaveLobby();
+	}
+}
+
 #undef LOCTEXT_NAMESPACE

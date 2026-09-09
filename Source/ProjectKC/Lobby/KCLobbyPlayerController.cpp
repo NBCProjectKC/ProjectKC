@@ -988,3 +988,26 @@ void AKCLobbyPlayerController::EndSession()
 	}
 }
 
+void AKCLobbyPlayerController::LeaveLobby()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			if (HasAuthority())
+			{
+				SessionSubsystem->EndSession();
+			}
+			else
+			{
+				SessionSubsystem->ReturnToMainMenu();
+			}
+		}
+	}
+}
+
