@@ -1,6 +1,7 @@
-﻿#include "KCLevelTypeLibrary.h"
+#include "KCLevelTypeLibrary.h"
 #include "KCLevelInfoRow.h"
 #include "Engine/DataTable.h"
+#include "ProjectKC/GameSystem/KCLevelSettings.h"
 
 FName UKCLevelTypeLibrary::GetLevelName(EKCLevelType LevelType)
 {
@@ -47,10 +48,14 @@ EKCLevelType UKCLevelTypeLibrary::GetLevelTypeFromWorld(const UWorld* World)
 
 const FKCLevelInfoRow* UKCLevelTypeLibrary::GetLevelInfoRow(EKCLevelType LevelType)
 {
-	const TSoftObjectPtr<UDataTable> LevelInfoTablePath(
-		FSoftObjectPath(TEXT("/Game/KC/GameSystem/DT_LevelInfo.DT_LevelInfo")));   // static 제거
+	const UKCLevelSettings* LevelSettings = GetDefault<UKCLevelSettings>();
+	if (!LevelSettings)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UKCLevelTypeLibrary::GetLevelInfoRow - KCLevelSettings를 찾지 못했습니다."));
+		return nullptr;
+	}
 
-	UDataTable* Table = LevelInfoTablePath.LoadSynchronous();
+	UDataTable* Table = LevelSettings->LevelInfoTable.LoadSynchronous();
 	if (!Table)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UKCLevelTypeLibrary::GetLevelInfoRow - DT_LevelInfo를 로드하지 못했습니다."));
