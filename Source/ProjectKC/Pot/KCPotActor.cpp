@@ -309,17 +309,20 @@ bool AKCPotActor::TrySubmitHeldIngredient(AActor& Interactor)
 	Stats.PlayerName = PlayerName;
 	++Stats.SubmissionCount;
 
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(
-		KCGameplayTags::Message_Ingredient_Submitted,
-		Message);
-
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[Pot] Ingredient submitted: Pot=%s, TeamId=%d, ItemId=%s"),
+		TEXT("[Pot] Ingredient submitted: Pot=%s, TeamId=%d, ItemId=%s, PlayerId=%s, PlayerName=%s, SubmissionCount=%d"),
 		*GetName(),
 		AssignedTeamId,
-		*Message.IngredientId.ToString());
+		*Message.IngredientId.ToString(),
+		*PlayerId,
+		*Stats.PlayerName,
+		Stats.SubmissionCount);
+
+	UGameplayMessageSubsystem::Get(this).BroadcastMessage(
+		KCGameplayTags::Message_Ingredient_Submitted,
+		Message);
 
 	return true;
 }
