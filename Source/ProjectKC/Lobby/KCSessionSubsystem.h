@@ -177,7 +177,7 @@ private:
 	int32 ExpectedPlayerCount = 0;
 
 	UPROPERTY()
-	EKCLevelType SelectedMapType = EKCLevelType::GasRange;
+	EKCLevelType SelectedMapType = EKCLevelType::PortableGasStove;
 
 	UPROPERTY()
 	float MatchDurationSeconds = 300.0f;

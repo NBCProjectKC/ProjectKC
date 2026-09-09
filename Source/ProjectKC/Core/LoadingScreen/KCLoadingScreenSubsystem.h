@@ -24,7 +24,7 @@ public:
 	virtual void Deinitialize() override;
  
 	/**
-	 * @param TargetLevel   타겟 레벨 타입 (예: EKCLevelType::GasRange).
+	 * @param TargetLevel   타겟 레벨 타입 (예: EKCLevelType::PortableGasStove).
 	 *                      나중에 "GasRange → 결과화면" 같은 다른 전환에도 이 함수를
 	 *                      재사용할 수 있도록 함
 	 * @param AssetTypes    pre-load할 PrimaryAssetType 목록 (예: {"Item"})

@@ -72,7 +72,7 @@ protected:
 	int32 SelectedPlayerCount = 6;
 
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|Settings")
-	EKCLevelType SelectedMapType = EKCLevelType::GasRange;
+	EKCLevelType SelectedMapType = EKCLevelType::PortableGasStove;
 
 	UPROPERTY(BlueprintReadOnly, Category = "KC|Lobby|Settings")
 	float SelectedMatchDuration = 300.0f;

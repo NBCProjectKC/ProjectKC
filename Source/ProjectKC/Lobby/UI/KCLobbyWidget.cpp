@@ -301,7 +301,7 @@ void UKCLobbyWidget::OnGameSettingsClicked()
 	}
 
 	int32 CurrentCount = 6;
-	EKCLevelType CurrentMap = EKCLevelType::GasRange;
+	EKCLevelType CurrentMap = EKCLevelType::PortableGasStove;
 	float CurrentDuration = 300.0f;
 
 	if (const UWorld* World = GetWorld())

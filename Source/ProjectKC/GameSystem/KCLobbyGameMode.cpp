@@ -819,7 +819,7 @@ void AKCLobbyGameMode::StartGame()
 				FName MapName = UKCLevelTypeLibrary::GetLevelName(WeakThis->SelectedLevelType);
 				if (MapName.IsNone())
 				{
-					MapName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::GasRange);
+					MapName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::PortableGasStove);
 				}
 
 				FString TravelURL = FString::Printf(TEXT("%s?listen?MatchTime=%.0f?Players=%d"),

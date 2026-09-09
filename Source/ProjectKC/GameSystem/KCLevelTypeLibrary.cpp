@@ -11,8 +11,8 @@ FName UKCLevelTypeLibrary::GetLevelName(EKCLevelType LevelType)
 	case EKCLevelType::LoadInLevel:		return TEXT("L_LoadInLevel");
 	case EKCLevelType::LobbyLevel:		return TEXT("L_LobbyLevel");
 	case EKCLevelType::Loading:			return TEXT("L_Loading");
-	case EKCLevelType::GasRange:		return TEXT("L_GasRange");
-	case EKCLevelType::MicroWaveOven:	return TEXT("L_PortableGasStove");
+	case EKCLevelType::PortableGasStove:		return TEXT("L_PortableGasStove");
+	case EKCLevelType::MicroWaveOven:	return TEXT("L_MicroWaveOven");
 	case EKCLevelType::FryingPan:		return TEXT("L_FryingPan");
 	default:							return NAME_None;
 	}
@@ -25,8 +25,8 @@ EKCLevelType UKCLevelTypeLibrary::GetLevelType(FName LevelName)
 	if (LevelName == TEXT("L_LoadInLevel"))  return EKCLevelType::LoadInLevel;
 	if (LevelName == TEXT("L_LobbyLevel"))   return EKCLevelType::LobbyLevel;
 	if (LevelName == TEXT("L_Loading"))      return EKCLevelType::Loading;
-	if (LevelName == TEXT("L_GasRange"))     return EKCLevelType::GasRange;
-	if (LevelName == TEXT("L_PortableGasStove"))return EKCLevelType::MicroWaveOven;
+	if (LevelName == TEXT("L_PortableGasStove"))     return EKCLevelType::PortableGasStove;
+	if (LevelName == TEXT("L_MicroWaveOven"))return EKCLevelType::MicroWaveOven;
 	if (LevelName == TEXT("L_FryingPan"))    return EKCLevelType::FryingPan;
 
 	return EKCLevelType::None;
