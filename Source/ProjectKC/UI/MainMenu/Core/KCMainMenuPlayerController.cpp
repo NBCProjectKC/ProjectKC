@@ -1,8 +1,10 @@
 #include "ProjectKC/UI/MainMenu/Core/KCMainMenuPlayerController.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Camera/CameraActor.h"
 #include "Engine/LocalPlayer.h"
 #include "EngineUtils.h"
+#include "ProjectKC/UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 
 void AKCMainMenuPlayerController::BeginPlay()
@@ -11,6 +13,7 @@ void AKCMainMenuPlayerController::BeginPlay()
 
 	InitializeMainMenuInput();
 	ApplyMainMenuCamera();
+	ShowSplashScreen();
 }
 
 void AKCMainMenuPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -50,6 +53,29 @@ void AKCMainMenuPlayerController::ApplyMainMenuCamera()
 	}
 }
 
+void AKCMainMenuPlayerController::ShowSplashScreen()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
+	const TSubclassOf<UUserWidget> SplashScreenClass = UISettings ? UISettings->SplashScreenClass.LoadSynchronous() : nullptr;
+	if (!SplashScreenClass)
+	{
+		return;
+	}
+
+	ActiveSplashScreen = CreateWidget<UUserWidget>(this, SplashScreenClass);
+	if (!ActiveSplashScreen)
+	{
+		return;
+	}
+
+	ActiveSplashScreen->AddToViewport(100);
+}
+
 void AKCMainMenuPlayerController::ClearMainMenuUI()
 {
 	if (!IsLocalController())
@@ -63,5 +89,11 @@ void AKCMainMenuPlayerController::ClearMainMenuUI()
 		{
 			UISubsystem->ClearScreenWidget();
 		}
+	}
+
+	if (ActiveSplashScreen)
+	{
+		ActiveSplashScreen->RemoveFromParent();
+		ActiveSplashScreen = nullptr;
 	}
 }
