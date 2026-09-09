@@ -147,7 +147,7 @@ void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG12] BeginPlay 진입, 로비 UI 표시 여부 판단 시작"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_TRACE][LobbyUI] BeginPlay 진입, 로비 UI 표시 여부 판단 시작"));
 
 	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
 	{
@@ -1023,6 +1023,6 @@ void AKCLobbyPlayerController::EndSession()
 
 void AKCLobbyPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
 {
-	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG12] HandleLoadingScreenHidden 수신 - 이제 로비 UI 표시"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_TRACE][LobbyUI] HandleLoadingScreenHidden 수신 - 이제 로비 UI 표시"));
 	SetupLobbyUI();
 }
