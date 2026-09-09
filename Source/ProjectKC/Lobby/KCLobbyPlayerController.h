@@ -167,6 +167,10 @@ public:
 	UFUNCTION(Exec, BlueprintCallable, Category = "KC|Lobby|Session")
 	void EndSession();
 
+	/** @brief 로비 나가기 (방장이면 세션 종료 및 전원 복귀, 클라이언트면 본인만 세션 해제 후 복귀) */
+	UFUNCTION(Exec, BlueprintCallable, Category = "KC|Lobby|Session")
+	void LeaveLobby();
+
 protected:
 	//~APlayerController interface
 	virtual void PostInitializeComponents() override;
