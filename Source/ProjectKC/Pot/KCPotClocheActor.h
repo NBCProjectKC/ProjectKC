@@ -43,10 +43,15 @@ private:
 
 	UFUNCTION()
 	void OnRep_OpenStartedServerTime();
+	UFUNCTION()
+	void OnRep_OpeningFinished();
 
 	/** 음수면 아직 열리지 않았고, 그 외에는 서버 기준 열림 시작 시각이다. */
 	UPROPERTY(ReplicatedUsing = OnRep_OpenStartedServerTime)
 	float OpenStartedServerTime = -1.0f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_OpeningFinished)
+	bool bOpeningFinished = false;
 
 	FVector ClosedLocation = FVector::ZeroVector;
 	FVector OpenLocation = FVector::ZeroVector;

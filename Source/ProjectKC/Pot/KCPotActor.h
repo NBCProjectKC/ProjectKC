@@ -18,6 +18,13 @@ struct FOnAttributeChangeData;
 struct FKCDishRuinedStruct;
 struct FKCRecipeCompletedStruct;
 
+/** 솥의 수명 동안 누적되는 플레이어별 재료 투입 기록이다. */
+struct FKCPotIngredientSubmissionStats
+{
+	FString PlayerName;
+	int32 SubmissionCount = 0;
+};
+
 /** 팀 전용 재료 투입과 조리 진행도를 담당하는 월드 냄비다. */
 UCLASS(Blueprintable)
 class PROJECTKC_API AKCPotActor
@@ -44,6 +51,10 @@ public:
 	FName GetActiveRecipeRowName() const { return ActiveRecipeRowName; }
 	const UKCCookingProgressAttributeSet* GetCookingProgressAttributes() const { return CookingProgressAttributes; }
 	float GetActiveProgressSpeedPerSecond() const { return ActiveProgressSpeedPerSecond; }
+
+	/** 서버에서 레벨 종료 전에 수집한다. 고유 ID별 복사본이며 ResetPot으로 지워지지 않는다.
+	 * 온라인 ID가 없는 경우 Local:<PlayerId> 키를 사용하며 재접속 식별은 보장하지 않는다. */
+	TMap<FString, FKCPotIngredientSubmissionStats> GetIngredientSubmissionStats() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "KC|Pot")
 	bool ResetPot();
@@ -120,6 +131,8 @@ private:
 	void MulticastCookingRuined();
 
 	FGameplayMessageListenerHandle RecipeCompletedListenerHandle;
+	// 서버 전용 누적 통계. 플레이어가 나가더라도 ID와 이름을 유지한다.
+	TMap<FString, FKCPotIngredientSubmissionStats> IngredientSubmissionStats;
 	FGameplayMessageListenerHandle DishRuinedListenerHandle;
 	FTimerHandle CookingTimerHandle;
 	FDelegateHandle CookingProgressChangedDelegateHandle;
