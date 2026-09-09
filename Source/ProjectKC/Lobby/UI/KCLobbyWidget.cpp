@@ -14,6 +14,7 @@
 #include "ProjectKC/ProjectKC.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Blueprint/WidgetTree.h"
 #include "Animation/WidgetAnimation.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "TimerManager.h"
@@ -23,6 +24,7 @@
 void UKCLobbyWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	SetIsFocusable(true);
 
 	UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] NativeConstruct"));
 
@@ -371,6 +373,31 @@ void UKCLobbyWidget::OnTeamIdUpdated(int32 NewTeamId)
 			Text_TeamName->SetText(LOCTEXT("TeamAssigning", "ASSIGNING..."));
 		}
 		UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyWidget] OnTeamIdUpdated UI Text set to: Team %d"), NewTeamId);
+	}
+}
+
+void UKCLobbyWidget::FocusChatInput()
+{
+	if ((CustomizationWidgetInstance && CustomizationWidgetInstance->IsInViewport()) ||
+		(GameSettingsWidgetInstance && GameSettingsWidgetInstance->IsInViewport()))
+	{
+		return;
+	}
+
+	if (WBP_ChatTest)
+	{
+		if (UWidget* InputWidget = WBP_ChatTest->GetWidgetFromName(TEXT("ChatInputBox")))
+		{
+			InputWidget->SetFocus();
+		}
+	}
+}
+
+void UKCLobbyWidget::ResetFocusToGame()
+{
+	if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LobbyPC->ResetFocusToGame();
 	}
 }
 
