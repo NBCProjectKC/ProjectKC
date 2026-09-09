@@ -18,6 +18,7 @@ class UKCCustomizationNetworkComponent;
 class UKCLoadingScreen;
 class UKCLoadingTipDataAsset;
 class UKCPlayerCustomizationComponent;
+class UInputAction;
 class UPaintingModeControllerComponent;
 class URuntimeMeshPaintTargetComponent;
 
@@ -39,6 +40,10 @@ class PROJECTKC_API AKCLobbyPlayerController : public APlayerController
 
 public:
 	AKCLobbyPlayerController();
+
+	/** @brief 채팅 등에서 포커스 해제 시 마우스 클릭 없이 게임/로비 UI로 키보드 포커스를 복구합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby")
+	void ResetFocusToGame();
 
 	/** @brief 클라이언트가 서버에 준비(Ready) 상태 토글을 요청하는 Server RPC */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "KC|Lobby")
@@ -162,15 +167,23 @@ public:
 	UFUNCTION(Exec, BlueprintCallable, Category = "KC|Lobby|Session")
 	void EndSession();
 
+	/** @brief 로비 나가기 (방장이면 세션 종료 및 전원 복귀, 클라이언트면 본인만 세션 해제 후 복귀) */
+	UFUNCTION(Exec, BlueprintCallable, Category = "KC|Lobby|Session")
+	void LeaveLobby();
+
 protected:
 	//~APlayerController interface
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostSeamlessTravel() override;
 	virtual void OnRep_PlayerState() override;
 	//~End of APlayerController interface
+
+	/** @brief Enter 키 입력 처리 (채팅창 포커스 활성화/토글) */
+	void HandleEnterKey();
 
 	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
 	void SetupLobbyUI();
@@ -255,6 +268,8 @@ private:
 
 	AKCLobbyCharacter* ResolveLocalCustomizationCharacter() const;
 	class UKCCustomizationSaveSubsystem* GetCustomizationSaveSubsystem() const;
+	void ConfigureCustomizationPaintingController();
+	bool ValidateCustomizationPaintingSetup() const;
 	bool OpenCustomizationCamera(AKCLobbyCharacter* TargetCharacter);
 	void UpdateCustomizationCameraTransform();
 	void CloseCustomizationCamera();
@@ -271,6 +286,16 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AKCLobbyCharacter> CustomizationCameraTarget;
+
+	/** 패키징에서도 Simple 페인팅 입력 생성에 필요한 에셋을 강하게 참조합니다. */
+	UPROPERTY()
+	TObjectPtr<UInputAction> CustomizationPaintActionAsset;
+
+	UPROPERTY()
+	TObjectPtr<UInputAction> CustomizationMouseDeltaActionAsset;
+
+	UPROPERTY()
+	TObjectPtr<UInputAction> CustomizationAdjustBrushSizeActionAsset;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> PreviousCustomizationViewTarget;

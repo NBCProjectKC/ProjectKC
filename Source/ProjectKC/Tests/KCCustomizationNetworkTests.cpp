@@ -272,6 +272,24 @@ bool FKCCustomizationNetworkControllerComponentsTest::RunTest(const FString& Par
 		TestTrue(
 			TEXT("플러그인 그림 도구는 커스터마이징 WBP보다 앞에 표시된다."),
 			LobbyPaintingController->ColorPickerWidgetZOrder > 20);
+		TestFalse(
+			TEXT("로비에서는 플러그인 기본 입력을 일괄 로드하지 않는다."),
+			LobbyPaintingController->bLoadDefaultInputAssets);
+		TestNotNull(
+			TEXT("패키징에서도 붓 입력 액션을 강하게 참조한다."),
+			LobbyPaintingController->PaintAction.Get());
+		TestNotNull(
+			TEXT("패키징에서도 마우스 이동 액션을 강하게 참조한다."),
+			LobbyPaintingController->MouseDeltaAction.Get());
+		TestNotNull(
+			TEXT("패키징에서도 브러시 크기 액션을 강하게 참조한다."),
+			LobbyPaintingController->AdjustBrushSizeAction.Get());
+		TestNull(
+			TEXT("P 커스터마이징 토글 액션은 비활성 상태다."),
+			LobbyPaintingController->TogglePaintingModeAction.Get());
+		TestNull(
+			TEXT("P 커스터마이징 토글 매핑은 비활성 상태다."),
+			LobbyPaintingController->PaintingToggleInputMappingContext.Get());
 	}
 	if (LobbyControllerDefaults)
 	{

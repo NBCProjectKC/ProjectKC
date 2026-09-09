@@ -43,6 +43,18 @@ public:
 	/** @brief 게임 세팅 팝업 위젯이 닫힐 때 호출 */
 	void NotifyGameSettingsWidgetClosed(UKCLobbyGameSettingsWidget* ClosedWidget);
 
+	/** @brief 채팅 입력창에 포커스를 설정합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
+	void FocusChatInput();
+
+	/** @brief 포커스를 게임/로비 UI로 복구합니다. */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
+	void ResetFocusToGame();
+
+	/** @brief 로비 나가기 요청 (방장이면 세션 종료, 클라이언트면 본인만 퇴장) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
+	void LeaveLobby();
+
 protected:
 	//~UUserWidget interface
 	virtual void NativeConstruct() override;
@@ -80,6 +92,10 @@ protected:
 	/** @brief 내부 임베드된 친구 목록 서브 위젯 */
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
 	TObjectPtr<UKCFriendListWidget> WBP_FriendList;
+
+	/** @brief 내부 임베드된 채팅 서브 위젯 (WBP_ChatTest) */
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")
+	TObjectPtr<UUserWidget> WBP_ChatTest;
 
 	/** @brief 게임 시작 시 재생할 위젯 애니메이션 */
 	UPROPERTY(Transient, meta = (BindWidgetAnimOptional), BlueprintReadOnly, Category = "KC|Lobby|UI")

@@ -24,9 +24,14 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "Painting/PaintingModeControllerComponent.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
+#include "Widgets/ColorPickerPanelWidget.h"
+#include "EnhancedInputSubsystems.h"
+#include "Engine/LocalPlayer.h"
+#include "UObject/ConstructorHelpers.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
@@ -34,14 +39,22 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 		TEXT("CustomizationNetwork"));
 	CustomizationPaintingController = CreateDefaultSubobject<UPaintingModeControllerComponent>(
 		TEXT("CustomizationPaintingController"));
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> PaintActionAsset(
+		TEXT("/MeshPaintingCore/Input/IA_Paint.IA_Paint"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> MouseDeltaActionAsset(
+		TEXT("/MeshPaintingCore/Input/IA_MouseDelta.IA_MouseDelta"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> AdjustBrushSizeActionAsset(
+		TEXT("/MeshPaintingCore/Input/IA_AdjustBrushSize.IA_AdjustBrushSize"));
+	CustomizationPaintActionAsset = PaintActionAsset.Object;
+	CustomizationMouseDeltaActionAsset = MouseDeltaActionAsset.Object;
+	CustomizationAdjustBrushSizeActionAsset = AdjustBrushSizeActionAsset.Object;
+
 	CustomizationPaintingController->ControlMode =
 		EPaintingModeControllerControlMode::Simple;
 	CustomizationPaintingController->bAutoRegister = false;
-	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
 	CustomizationPaintingController->ColorPickerWidgetZOrder = 30;
-	CustomizationPaintingController->bLoadDefaultInputAssets = false;
-	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
-	CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+	ConfigureCustomizationPaintingController();
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
@@ -51,14 +64,81 @@ void AKCLobbyPlayerController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	if (CustomizationPaintingController)
+	ConfigureCustomizationPaintingController();
+}
+
+void AKCLobbyPlayerController::ConfigureCustomizationPaintingController()
+{
+	if (!CustomizationPaintingController)
 	{
-		// 로비 커스터마이징은 UI 버튼을 통해서만 시작합니다. Blueprint에 저장된
-		// 플러그인 기본값이 P 토글 입력을 다시 활성화하지 못하게 보장합니다.
-		CustomizationPaintingController->bLoadDefaultInputAssets = false;
-		CustomizationPaintingController->TogglePaintingModeAction = nullptr;
-		CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+		return;
 	}
+
+	// 로비 커스터마이징은 UI 버튼으로만 시작합니다. 플러그인의 전체 기본 입력
+	// 로드는 끄되, Simple 모드에 필요한 입력만 프로젝트 소유 참조로 공급합니다.
+	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
+	CustomizationPaintingController->bLoadDefaultInputAssets = false;
+	CustomizationPaintingController->PaintAction = CustomizationPaintActionAsset;
+	CustomizationPaintingController->MouseDeltaAction =
+		CustomizationMouseDeltaActionAsset;
+	CustomizationPaintingController->AdjustBrushSizeAction =
+		CustomizationAdjustBrushSizeActionAsset;
+	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
+	CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+}
+
+bool AKCLobbyPlayerController::ValidateCustomizationPaintingSetup() const
+{
+	if (!CustomizationPaintingController)
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: Controller is null"));
+		return false;
+	}
+
+	const bool bHasRequiredAssets =
+		IsValid(CustomizationPaintActionAsset) &&
+		IsValid(CustomizationMouseDeltaActionAsset) &&
+		IsValid(CustomizationAdjustBrushSizeActionAsset);
+	const bool bControllerUsesRequiredAssets =
+		CustomizationPaintingController->PaintAction ==
+			CustomizationPaintActionAsset &&
+		CustomizationPaintingController->MouseDeltaAction ==
+			CustomizationMouseDeltaActionAsset &&
+		CustomizationPaintingController->AdjustBrushSizeAction ==
+			CustomizationAdjustBrushSizeActionAsset;
+	if (!bHasRequiredAssets || !bControllerUsesRequiredAssets)
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: "
+				"Paint=%s, MouseDelta=%s, AdjustBrushSize=%s, Bound=%s"),
+			*GetNameSafe(CustomizationPaintActionAsset),
+			*GetNameSafe(CustomizationMouseDeltaActionAsset),
+			*GetNameSafe(CustomizationAdjustBrushSizeActionAsset),
+			bControllerUsesRequiredAssets ? TEXT("true") : TEXT("false"));
+		return false;
+	}
+
+	if (!CustomizationPaintingController->bAutoCreateColorPickerWidget ||
+		!CustomizationPaintingController->ColorPickerWidgetClass.Get())
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: "
+				"ColorPicker auto creation or widget class is missing"));
+		return false;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer ||
+		!LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: "
+				"Enhanced Input local player subsystem is unavailable"));
+		return false;
+	}
+
+	return true;
 }
 
 void AKCLobbyPlayerController::BeginPlay()
@@ -66,6 +146,50 @@ void AKCLobbyPlayerController::BeginPlay()
 	Super::BeginPlay();
 	SetupLobbyUI();
 	RefreshLobbyCustomizationPresentations();
+}
+
+void AKCLobbyPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AKCLobbyPlayerController::HandleEnterKey);
+	}
+}
+
+void AKCLobbyPlayerController::HandleEnterKey()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (LobbyWidgetInstance)
+	{
+		LobbyWidgetInstance->FocusChatInput();
+	}
+}
+
+void AKCLobbyPlayerController::ResetFocusToGame()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	if (LobbyWidgetInstance)
+	{
+		if (TSharedPtr<SWidget> SafeWidget = LobbyWidgetInstance->GetCachedWidget())
+		{
+			InputMode.SetWidgetToFocus(SafeWidget);
+		}
+		LobbyWidgetInstance->SetFocus();
+	}
+	SetInputMode(InputMode);
 }
 
 void AKCLobbyPlayerController::PlayerTick(const float DeltaTime)
@@ -138,6 +262,14 @@ bool AKCLobbyPlayerController::BeginCustomizationEditing()
 		UKCLevelTypeLibrary::GetLevelTypeFromWorld(GetWorld()) !=
 			EKCLevelType::LobbyLevel ||
 		!CustomizationPaintingController)
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	ConfigureCustomizationPaintingController();
+	if (!ValidateCustomizationPaintingSetup())
 	{
 		LastCustomizationEditingResult =
 			EKCCustomizationSaveResult::InvalidPaintTarget;
@@ -778,16 +910,8 @@ void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
 		return;
 	}
 
-	// 3. 도배 방지 (쿨타임 검사)
-	const double CurrentTime = FPlatformTime::Seconds();
-	if (CurrentTime - LastChatMessageTimeSeconds < ChatCooldownSeconds)
-	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SendChatMessage Rejected: Cooldown active (%.2fs remaining)"),
-			ChatCooldownSeconds - (CurrentTime - LastChatMessageTimeSeconds));
-		return;
-	}
-
-	LastChatMessageTimeSeconds = CurrentTime;
+	// 3. 빠른 전송 허용 (쿨타임 제한 해제)
+	LastChatMessageTimeSeconds = FPlatformTime::Seconds();
 
 	// 4. 서버로 전송
 	Server_SendChatMessage(TrimmedMessage);
@@ -860,6 +984,29 @@ void AKCLobbyPlayerController::EndSession()
 		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
 		{
 			SessionSubsystem->EndSession();
+		}
+	}
+}
+
+void AKCLobbyPlayerController::LeaveLobby()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSubsystem = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			if (HasAuthority())
+			{
+				SessionSubsystem->EndSession();
+			}
+			else
+			{
+				SessionSubsystem->ReturnToMainMenu();
+			}
 		}
 	}
 }
