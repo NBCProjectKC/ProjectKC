@@ -28,37 +28,10 @@
 #include "InputCoreTypes.h"
 #include "Painting/PaintingModeControllerComponent.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
-
-namespace
-{
-void EnsureLobbyPaintingInputAssets(
-	UPaintingModeControllerComponent* PaintingController)
-{
-	if (!PaintingController)
-	{
-		return;
-	}
-
-	if (!PaintingController->PaintAction)
-	{
-		PaintingController->PaintAction = LoadObject<UInputAction>(
-			nullptr,
-			TEXT("/MeshPaintingCore/Input/IA_Paint.IA_Paint"));
-	}
-	if (!PaintingController->AdjustBrushSizeAction)
-	{
-		PaintingController->AdjustBrushSizeAction = LoadObject<UInputAction>(
-			nullptr,
-			TEXT("/MeshPaintingCore/Input/IA_AdjustBrushSize.IA_AdjustBrushSize"));
-	}
-	if (!PaintingController->MouseDeltaAction)
-	{
-		PaintingController->MouseDeltaAction = LoadObject<UInputAction>(
-			nullptr,
-			TEXT("/MeshPaintingCore/Input/IA_MouseDelta.IA_MouseDelta"));
-	}
-}
-}
+#include "Widgets/ColorPickerPanelWidget.h"
+#include "EnhancedInputSubsystems.h"
+#include "Engine/LocalPlayer.h"
+#include "UObject/ConstructorHelpers.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
@@ -66,15 +39,22 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 		TEXT("CustomizationNetwork"));
 	CustomizationPaintingController = CreateDefaultSubobject<UPaintingModeControllerComponent>(
 		TEXT("CustomizationPaintingController"));
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> PaintActionAsset(
+		TEXT("/MeshPaintingCore/Input/IA_Paint.IA_Paint"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> MouseDeltaActionAsset(
+		TEXT("/MeshPaintingCore/Input/IA_MouseDelta.IA_MouseDelta"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> AdjustBrushSizeActionAsset(
+		TEXT("/MeshPaintingCore/Input/IA_AdjustBrushSize.IA_AdjustBrushSize"));
+	CustomizationPaintActionAsset = PaintActionAsset.Object;
+	CustomizationMouseDeltaActionAsset = MouseDeltaActionAsset.Object;
+	CustomizationAdjustBrushSizeActionAsset = AdjustBrushSizeActionAsset.Object;
+
 	CustomizationPaintingController->ControlMode =
 		EPaintingModeControllerControlMode::Simple;
 	CustomizationPaintingController->bAutoRegister = false;
-	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
 	CustomizationPaintingController->ColorPickerWidgetZOrder = 30;
-	CustomizationPaintingController->bLoadDefaultInputAssets = false;
-	EnsureLobbyPaintingInputAssets(CustomizationPaintingController);
-	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
-	CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+	ConfigureCustomizationPaintingController();
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
@@ -84,16 +64,81 @@ void AKCLobbyPlayerController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	if (CustomizationPaintingController)
+	ConfigureCustomizationPaintingController();
+}
+
+void AKCLobbyPlayerController::ConfigureCustomizationPaintingController()
+{
+	if (!CustomizationPaintingController)
 	{
-		// 로비 커스터마이징은 UI 버튼을 통해서만 시작합니다. Blueprint에 저장된
-		// 플러그인 기본값이 P 토글 입력을 다시 활성화하지 못하게 보장합니다.
-		CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
-		CustomizationPaintingController->bLoadDefaultInputAssets = false;
-		EnsureLobbyPaintingInputAssets(CustomizationPaintingController);
-		CustomizationPaintingController->TogglePaintingModeAction = nullptr;
-		CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+		return;
 	}
+
+	// 로비 커스터마이징은 UI 버튼으로만 시작합니다. 플러그인의 전체 기본 입력
+	// 로드는 끄되, Simple 모드에 필요한 입력만 프로젝트 소유 참조로 공급합니다.
+	CustomizationPaintingController->bAutoCreateColorPickerWidget = true;
+	CustomizationPaintingController->bLoadDefaultInputAssets = false;
+	CustomizationPaintingController->PaintAction = CustomizationPaintActionAsset;
+	CustomizationPaintingController->MouseDeltaAction =
+		CustomizationMouseDeltaActionAsset;
+	CustomizationPaintingController->AdjustBrushSizeAction =
+		CustomizationAdjustBrushSizeActionAsset;
+	CustomizationPaintingController->TogglePaintingModeAction = nullptr;
+	CustomizationPaintingController->PaintingToggleInputMappingContext = nullptr;
+}
+
+bool AKCLobbyPlayerController::ValidateCustomizationPaintingSetup() const
+{
+	if (!CustomizationPaintingController)
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: Controller is null"));
+		return false;
+	}
+
+	const bool bHasRequiredAssets =
+		IsValid(CustomizationPaintActionAsset) &&
+		IsValid(CustomizationMouseDeltaActionAsset) &&
+		IsValid(CustomizationAdjustBrushSizeActionAsset);
+	const bool bControllerUsesRequiredAssets =
+		CustomizationPaintingController->PaintAction ==
+			CustomizationPaintActionAsset &&
+		CustomizationPaintingController->MouseDeltaAction ==
+			CustomizationMouseDeltaActionAsset &&
+		CustomizationPaintingController->AdjustBrushSizeAction ==
+			CustomizationAdjustBrushSizeActionAsset;
+	if (!bHasRequiredAssets || !bControllerUsesRequiredAssets)
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: "
+				"Paint=%s, MouseDelta=%s, AdjustBrushSize=%s, Bound=%s"),
+			*GetNameSafe(CustomizationPaintActionAsset),
+			*GetNameSafe(CustomizationMouseDeltaActionAsset),
+			*GetNameSafe(CustomizationAdjustBrushSizeActionAsset),
+			bControllerUsesRequiredAssets ? TEXT("true") : TEXT("false"));
+		return false;
+	}
+
+	if (!CustomizationPaintingController->bAutoCreateColorPickerWidget ||
+		!CustomizationPaintingController->ColorPickerWidgetClass.Get())
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: "
+				"ColorPicker auto creation or widget class is missing"));
+		return false;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer ||
+		!LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+	{
+		UE_LOG(LogKCLobby, Error,
+			TEXT("[KCLobbyPlayerController] Customization painting setup invalid: "
+				"Enhanced Input local player subsystem is unavailable"));
+		return false;
+	}
+
+	return true;
 }
 
 void AKCLobbyPlayerController::BeginPlay()
@@ -173,6 +218,14 @@ bool AKCLobbyPlayerController::BeginCustomizationEditing()
 		UKCLevelTypeLibrary::GetLevelTypeFromWorld(GetWorld()) !=
 			EKCLevelType::LobbyLevel ||
 		!CustomizationPaintingController)
+	{
+		LastCustomizationEditingResult =
+			EKCCustomizationSaveResult::InvalidPaintTarget;
+		return false;
+	}
+
+	ConfigureCustomizationPaintingController();
+	if (!ValidateCustomizationPaintingSetup())
 	{
 		LastCustomizationEditingResult =
 			EKCCustomizationSaveResult::InvalidPaintTarget;
