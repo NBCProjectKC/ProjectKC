@@ -16,6 +16,9 @@
 #include "Player/KCPlayerController.h"
 #include "KCLevelTypeLibrary.h"
 #include "TimerManager.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
+#include "KCLobbyGameMode.h"
 
 
 AKCGameMode::AKCGameMode()
@@ -64,22 +67,7 @@ void AKCGameMode::HandleMatchHasStarted()
 				}
 			}
 		}
-	
-		/*
-		 * TODO : 로비에서 그 판의 타이머를 세팅하는 코드입니다.
-		 * KCSessionSubsystem에서 로비 설정 매치 시간 복원
-		if (UGameInstance* GI = GetGameInstance())
-		{
-			if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
-			{
-				if (SessionSub->GetMatchDurationSeconds() > 0.0f)
-				{
-					MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
-				}
-			}
-		}
-		*/
-		
+			
 		// TODO 임시 코드
 		// GameState의 서버시간 설정
 		const float ServerNow = GetWorld()->GetTimeSeconds();
@@ -332,7 +320,6 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 	if (KCGameState)
 	{
 		KCGameState->SetGamePhase(EKCGamePhaseType::Ending);
-		KCGameState->SetResultScreenEndServerTime(GetWorld()->GetTimeSeconds() + ResultScreenDuration);
 	}
 
 	// 게임 승리 로그
@@ -441,48 +428,6 @@ void AKCGameMode::Logout(AController* Exiting)
 	Super::Logout(Exiting);
 }
 
-// 재접속 시 팀 및 슬롯 정보 복원
-void AKCGameMode::PostLogin(APlayerController* NewPlayer)
-{
-	Super::PostLogin(NewPlayer);
-
-	if (!NewPlayer)
-	{
-		return;
-	}
-
-	AKCPlayerState* KCPS = NewPlayer->GetPlayerState<AKCPlayerState>();
-	if (!KCPS)
-	{
-		return;
-	}
-
-	// UniqueNetId 우선 조회 (스팀 접속 첫 프레임부터 100% 즉시 복원)
-	if (UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>())
-	{
-		const FString NetIdStr = KCPS->GetUniquePlayerIdString();
-		const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
-
-		FString SavedPlayerName;
-		int32 SavedTeamId = 0;
-		int32 SavedSlotIndex = INDEX_NONE;
-
-		if (!QueryKey.IsEmpty() && SessionSub->GetSavedLobbyPlayerData(QueryKey, SavedPlayerName, SavedTeamId, SavedSlotIndex))
-		{
-			KCPS->SetGamePlayerName(SavedPlayerName);
-			KCPS->SetTeamId(SavedTeamId);
-			KCPS->SetSlotIndex(SavedSlotIndex);
-			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 재접속: Key='%s', Name='%s', TeamId=%d, SlotIndex=%d 즉시 복원 성공"),
-				*QueryKey, *SavedPlayerName, SavedTeamId, SavedSlotIndex);
-		}
-		else
-		{
-			UE_LOG(LogKCLobby, Log, TEXT("[GasRange] 플레이어 접속: Key='%s', 세션 백업 데이터 없음 (신규 난입)"),
-				*QueryKey);
-		}
-	}
-}
-
 void AKCGameMode::Debug_SubmitIngredient(int32 TeamId, FString IngredientTagName)
 {
 	const FGameplayTag IngredientTag = FGameplayTag::RequestGameplayTag(FName(*IngredientTagName), false);
@@ -543,4 +488,114 @@ void AKCGameMode::RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer)
 		TravelBackToLobby(); // 트래블 실행
 	}
 	// 안 누른 사람이 한 명이라도 있으면 그대로 함수 종료 -> 10초 타이머가 알아서 트래블
+}
+
+
+void AKCGameMode::RestoreSlotDataForController(AController* Controller)
+{
+	AKCPlayerState* KCPS = Controller ? Controller->GetPlayerState<AKCPlayerState>() : nullptr;
+	if (!KCPS)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 중단 - KCPS가 null. Controller=%s"),
+			Controller ? *Controller->GetName() : TEXT("null"));
+		return;
+	}
+
+	UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>();
+	if (!SessionSub)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 중단 - SessionSub가 null."));
+		return;
+	}
+
+	const FString NetIdStr = KCPS->GetUniquePlayerIdString();
+	const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
+
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 진행 중 - NetIdStr='%s', PlayerName='%s', QueryKey='%s'"),
+		*NetIdStr, *KCPS->GetPlayerName(), *QueryKey);
+
+	if (QueryKey.IsEmpty())
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 중단 - QueryKey가 비어있음."));
+		return;
+	}
+
+	FString SavedPlayerName;
+	int32 SavedTeamId = 0;
+	int32 SavedSlotIndex = INDEX_NONE;
+
+	if (SessionSub->GetSavedLobbyPlayerData(QueryKey, SavedPlayerName, SavedTeamId, SavedSlotIndex))
+	{
+		KCPS->SetGamePlayerName(SavedPlayerName);
+		KCPS->SetTeamId(SavedTeamId);
+		KCPS->SetSlotIndex(SavedSlotIndex);
+		UE_LOG(LogKCLobby, Log, TEXT("[GasRange][spawn] 슬롯 데이터 복원: Key='%s', Name='%s', TeamId=%d, SlotIndex=%d"),
+			*QueryKey, *SavedPlayerName, SavedTeamId, SavedSlotIndex);
+	}
+	else
+	{
+		UE_LOG(LogKCLobby, Log, TEXT("[GasRange][spawn] 세션 백업 데이터 없음: Key='%s'"), *QueryKey);
+	}
+}
+
+bool AKCGameMode::UpdatePlayerStartSpot(AController* Player, const FString& Portal, FString& OutErrorMessage)
+{
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG4] UpdatePlayerStartSpot 진입, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
+
+	RestoreSlotDataForController(Player);
+
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG4] UpdatePlayerStartSpot 완료, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
+
+	return Super::UpdatePlayerStartSpot(Player, Portal, OutErrorMessage);
+}
+
+void AKCGameMode::InitSeamlessTravelPlayer(AController* NewController)
+{
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG6] InitSeamlessTravelPlayer 진입, Player=%s"),
+		NewController ? *NewController->GetName() : TEXT("null"));
+
+	RestoreSlotDataForController(NewController); // slot -1 playerid 261 teamid -1 상태로 restore~ 실행
+
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG6] InitSeamlessTravelPlayer 완료, Player=%s"),
+		NewController ? *NewController->GetName() : TEXT("null"));
+
+	Super::InitSeamlessTravelPlayer(NewController);
+}
+
+AActor* AKCGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	const AKCPlayerState* KCPlayerState = Player ? Player->GetPlayerState<AKCPlayerState>() : nullptr;
+
+	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG2] ChoosePlayerStart 진입, Player=%s, PlayerState 주소: %p"),
+		Player ? *Player->GetName() : TEXT("null"), KCPlayerState);
+
+	if (!KCPlayerState)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] PlayerState 없음. 기본 시작점 선택."));
+		return Super::ChoosePlayerStart_Implementation(Player);
+	}
+
+	const int32 SlotIndex = KCPlayerState->GetSlotIndex();
+	if (SlotIndex < 0 || SlotIndex >= AKCLobbyGameMode::REGULAR_SLOT_COUNT)
+	{
+		UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] Player='%s', 유효하지 않은 SlotIndex=%d. 기본 시작점 선택."),
+			*KCPlayerState->GetPlayerName(), SlotIndex);
+		return Super::ChoosePlayerStart_Implementation(Player);
+	}
+
+	const FName TargetStartTag(*FString::Printf(TEXT("Slot_%d"), SlotIndex));
+
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		APlayerStart* Start = *It;
+		if (Start->PlayerStartTag == TargetStartTag)
+		{
+			UE_LOG(LogKCLobby, Log, TEXT("[Spawn] Player='%s', SlotIndex=%d, PlayerStart='%s', Tag='%s'"),
+				*KCPlayerState->GetPlayerName(), SlotIndex, *Start->GetName(), *TargetStartTag.ToString());
+			return Start;
+		}
+	}
+
+	UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] PlayerStartTag='%s' 없음. 기본 시작점 선택."), *TargetStartTag.ToString());
+	return Super::ChoosePlayerStart_Implementation(Player);
 }
