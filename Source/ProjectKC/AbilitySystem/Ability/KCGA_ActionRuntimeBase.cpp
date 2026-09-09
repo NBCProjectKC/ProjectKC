@@ -29,7 +29,7 @@ UKCGA_ActionRuntimeBase::UKCGA_ActionRuntimeBase()
 	AddSupportedActionHook(TAG_KC_ActionHook_OnStart);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnExecuteStart);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnExecute);
-	AddSupportedActionHook(TAG_KC_ActionHook_OnConfirmedHit);
+	AddSupportedActionHook(TAG_KC_ActionHook_OnFirstHit);
 	AddSupportedActionHook(TAG_KC_ActionHook_OnComplete);
 }
 
@@ -76,7 +76,7 @@ void UKCGA_ActionRuntimeBase::ActivateAbility(
 	bHasActivationHitResult = false;
 	bFinishingAction = false;
 	bActionExecutionStarted = false;
-	bConfirmedHitHookExecuted = false;
+	bFirstHitHookExecuted = false;
 	bDurabilityConsumedThisActivation = false;
 	bUseConsumptionPendingThisActivation = false;
 	StopLoopingCue();
@@ -196,7 +196,7 @@ void UKCGA_ActionRuntimeBase::EndAbility(
 	ActivationHitResult = FHitResult();
 	bHasActivationHitResult = false;
 	bActionExecutionStarted = false;
-	bConfirmedHitHookExecuted = false;
+	bFirstHitHookExecuted = false;
 	// Ability 종료 중에는 GAS가 Task 배열을 순회해 직접 정리한다.
 	ActiveMontageTask = nullptr;
 	ActiveTraceTask = nullptr;
@@ -229,7 +229,7 @@ bool UKCGA_ActionRuntimeBase::BeginExecutionWindow()
 	{
 		return false;
 	}
-	bConfirmedHitHookExecuted = false;
+	bFirstHitHookExecuted = false;
 
 	// 대상 수집 전에 실행한다. 명중 여부와 무관한 연출이 여기에 온다.
 	ExecuteSourceHook(TAG_KC_ActionHook_OnExecuteStart);
@@ -327,9 +327,9 @@ FKCActionTargetingContext UKCGA_ActionRuntimeBase::BuildTargetingContext() const
 bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 	const TArray<FKCActionTarget>& Targets)
 {
-	bool bConfirmedHit = false;
+	bool bHadHit = false;
 	bool bAnyExecutionSucceeded = false;
-	int32 FirstConfirmedHitIndex = INDEX_NONE;
+	int32 FirstHitIndex = INDEX_NONE;
 	for (int32 TargetIndex = 0; TargetIndex < Targets.Num(); ++TargetIndex)
 	{
 		const FKCActionTarget& Target = Targets[TargetIndex];
@@ -339,10 +339,10 @@ bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 		}
 		if (Target.bHasHitResult)
 		{
-			bConfirmedHit = true;
-			if (FirstConfirmedHitIndex == INDEX_NONE)
+			bHadHit = true;
+			if (FirstHitIndex == INDEX_NONE)
 			{
-				FirstConfirmedHitIndex = TargetIndex;
+				FirstHitIndex = TargetIndex;
 			}
 		}
 
@@ -355,21 +355,21 @@ bool UKCGA_ActionRuntimeBase::ExecuteTargets(
 			Target.bHasHitResult ? &Target.HitResult : nullptr);
 	}
 
-	if (FirstConfirmedHitIndex != INDEX_NONE && !bConfirmedHitHookExecuted)
+	if (FirstHitIndex != INDEX_NONE && !bFirstHitHookExecuted)
 	{
-		bConfirmedHitHookExecuted = true;
-		const FKCActionTarget& ConfirmedTarget = Targets[FirstConfirmedHitIndex];
+		bFirstHitHookExecuted = true;
+		const FKCActionTarget& FirstHitTarget = Targets[FirstHitIndex];
 		UAbilitySystemComponent* TargetAbilitySystem =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(
-				ConfirmedTarget.Actor);
+				FirstHitTarget.Actor);
 		bAnyExecutionSucceeded |= ExecuteActionHook(
-			TAG_KC_ActionHook_OnConfirmedHit,
+			TAG_KC_ActionHook_OnFirstHit,
 			TargetAbilitySystem,
-			ConfirmedTarget.Actor,
-			&ConfirmedTarget.HitResult);
+			FirstHitTarget.Actor,
+			&FirstHitTarget.HitResult);
 	}
 
-	if (bConfirmedHit && !bDurabilityConsumedThisActivation &&
+	if (bHadHit && !bDurabilityConsumedThisActivation &&
 		TryConsumeActiveItemDurability(
 			EKCItemDurabilityConsumeMode::OnFirstHit))
 	{

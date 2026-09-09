@@ -80,7 +80,7 @@ namespace KCAbilityDefinitionTests
 
 	UKCApplyMontageHitLagFragment* AddHitLagFragment(
 		UKCAbilityDefinition* Definition,
-		FGameplayTag HookTag = TAG_KC_ActionHook_OnConfirmedHit)
+		FGameplayTag HookTag = TAG_KC_ActionHook_OnFirstHit)
 	{
 		FKCActionHookStruct Hook;
 		Hook.HookTag = HookTag;
@@ -107,10 +107,10 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
 			TEXT("ActionHook.OnExecute")) == TAG_KC_ActionHook_OnExecute);
 	TestTrue(
-		TEXT("명중 확정 Hook 태그도 네이티브 태그로 등록되어 있다."),
+		TEXT("최초 명중 Hook 태그도 네이티브 태그로 등록되어 있다."),
 		UKCGameplayTagBlueprintLibrary::RequestRegisteredGameplayTag(
-			TEXT("ActionHook.OnConfirmedHit")) ==
-			TAG_KC_ActionHook_OnConfirmedHit);
+			TEXT("ActionHook.OnFirstHit")) ==
+			TAG_KC_ActionHook_OnFirstHit);
 
 	// ── 대상 수집 축 ───────────────────────────────────────
 	TestTrue(
@@ -297,7 +297,7 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 	UKCApplyMontageHitLagFragment* ValidHitLagFragment =
 		AddHitLagFragment(ValidHitLag);
 	TestTrue(
-		TEXT("HitResult Targeting과 Montage를 가진 OnConfirmedHit 역경직은 유효하다."),
+		TEXT("HitResult Targeting과 Montage를 가진 OnFirstHit 역경직은 유효하다."),
 		ValidHitLag->ValidateWithActionContract(Error));
 	TestTrue(
 		TEXT("역경직은 항상 Source Scope로 생성된다."),
@@ -322,13 +322,13 @@ bool FKCAbilityDefinitionValidationTest::RunTest(const FString& Parameters)
 		TEXT("역경직 Fragment를 OnExecute에 배치하면 거부한다."),
 		HitLagOnWrongHook->ValidateWithActionContract(Error));
 
-	UKCAbilityDefinition* ConfirmedHitWithoutHitResults =
+	UKCAbilityDefinition* FirstHitWithoutHitResults =
 		MakeDefinition(UKCSelfTargeting::StaticClass());
-	AddMontage(ConfirmedHitWithoutHitResults);
-	AddHitLagFragment(ConfirmedHitWithoutHitResults);
+	AddMontage(FirstHitWithoutHitResults);
+	AddHitLagFragment(FirstHitWithoutHitResults);
 	TestFalse(
-		TEXT("HitResult를 만들지 않는 Targeting의 OnConfirmedHit은 거부한다."),
-		ConfirmedHitWithoutHitResults->ValidateWithActionContract(Error));
+		TEXT("HitResult를 만들지 않는 Targeting의 OnFirstHit은 거부한다."),
+		FirstHitWithoutHitResults->ValidateWithActionContract(Error));
 
 	// ── 적용 범위 축: 흡혈 무기가 데이터만으로 조립된다 ────
 	UKCAbilityDefinition* Lifesteal =
