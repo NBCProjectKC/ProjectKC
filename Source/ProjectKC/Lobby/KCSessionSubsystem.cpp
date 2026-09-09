@@ -14,6 +14,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
+#include "ProjectKC/Lobby/UI/KCLobbyToastWidget.h"
+#include "ProjectKC/Lobby/KCLobbyStringTable.h"
 #include "Engine/Engine.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
@@ -58,6 +60,7 @@ void UKCSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	if (GEngine)
 	{
 		NetworkFailureDelegateHandle = GEngine->OnNetworkFailure().AddUObject(this, &UKCSessionSubsystem::HandleNetworkFailure);
+		TravelFailureDelegateHandle = GEngine->OnTravelFailure().AddUObject(this, &UKCSessionSubsystem::HandleTravelFailure);
 	}
 }
 
@@ -65,9 +68,16 @@ void UKCSessionSubsystem::Deinitialize()
 {
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Deinitializing KCSessionSubsystem..."));
 
-	if (GEngine && NetworkFailureDelegateHandle.IsValid())
+	if (GEngine)
 	{
-		GEngine->OnNetworkFailure().Remove(NetworkFailureDelegateHandle);
+		if (NetworkFailureDelegateHandle.IsValid())
+		{
+			GEngine->OnNetworkFailure().Remove(NetworkFailureDelegateHandle);
+		}
+		if (TravelFailureDelegateHandle.IsValid())
+		{
+			GEngine->OnTravelFailure().Remove(TravelFailureDelegateHandle);
+		}
 	}
 
 	if (SessionInterface.IsValid())
@@ -88,6 +98,8 @@ void UKCSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLANM
 		NumPublicConnections, bIsLANMatch ? TEXT("TRUE") : TEXT("FALSE"));
 
 	bSessionTerminationNotified = false;
+	bIsJoiningSession = false;
+	PendingJoinFailureMessage = FText::GetEmpty();
 
 	if (!SessionInterface.IsValid())
 	{
@@ -139,6 +151,8 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession requested"));
 
 	bSessionTerminationNotified = false;
+	bIsJoiningSession = true;
+	PendingJoinFailureMessage = FText::GetEmpty();
 
 	// 세션 정보 캐싱 (재접속 지원)
 	CacheSessionResult(SessionResult);
@@ -146,6 +160,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	if (!SessionInterface.IsValid())
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: SessionInterface is invalid"));
+		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 		return;
 	}
@@ -154,6 +169,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	if (!LocalPlayer)
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: LocalPlayer is null"));
+		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 		return;
 	}
@@ -173,6 +189,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	if (!bSuccess)
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession returned false immediately!"));
+		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 	}
 	else
@@ -234,6 +251,7 @@ void UKCSessionSubsystem::PerformReturnToMainMenu()
 {
 	bPendingReturnToMainMenu = false;
 	bSessionTerminationNotified = false;
+	bIsJoiningSession = false;
 	const FName MainMenuLevelName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::MainMenu);
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Opening MainMenu level: %s"), *MainMenuLevelName.ToString());
 
@@ -259,6 +277,12 @@ void UKCSessionSubsystem::NotifySessionTerminatedByHost(const FString& Reason)
 
 	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] NotifySessionTerminatedByHost: %s"), *Reason);
 	OnSessionTerminatedByHost.Broadcast(Reason);
+
+	// 이미 다른 실패 사유가 지정되지 않았다면 방장 종료 메시지 설정
+	if (PendingJoinFailureMessage.IsEmpty())
+	{
+		PendingJoinFailureMessage = UKCLobbyStringTable::GetMessage(EKCLobbyMessageType::HostClosed);
+	}
 
 	// 방장이 세션을 종료했으므로 선택지(팝업) 없이 즉시 메인 메뉴로 자동 복귀
 	ReturnToMainMenu();
@@ -291,13 +315,90 @@ void UKCSessionSubsystem::BroadcastSessionTerminatedToClients(const FString& Rea
 
 void UKCSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	const FWorldContext* Context = nullptr;
+	if (GEngine)
+	{
+		Context = World ? GEngine->GetWorldContextFromWorld(World)
+						: GEngine->GetWorldContextFromPendingNetGameNetDriver(NetDriver);
+	}
+
+	if (Context)
+	{
+		if (Context->OwningGameInstance != GetGameInstance())
+		{
+			return;
+		}
+	}
+	else if (World && World != GetWorld())
+	{
+		return;
+	}
+
+	// 방장(서버)은 클라이언트용 연결 끊김/참가 실패 처리 대상이 아님
+	if (World && World->GetNetMode() != NM_Client)
+	{
+		return;
+	}
+
 	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] HandleNetworkFailure: Type=%d, Error='%s'"),
 		static_cast<int32>(FailureType), *ErrorString);
 
-	// 클라이언트 환경에서 방장과의 연결이 끊겼을 때 (방장이 강제 종료했거나 네트워크가 단절된 경우)
-	if (World && World->GetNetMode() == NM_Client)
+	const bool bIsLobbyFull = ErrorString.Contains(TEXT("LOBBY_FULL"));
+
+	// 세션 참가 진행 중 발생한 네트워크 실패 (정원 초과 등)
+	if (bIsJoiningSession)
 	{
-		NotifySessionTerminatedByHost(TEXT("Connection to host has been lost."));
+		bIsJoiningSession = false;
+		const EKCLobbyMessageType FailType = bIsLobbyFull ? EKCLobbyMessageType::LobbyFull : EKCLobbyMessageType::SessionNotFound;
+		const FText FailureMessage = UKCLobbyStringTable::GetMessage(FailType);
+		PendingJoinFailureMessage = FailureMessage;
+		OnJoinFailed.Broadcast(FailureMessage);
+		ShowToastNotification(FailureMessage);
+		// 맵 리로드 시 MainMenu의 BeginPlay에서 다시 띄울 수 있도록 유지
+		PendingJoinFailureMessage = FailureMessage;
+		return;
+	}
+
+	// 이미 접속해 있던 로비/인게임에서 방장과의 연결이 끊겼을 때 (방장 종료 또는 네트워크 단절)
+	const FText HostLostMessage = UKCLobbyStringTable::GetMessage(EKCLobbyMessageType::HostLost);
+	PendingJoinFailureMessage = HostLostMessage;
+	NotifySessionTerminatedByHost(HostLostMessage.ToString());
+}
+
+void UKCSessionSubsystem::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
+{
+	const FWorldContext* Context = GEngine && World ? GEngine->GetWorldContextFromWorld(World) : nullptr;
+	if (Context)
+	{
+		if (Context->OwningGameInstance != GetGameInstance())
+		{
+			return;
+		}
+	}
+	else if (World && World != GetWorld())
+	{
+		return;
+	}
+
+	// 방장(서버)은 레벨 이동 실패 대상이 아님
+	if (World && World->GetNetMode() != NM_Client)
+	{
+		return;
+	}
+
+	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] HandleTravelFailure: Type=%d, Error='%s'"),
+		static_cast<int32>(FailureType), *ErrorString);
+
+	const bool bIsLobbyFull = ErrorString.Contains(TEXT("LOBBY_FULL"));
+	if (bIsJoiningSession)
+	{
+		bIsJoiningSession = false;
+		const EKCLobbyMessageType FailType = bIsLobbyFull ? EKCLobbyMessageType::LobbyFull : EKCLobbyMessageType::SessionNotFound;
+		const FText FailureMessage = UKCLobbyStringTable::GetMessage(FailType);
+		PendingJoinFailureMessage = FailureMessage;
+		OnJoinFailed.Broadcast(FailureMessage);
+		ShowToastNotification(FailureMessage);
+		PendingJoinFailureMessage = FailureMessage;
 	}
 }
 
@@ -400,6 +501,22 @@ void UKCSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 	else if (!bSuccess)
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession failed on OnlineSubsystem (Result: %d)"), static_cast<int32>(Result));
+		bIsJoiningSession = false;
+
+		EKCLobbyMessageType FailType = EKCLobbyMessageType::SessionNotFound;
+		if (Result == EOnJoinSessionCompleteResult::SessionIsFull)
+		{
+			FailType = EKCLobbyMessageType::LobbyFull;
+		}
+		else if (Result == EOnJoinSessionCompleteResult::SessionDoesNotExist)
+		{
+			FailType = EKCLobbyMessageType::SessionNotFound;
+		}
+
+		const FText FailMsg = UKCLobbyStringTable::GetMessage(FailType);
+		PendingJoinFailureMessage = FailMsg;
+		OnJoinFailed.Broadcast(FailMsg);
+		ShowToastNotification(FailMsg);
 	}
 
 	OnJoinSessionComplete.Broadcast(bSuccess, ConnectString);
@@ -492,6 +609,7 @@ void UKCSessionSubsystem::ClearSavedLobbyData()
 	ExpectedPlayerCount = 0;
 	SelectedMapType = EKCLevelType::GasRange;
 	MatchDurationSeconds = 300.0f;
+	bIsJoiningSession = false;
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Cleared Saved Lobby Player Data"));
 }
 
@@ -535,4 +653,65 @@ void UKCSessionSubsystem::ClearCachedSession()
 	bHasCachedSession = false;
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Cleared Cached Session"));
 }
+
+void UKCSessionSubsystem::ShowToastNotification(const FText& InMessage, float Duration, APlayerController* PC)
+{
+	APlayerController* TargetPC = PC;
+	if (!TargetPC)
+	{
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			TargetPC = GI->GetFirstLocalPlayerController();
+		}
+	}
+
+	if (!TargetPC)
+	{
+		PendingJoinFailureMessage = InMessage;
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] ShowToastNotification: Local PC not available yet, cached pending message: %s"), *InMessage.ToString());
+		return;
+	}
+
+	if (!LobbyToastWidgetClass)
+	{
+		LobbyToastWidgetClass = StaticLoadClass(
+			UKCLobbyToastWidget::StaticClass(),
+			nullptr,
+			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyToast.WBP_LobbyToast_C"));
+	}
+
+	if (!LobbyToastWidgetClass)
+	{
+		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] LobbyToastWidgetClass was not found (/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyToast)."));
+		return;
+	}
+
+	UKCLobbyToastWidget* ToastInstance = CreateWidget<UKCLobbyToastWidget>(TargetPC, LobbyToastWidgetClass);
+	if (ToastInstance)
+	{
+		PendingJoinFailureMessage = FText::GetEmpty();
+		ToastInstance->AddToViewport(500);
+		ToastInstance->ShowToast(InMessage, Duration);
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] ShowToastNotification: Displayed LobbyToast to viewport with message: '%s' (Duration: %.1fs)"),
+			*InMessage.ToString(), Duration);
+	}
+}
+
+void UKCSessionSubsystem::ShowLobbyMessageToast(EKCLobbyMessageType MessageType, float Duration, APlayerController* PC)
+{
+	const FText Msg = UKCLobbyStringTable::GetMessage(MessageType);
+	ShowToastNotification(Msg, Duration, PC);
+}
+
+void UKCSessionSubsystem::CheckAndShowPendingJoinFailure(APlayerController* PC)
+{
+	if (!PendingJoinFailureMessage.IsEmpty())
+	{
+		const FText MsgToShow = PendingJoinFailureMessage;
+		PendingJoinFailureMessage = FText::GetEmpty();
+		ShowToastNotification(MsgToShow, 3.0f, PC);
+	}
+}
+
+
 
