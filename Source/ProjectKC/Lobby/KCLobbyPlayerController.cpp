@@ -148,6 +148,50 @@ void AKCLobbyPlayerController::BeginPlay()
 	RefreshLobbyCustomizationPresentations();
 }
 
+void AKCLobbyPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AKCLobbyPlayerController::HandleEnterKey);
+	}
+}
+
+void AKCLobbyPlayerController::HandleEnterKey()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (LobbyWidgetInstance)
+	{
+		LobbyWidgetInstance->FocusChatInput();
+	}
+}
+
+void AKCLobbyPlayerController::ResetFocusToGame()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	if (LobbyWidgetInstance)
+	{
+		if (TSharedPtr<SWidget> SafeWidget = LobbyWidgetInstance->GetCachedWidget())
+		{
+			InputMode.SetWidgetToFocus(SafeWidget);
+		}
+		LobbyWidgetInstance->SetFocus();
+	}
+	SetInputMode(InputMode);
+}
+
 void AKCLobbyPlayerController::PlayerTick(const float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
@@ -866,16 +910,8 @@ void AKCLobbyPlayerController::SendChatMessage(const FString& Message)
 		return;
 	}
 
-	// 3. 도배 방지 (쿨타임 검사)
-	const double CurrentTime = FPlatformTime::Seconds();
-	if (CurrentTime - LastChatMessageTimeSeconds < ChatCooldownSeconds)
-	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SendChatMessage Rejected: Cooldown active (%.2fs remaining)"),
-			ChatCooldownSeconds - (CurrentTime - LastChatMessageTimeSeconds));
-		return;
-	}
-
-	LastChatMessageTimeSeconds = CurrentTime;
+	// 3. 빠른 전송 허용 (쿨타임 제한 해제)
+	LastChatMessageTimeSeconds = FPlatformTime::Seconds();
 
 	// 4. 서버로 전송
 	Server_SendChatMessage(TrimmedMessage);
