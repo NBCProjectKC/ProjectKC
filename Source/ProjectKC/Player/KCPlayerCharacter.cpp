@@ -438,7 +438,6 @@ void AKCPlayerCharacter::BeginPlay()
 		CurrentHitCameraFOVOffset = 0.0f;
 		HitCameraFOVElapsed = -1.0f;
 	}
-
 	InitializeAbilityActorInfo();
 	RefreshTeamAppearanceBinding();
 	if (PlayerCustomizationComponent)
@@ -501,6 +500,7 @@ void AKCPlayerCharacter::PawnClientRestart()
 		PlayerCustomizationComponent->InitializeForPawn();
 	}
 }
+
 
 void AKCPlayerCharacter::RefreshTeamAppearanceBinding()
 {

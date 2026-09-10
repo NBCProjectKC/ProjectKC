@@ -275,7 +275,11 @@ void UKCPlayerInteractionPromptComponent::HandleHeldItemChanged(
 	}
 
 	ClearTargetActor();
+	RefreshBestInteractableTarget();
+}
 
+void UKCPlayerInteractionPromptComponent::RefreshBestInteractableTarget()
+{
 	if (UKCPlayerInteractionComponent* InteractionComponent =
 		BoundInteractionComponent.Get())
 	{
@@ -291,6 +295,7 @@ void UKCPlayerInteractionPromptComponent::HandleObservedHeldItemBroken()
 {
 	UnbindObservedHeldItem();
 	ClearTargetActor();
+	RefreshBestInteractableTarget();
 }
 
 void UKCPlayerInteractionPromptComponent::HandleObservedHeldItemDestroyed(
@@ -298,6 +303,7 @@ void UKCPlayerInteractionPromptComponent::HandleObservedHeldItemDestroyed(
 {
 	UnbindObservedHeldItem();
 	ClearTargetActor();
+	RefreshBestInteractableTarget();
 }
 
 void UKCPlayerInteractionPromptComponent::SetTargetActor(AActor* NewTargetActor)

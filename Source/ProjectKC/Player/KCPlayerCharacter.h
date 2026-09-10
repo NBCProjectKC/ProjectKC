@@ -147,6 +147,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> TopDownCameraComponent;
 
+
 	/** 커서의 월드 거리 중 카메라 선행 오프셋으로 반영할 비율이다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Camera|Look Ahead",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
