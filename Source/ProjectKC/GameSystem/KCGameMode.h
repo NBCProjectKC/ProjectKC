@@ -90,10 +90,7 @@ protected:
 	bool bUseFixedRecipeList = true;
 	
 private:
-	int32 GetRequiredPlayerCount() const
-	{
-		return TeamCount * PlayersPerTeam;
-	}
+	int32 GetRequiredPlayerCount() const;
 	
 	// Multicast RPC로 클라이언트 알림 : 요리가 망할 때, 요리가 시작할 때
 	UFUNCTION(NetMulticast, Reliable)
