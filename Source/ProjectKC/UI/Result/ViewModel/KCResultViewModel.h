@@ -35,16 +35,26 @@ public:
 	int32 GetRemainingBackToLobbySeconds() const { return RemainingBackToLobbySeconds; }
 
 	UFUNCTION(BlueprintPure, Category = "KC|UI")
-	FText GetRemainingBackToLobbyText() const { return RemainingBackToLobbyText; }
+	FText GetRemainingBackToLobbySecondText() const { return RemainingBackToLobbySecondText; }
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void SetRemainingBackToLobbySeconds(int32 NewRemainingSeconds);
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	int32 GetWinningTeamId() const { return WinningTeamId; }
+
+	UFUNCTION(BlueprintPure, Category = "KC|UI")
+	FText GetWinningTeamText() const { return WinningTeamText; }
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void SetWinningTeamId(int32 NewWinningTeamId);
 
 	UFUNCTION(BlueprintCallable, Category = "KC|UI|Preview")
 	void SetPreviewData(const TArray<FKCResultTeamViewData>& NewTeams);
 
 private:
-	static FText MakeBackToLobbyText(int32 RemainingSeconds);
+	static FText MakeRemainingSecondText(int32 RemainingSeconds);
+	static FText MakeWinningTeamText(int32 InWinningTeamId);
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
 	TArray<FKCResultTeamViewData> Teams;
@@ -53,5 +63,11 @@ private:
 	int32 RemainingBackToLobbySeconds = 0;
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
-	FText RemainingBackToLobbyText;
+	FText RemainingBackToLobbySecondText;
+
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Setter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	int32 WinningTeamId = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter, Category = "KC|UI", meta = (AllowPrivateAccess = "true"))
+	FText WinningTeamText;
 };

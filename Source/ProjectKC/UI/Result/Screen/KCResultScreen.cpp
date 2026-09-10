@@ -4,6 +4,7 @@
 #include "Components/TextBlock.h"
 #include "GameSystem/KCGameState.h"
 #include "Player/KCPlayerController.h"
+#include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 #include "ProjectKC/UI/Result/ViewModel/KCResultViewModel.h"
 
 void UKCResultScreen::NativeConstruct()
@@ -24,6 +25,10 @@ void UKCResultScreen::NativeConstruct()
 	}
 
 	RefreshResultScreen();
+	if (ShowResult)
+	{
+		PlayAnimation(ShowResult);
+	}
 	StartBackToLobbyTimer();
 }
 
@@ -41,14 +46,32 @@ void UKCResultScreen::NativeDestruct()
 
 void UKCResultScreen::HandleBackToLobbyButtonClicked()
 {
+	if (!ResultViewModel)
+	{
+		ResultViewModel = NewObject<UKCResultViewModel>(this);
+	}
+
+	if (BackToLobbyButton)
+	{
+		BackToLobbyButton->SetIsEnabled(false);
+	}
+
 	if (AKCPlayerController* PlayerController = Cast<AKCPlayerController>(GetOwningPlayer()))
 	{
 		PlayerController->RequestSkipResultScreen();
 	}
 }
 
+void UKCResultScreen::NativeApplyColorStyle(const UKCColorStyle* InColorStyle)
+{
+	Super::NativeApplyColorStyle(InColorStyle);
+
+	ApplyWinningTeamColor();
+}
+
 void UKCResultScreen::RefreshResultScreen()
 {
+	UpdateWinningTeam();
 	UpdateBackToLobbyTimer();
 }
 
@@ -88,13 +111,54 @@ void UKCResultScreen::UpdateBackToLobbyTimer()
 	}
 
 	ResultViewModel->SetRemainingBackToLobbySeconds(RemainingSeconds);
-	ApplyBackToLobbyText();
+	ApplySecondCountText();
+	UpdateWinningTeam();
 }
 
-void UKCResultScreen::ApplyBackToLobbyText()
+void UKCResultScreen::ApplySecondCountText()
 {
-	if (BackToLobbySecondText && ResultViewModel)
+	if (SecondCountText && ResultViewModel)
 	{
-		BackToLobbySecondText->SetText(ResultViewModel->GetRemainingBackToLobbyText());
+		SecondCountText->SetText(ResultViewModel->GetRemainingBackToLobbySecondText());
 	}
+}
+
+void UKCResultScreen::UpdateWinningTeam()
+{
+	if (!ResultViewModel)
+	{
+		ResultViewModel = NewObject<UKCResultViewModel>(this);
+	}
+
+	const UWorld* World = GetWorld();
+	const AKCGameState* GameState = World ? World->GetGameState<AKCGameState>() : nullptr;
+	ResultViewModel->SetWinningTeamId(GameState ? GameState->GetWinningTeamId() : INDEX_NONE);
+	ApplyWinningTeamText();
+}
+
+void UKCResultScreen::ApplyWinningTeamText()
+{
+	if (TeamText && ResultViewModel)
+	{
+		TeamText->SetText(ResultViewModel->GetWinningTeamText());
+		ApplyWinningTeamColor();
+	}
+}
+
+void UKCResultScreen::ApplyWinningTeamColor()
+{
+	if (!TeamText || !ResultViewModel)
+	{
+		return;
+	}
+
+	const int32 WinningTeamId = ResultViewModel->GetWinningTeamId();
+	const UKCColorStyle* CurrentColorStyle = GetColorStyle();
+	if (WinningTeamId != INDEX_NONE && CurrentColorStyle && CurrentColorStyle->TeamColors.IsValidIndex(WinningTeamId))
+	{
+		TeamText->SetColorAndOpacity(FSlateColor(CurrentColorStyle->TeamColors[WinningTeamId]));
+		return;
+	}
+
+	TeamText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 }

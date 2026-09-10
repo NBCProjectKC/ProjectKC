@@ -9,6 +9,8 @@
 
 class UTextBlock;
 class UButton;
+class UWidgetAnimation;
+class UKCColorStyle;
 class UKCResultViewModel;
 
 UCLASS(Abstract, Blueprintable)
@@ -29,12 +31,19 @@ public:
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
-	TObjectPtr<UTextBlock> BackToLobbySecondText;
+	TObjectPtr<UTextBlock> SecondCountText;
+
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
+	TObjectPtr<UTextBlock> TeamText;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
 	TObjectPtr<UButton> BackToLobbyButton;
+
+	UPROPERTY(Transient, meta = (BindWidgetAnimOptional), BlueprintReadOnly, Category = "KC|UI")
+	TObjectPtr<UWidgetAnimation> ShowResult;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|UI")
 	TObjectPtr<UKCResultViewModel> ResultViewModel;
@@ -46,7 +55,10 @@ private:
 	void StartBackToLobbyTimer();
 	void StopBackToLobbyTimer();
 	void UpdateBackToLobbyTimer();
-	void ApplyBackToLobbyText();
+	void ApplySecondCountText();
+	void UpdateWinningTeam();
+	void ApplyWinningTeamText();
+	void ApplyWinningTeamColor();
 
 	FTimerHandle BackToLobbyTimerHandle;
 };

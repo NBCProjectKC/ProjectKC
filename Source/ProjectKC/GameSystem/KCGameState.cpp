@@ -25,6 +25,7 @@ void AKCGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AKCGameState, MatchStartServerTime);
 	DOREPLIFETIME(AKCGameState, MatchEndServerTime);
 	DOREPLIFETIME(AKCGameState, ResultScreenEndServerTime);
+	DOREPLIFETIME(AKCGameState, WinningTeamId);
 }
 
 void AKCGameState::InitializeTeamCount(int32 InTeamCount)
@@ -36,6 +37,7 @@ void AKCGameState::InitializeTeamCount(int32 InTeamCount)
 
 	TeamScores.Init(0, InTeamCount);
 	PotIngredients.Init(FGameplayTagContainer(), InTeamCount);
+	WinningTeamId = INDEX_NONE;
 }
 
 void AKCGameState::SetGamePhase(EKCGamePhaseType NewPhase)
@@ -95,6 +97,16 @@ void AKCGameState::SetActiveRecipes(const TArray<FName>& InRecipeRowNames)
 
 	ActiveRecipeRowNames = InRecipeRowNames;
 	OnRep_ActiveRecipes();
+}
+
+void AKCGameState::SetWinningTeamId(int32 InWinningTeamId)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	WinningTeamId = InWinningTeamId;
 }
 
 int32 AKCGameState::GetTeamScore(int32 TeamId) const
