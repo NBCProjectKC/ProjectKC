@@ -150,7 +150,7 @@ void UKCSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLANM
 
 void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResult)
 {
-	UE_LOG(LogKCGameSystem, Log, TEXT("[Session] JoinSession requested"));
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession requested"));
 
 	bSessionTerminationNotified = false;
 	bIsJoiningSession = true;
@@ -161,7 +161,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession Failed: SessionInterface is invalid"));
+		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: SessionInterface is invalid"));
 		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 		return;
@@ -170,7 +170,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer();
 	if (!LocalPlayer)
 	{
-		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession Failed: LocalPlayer is null"));
+		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: LocalPlayer is null"));
 		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 		return;
@@ -195,13 +195,13 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	const bool bSuccess = SessionInterface->JoinSession(LocalPlayer->GetControllerId(), NAME_GameSession, SessionResult.OnlineResult);
 	if (!bSuccess)
 	{
-		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession returned false immediately!"));
+		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession returned false immediately!"));
 		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 	}
 	else
 	{
-		UE_LOG(LogKCGameSystem, Log, TEXT("[Session] JoinSession request dispatched to OnlineSubsystem"));
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession request dispatched to OnlineSubsystem"));
 	}
 }
 
@@ -514,7 +514,7 @@ void UKCSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 	}
 	else if (!bSuccess)
 	{
-		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession failed on OnlineSubsystem (Result: %d)"), static_cast<int32>(Result));
+		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession failed on OnlineSubsystem (Result: %d)"), static_cast<int32>(Result));
 		bIsJoiningSession = false;
 
 		EKCLobbyMessageType FailType = EKCLobbyMessageType::SessionNotFound;

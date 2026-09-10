@@ -32,15 +32,42 @@ AKCGameMode::AKCGameMode()
 }
 
 // 매치 흐름
+int32 AKCGameMode::GetRequiredPlayerCount() const
+{
+	if (const UGameInstance* GI = GetGameInstance())
+	{
+		if (const UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			const int32 ExpectedCount = SessionSub->GetExpectedPlayerCount();
+			if (ExpectedCount > 0)
+			{
+				return ExpectedCount;
+			}
+		}
+	}
+
+	return TeamCount * PlayersPerTeam;
+}
+
 bool AKCGameMode::ReadyToStartMatch_Implementation()
 {
-	// 인원 재확인
-	return GetNumPlayers() >= GetRequiredPlayerCount();
+	const int32 CurrentPlayers = GetNumPlayers();
+	const int32 RequiredPlayers = GetRequiredPlayerCount();
+	return CurrentPlayers >= RequiredPlayers;
 }
 
 void AKCGameMode::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
+
+	// 세션 설정 인원에 맞춰 팀당 인원수 동기화
+	if (TeamCount > 0)
+	{
+		PlayersPerTeam = FMath::Max(1, GetRequiredPlayerCount() / TeamCount);
+	}
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Match] HandleMatchHasStarted 진입 - 접속 인원: %d, 요구 인원: %d, 팀당 인원: %d"),
+		GetNumPlayers(), GetRequiredPlayerCount(), PlayersPerTeam);
 
 	KCGameState = GetGameState<AKCGameState>();
 
@@ -496,7 +523,7 @@ void AKCGameMode::RestoreSlotDataForController(AController* Controller)
 	AKCPlayerState* KCPS = Controller ? Controller->GetPlayerState<AKCPlayerState>() : nullptr;
 	if (!KCPS)
 	{
-		UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - KCPS가 null. Controller=%s"),
+		UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - KCPS가 null. Controller=%s"),
 			Controller ? *Controller->GetName() : TEXT("null"));
 		return;
 	}
@@ -504,19 +531,19 @@ void AKCGameMode::RestoreSlotDataForController(AController* Controller)
 	UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>();
 	if (!SessionSub)
 	{
-		UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - SessionSub가 null."));
+		UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - SessionSub가 null."));
 		return;
 	}
 
 	const FString NetIdStr = KCPS->GetUniquePlayerIdString();
 	const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
 
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 진행 중 - NetIdStr='%s', PlayerName='%s', QueryKey='%s'"),
+	UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] RestoreSlotDataForController 진행 중 - NetIdStr='%s', PlayerName='%s', QueryKey='%s'"),
 		*NetIdStr, *KCPS->GetPlayerName(), *QueryKey);
 
 	if (QueryKey.IsEmpty())
 	{
-		UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - QueryKey가 비어있음."));
+		UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - QueryKey가 비어있음."));
 		return;
 	}
 
@@ -540,11 +567,11 @@ void AKCGameMode::RestoreSlotDataForController(AController* Controller)
 
 bool AKCGameMode::UpdatePlayerStartSpot(AController* Player, const FString& Portal, FString& OutErrorMessage)
 {
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] UpdatePlayerStartSpot 진입, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] UpdatePlayerStartSpot 진입, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
 
 	RestoreSlotDataForController(Player);
 
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] UpdatePlayerStartSpot 완료, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[Spawn] UpdatePlayerStartSpot 완료, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
 
 	return Super::UpdatePlayerStartSpot(Player, Portal, OutErrorMessage);
 }
