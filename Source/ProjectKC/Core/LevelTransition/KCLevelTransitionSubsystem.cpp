@@ -1,9 +1,11 @@
-﻿#include "KCLevelTransitionSubsystem.h"
+#include "KCLevelTransitionSubsystem.h"
 
 #include "GameSystem/KCLevelTypeLibrary.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCLevelChangedStruct.h"
+
+#include "ProjectKC/ProjectKC.h"
 
 void UKCLevelTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -34,6 +36,6 @@ void UKCLevelTransitionSubsystem::OnLevelLoaded(UWorld* LoadedWorld)
 
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Level_Changed, Message);
 
-	UE_LOG(LogTemp, Log, TEXT("[LevelTransition] 레벨 전환 감지: %s (Type=%d)"),
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[LevelTransition] 레벨 전환 감지: %s (Type=%d) -> Message_Level_Changed 브로드캐스트"),
 		*LoadedWorld->GetMapName(), static_cast<int32>(NewLevelType));
 }

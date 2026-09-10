@@ -14,6 +14,10 @@ class UKCWorldIndicatorWidget;
 class UKCInteractionPromptWidget;
 class UKCInteractionPromptRegistry;
 class UKCUserWidget;
+class UKCLobbyWidget;
+class UKCLobbyToastWidget;
+class UKCLobbyGameSettingsWidget;
+class UKCCustomizationWidget;
 
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "ProjectKC UI"))
 class PROJECTKC_API UKCUISettings : public UDeveloperSettings
@@ -65,4 +69,16 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Indicator")
 	TSoftObjectPtr<UKCInteractionPromptRegistry> InteractionPromptRegistry;
+	
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Lobby")
+	TSoftClassPtr<UKCLobbyWidget> LobbyWidgetClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Lobby")
+	TSoftClassPtr<UKCCustomizationWidget> CustomizationWidgetClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Lobby")
+	TSoftClassPtr<UKCLobbyToastWidget> LobbyToastWidgetClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Lobby")
+	TSoftClassPtr<UKCLobbyGameSettingsWidget> LobbyGameSettingsWidgetClass;
 };

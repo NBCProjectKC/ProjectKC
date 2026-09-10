@@ -1,6 +1,0 @@
-Key,SourceString
-Lobby_Full,"The lobby is full. Unable to join the session."
-Host_Closed,"The host has closed the lobby."
-Host_Lost,"Connection to host has been lost."
-Session_NotFound,"The session no longer exists."
-Not_All_Ready,"All players must be ready to start."
