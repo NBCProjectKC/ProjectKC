@@ -237,16 +237,17 @@ void UKCLobbyWidget::OnCustomizationClicked()
 
 	if (!CustomizationWidgetClass)
 	{
-		CustomizationWidgetClass = StaticLoadClass(
-			UKCCustomizationWidget::StaticClass(),
-			nullptr,
-			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Customization.WBP_Customization_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			CustomizationWidgetClass =
+				UISettings->CustomizationWidgetClass.LoadSynchronous();
+		}
 	}
 	if (!CustomizationWidgetClass)
 	{
 		LobbyPlayerController->CancelCustomizationEditing();
 		UE_LOG(LogKCLobby, Error,
-			TEXT("[KCLobbyWidget] WBP_Customization was not found. Create it at the default path or set CustomizationWidgetClass."));
+			TEXT("[KCLobbyWidget] CustomizationWidgetClass is not set in WBP_LobbyUI or KCUISettings."));
 		return;
 	}
 
