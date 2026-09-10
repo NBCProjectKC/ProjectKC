@@ -11,6 +11,8 @@
 #include "GameSystem/Enum/KCLevelType.h"
 #include "KCLobbyPlayerController.generated.h"
 
+struct FGameplayTag;
+struct FKCEmptyMessageStruct;
 class UKCLobbyWidget;
 class ACameraActor;
 class AKCLobbyCharacter;
@@ -313,4 +315,6 @@ private:
 
 	/** @brief 1회 전송 가능한 최대 글자 수 */
 	static constexpr int32 MaxChatMessageLength = 100;
+	
+	void HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message);
 };
