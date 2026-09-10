@@ -32,7 +32,6 @@
 #include "Widgets/ColorPickerPanelWidget.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
-#include "UObject/ConstructorHelpers.h"
 
 AKCLobbyPlayerController::AKCLobbyPlayerController()
 {
@@ -41,15 +40,16 @@ AKCLobbyPlayerController::AKCLobbyPlayerController()
 	CustomizationPaintingController = CreateDefaultSubobject<UPaintingModeControllerComponent>(
 		TEXT("CustomizationPaintingController"));
 
-	static ConstructorHelpers::FObjectFinder<UInputAction> PaintActionAsset(
-		TEXT("/MeshPaintingCore/Input/IA_Paint.IA_Paint"));
-	static ConstructorHelpers::FObjectFinder<UInputAction> MouseDeltaActionAsset(
-		TEXT("/MeshPaintingCore/Input/IA_MouseDelta.IA_MouseDelta"));
-	static ConstructorHelpers::FObjectFinder<UInputAction> AdjustBrushSizeActionAsset(
-		TEXT("/MeshPaintingCore/Input/IA_AdjustBrushSize.IA_AdjustBrushSize"));
-	CustomizationPaintActionAsset = PaintActionAsset.Object;
-	CustomizationMouseDeltaActionAsset = MouseDeltaActionAsset.Object;
-	CustomizationAdjustBrushSizeActionAsset = AdjustBrushSizeActionAsset.Object;
+	const UPaintingModeControllerComponent* PluginPaintingDefaults =
+		GetDefault<UPaintingModeControllerComponent>();
+	if (PluginPaintingDefaults)
+	{
+		CustomizationPaintActionAsset = PluginPaintingDefaults->PaintAction;
+		CustomizationMouseDeltaActionAsset =
+			PluginPaintingDefaults->MouseDeltaAction;
+		CustomizationAdjustBrushSizeActionAsset =
+			PluginPaintingDefaults->AdjustBrushSizeAction;
+	}
 
 	CustomizationPaintingController->ControlMode =
 		EPaintingModeControllerControlMode::Simple;

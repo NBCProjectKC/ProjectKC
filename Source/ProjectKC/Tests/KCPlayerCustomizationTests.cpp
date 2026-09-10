@@ -2,6 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Customization/KCCustomizationAssetSet.h"
+#include "Customization/KCCustomizationSettings.h"
 #include "Player/Component/KCPlayerCustomizationComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -13,11 +15,21 @@ bool FKCPlayerCustomizationDefaultsTest::RunTest(const FString& Parameters)
 {
 	const UKCPlayerCustomizationComponent* Defaults =
 		GetDefault<UKCPlayerCustomizationComponent>();
+	const UKCCustomizationSettings* Settings =
+		GetDefault<UKCCustomizationSettings>();
+	UKCCustomizationAssetSet* AssetSet = Settings
+		? Settings->AssetSet.LoadSynchronous()
+		: nullptr;
 
-	TestNotNull(TEXT("눈 메시 기본 에셋이 설정된다."), Defaults->EyeMesh.Get());
-	TestNotNull(TEXT("앞치마 메시 기본 에셋이 설정된다."), Defaults->ApronMesh.Get());
-	TestNotNull(TEXT("셰프 모자 메시 기본 에셋이 설정된다."), Defaults->ChefHatMesh.Get());
-	TestNotNull(TEXT("페인트 머티리얼 기본 에셋이 설정된다."), Defaults->PaintMaterial.Get());
+	TestNotNull(TEXT("커스터마이징 에셋 설정을 찾을 수 있다."), Settings);
+	TestNotNull(TEXT("커스터마이징 AssetSet을 로드할 수 있다."), AssetSet);
+	if (AssetSet)
+	{
+		TestNotNull(TEXT("눈 메시가 AssetSet에 설정된다."), AssetSet->EyeMesh.Get());
+		TestNotNull(TEXT("앞치마 메시가 AssetSet에 설정된다."), AssetSet->ApronMesh.Get());
+		TestNotNull(TEXT("셰프 모자 메시가 AssetSet에 설정된다."), AssetSet->ChefHatMesh.Get());
+		TestNotNull(TEXT("페인트 머티리얼이 AssetSet에 설정된다."), AssetSet->PaintMaterial.Get());
+	}
 
 	const FTransform ExpectedApronTransform(
 		FRotator::ZeroRotator,

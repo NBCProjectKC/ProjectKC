@@ -2,9 +2,11 @@
 
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Customization/KCCustomizationAssetSet.h"
 #include "Customization/KCCustomizationNetworkComponent.h"
 #include "Customization/KCCustomizationNetworkTypes.h"
 #include "Customization/KCCustomizationSaveSubsystem.h"
+#include "Customization/KCCustomizationSettings.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -15,7 +17,6 @@
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
 #include "Player/KCPlayerState.h"
 #include "TimerManager.h"
-#include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKCPlayerCustomization, Log, All);
 
@@ -33,20 +34,6 @@ namespace
 UKCPlayerCustomizationComponent::UKCPlayerCustomizationComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> EyeMeshFinder(
-		TEXT("/Game/KC/Player/Customization/Meshes/SM_EyeWhite_LowPoly.SM_EyeWhite_LowPoly"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ApronMeshFinder(
-		TEXT("/Game/KC/Player/Customization/Meshes/SM_Apron_LowPoly.SM_Apron_LowPoly"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ChefHatMeshFinder(
-		TEXT("/Game/KC/Player/Customization/Meshes/SM_ChefHat_LowPoly.SM_ChefHat_LowPoly"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> PaintMaterialFinder(
-		TEXT("/Game/KC/Player/Customization/Materials/M_CustomizationPaintBase.M_CustomizationPaintBase"));
-
-	EyeMesh = EyeMeshFinder.Object;
-	ApronMesh = ApronMeshFinder.Object;
-	ChefHatMesh = ChefHatMeshFinder.Object;
-	PaintMaterial = PaintMaterialFinder.Object;
 
 	LeftEyeTransform = FTransform(
 		FRotator::ZeroRotator,
@@ -440,6 +427,10 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeVisuals()
 	{
 		return true;
 	}
+	if (!ResolveCustomizationAssets())
+	{
+		return false;
+	}
 
 	AActor* Owner = GetOwner();
 	UStaticMeshComponent* AvatarBody = FindAvatarBody();
@@ -472,6 +463,61 @@ bool UKCPlayerCustomizationComponent::CreateRuntimeVisuals()
 
 	HideLegacyEyeMesh();
 	return true;
+}
+
+bool UKCPlayerCustomizationComponent::ResolveCustomizationAssets()
+{
+	if (IsValid(EyeMesh) && IsValid(ApronMesh) &&
+		IsValid(ChefHatMesh) && IsValid(PaintMaterial))
+	{
+		return true;
+	}
+
+	const UKCCustomizationSettings* Settings =
+		GetDefault<UKCCustomizationSettings>();
+	UKCCustomizationAssetSet* AssetSet = Settings
+		? Settings->AssetSet.LoadSynchronous()
+		: nullptr;
+	if (!IsValid(AssetSet))
+	{
+		UE_LOG(LogKCPlayerCustomization, Error,
+			TEXT("Unable to resolve customization assets: "
+				"KCCustomizationSettings.AssetSet is not configured or failed to load."));
+		return false;
+	}
+
+	LoadedAssetSet = AssetSet;
+	if (!EyeMesh)
+	{
+		EyeMesh = AssetSet->EyeMesh;
+	}
+	if (!ApronMesh)
+	{
+		ApronMesh = AssetSet->ApronMesh;
+	}
+	if (!ChefHatMesh)
+	{
+		ChefHatMesh = AssetSet->ChefHatMesh;
+	}
+	if (!PaintMaterial)
+	{
+		PaintMaterial = AssetSet->PaintMaterial;
+	}
+
+	const bool bResolved = IsValid(EyeMesh) && IsValid(ApronMesh) &&
+		IsValid(ChefHatMesh) && IsValid(PaintMaterial);
+	if (!bResolved)
+	{
+		UE_LOG(LogKCPlayerCustomization, Error,
+			TEXT("Customization AssetSet '%s' is incomplete: "
+				"Eye=%s Apron=%s Hat=%s Material=%s"),
+			*GetNameSafe(AssetSet),
+			*GetNameSafe(EyeMesh),
+			*GetNameSafe(ApronMesh),
+			*GetNameSafe(ChefHatMesh),
+			*GetNameSafe(PaintMaterial));
+	}
+	return bResolved;
 }
 
 void UKCPlayerCustomizationComponent::ReleaseRuntimePaintTarget()
