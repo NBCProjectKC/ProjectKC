@@ -32,15 +32,42 @@ AKCGameMode::AKCGameMode()
 }
 
 // 매치 흐름
+int32 AKCGameMode::GetRequiredPlayerCount() const
+{
+	if (const UGameInstance* GI = GetGameInstance())
+	{
+		if (const UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			const int32 ExpectedCount = SessionSub->GetExpectedPlayerCount();
+			if (ExpectedCount > 0)
+			{
+				return ExpectedCount;
+			}
+		}
+	}
+
+	return TeamCount * PlayersPerTeam;
+}
+
 bool AKCGameMode::ReadyToStartMatch_Implementation()
 {
-	// 인원 재확인
-	return GetNumPlayers() >= GetRequiredPlayerCount();
+	const int32 CurrentPlayers = GetNumPlayers();
+	const int32 RequiredPlayers = GetRequiredPlayerCount();
+	return CurrentPlayers >= RequiredPlayers;
 }
 
 void AKCGameMode::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
+
+	// 세션 설정 인원에 맞춰 팀당 인원수 동기화
+	if (TeamCount > 0)
+	{
+		PlayersPerTeam = FMath::Max(1, GetRequiredPlayerCount() / TeamCount);
+	}
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Match] HandleMatchHasStarted 진입 - 접속 인원: %d, 요구 인원: %d, 팀당 인원: %d"),
+		GetNumPlayers(), GetRequiredPlayerCount(), PlayersPerTeam);
 
 	KCGameState = GetGameState<AKCGameState>();
 
