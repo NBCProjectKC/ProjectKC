@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameSystem/Enum/KCLevelType.h"
@@ -24,6 +24,12 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "KC|Level")
 	static EKCLevelType GetLevelTypeFromWorld(const UWorld* World);
+
+	UFUNCTION(BlueprintPure, Category = "KC|Level")
+	static bool IsPlayableLevel(EKCLevelType LevelType);
+
+	UFUNCTION(BlueprintPure, Category = "KC|Level")
+	static bool IsInGameLevel(EKCLevelType LevelType);
 	
 	static const FKCLevelInfoRow* GetLevelInfoRow(EKCLevelType LevelType);
 };

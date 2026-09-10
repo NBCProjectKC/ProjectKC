@@ -92,8 +92,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Items", meta = (TitleProperty = "ItemDefinition"))
 	TArray<FKCWeightedItemSpawnEntry> Items;
 
-	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Items", meta = (ClampMin = "0"))
+	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Items", meta = (ClampMin = "0", DisplayName = "Default Max Item Count"))
 	int32 MaxItemCount = 3;
+
+	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Items|Player Count", meta = (ClampMin = "0"))
+	int32 MaxItemCountFor2Players = 3;
+
+	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Items|Player Count", meta = (ClampMin = "0"))
+	int32 MaxItemCountFor4Players = 3;
+
+	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Items|Player Count", meta = (ClampMin = "0"))
+	int32 MaxItemCountFor6Players = 3;
 
 	UPROPERTY(EditInstanceOnly, Category = "KC|Spawn|Items")
 	TArray<TObjectPtr<AKCItemSpawnPoint>> ItemSpawnPoints;
@@ -128,6 +137,7 @@ private:
 	};
 
 	bool ValidateSettings(FString& OutError) const;
+	int32 ResolveMaxItemCount() const;
 	void ScheduleInitialSpawns();
 	int32 CountUniqueSpawnPoints(
 		const TArray<TObjectPtr<AKCItemSpawnPoint>>& Points) const;
