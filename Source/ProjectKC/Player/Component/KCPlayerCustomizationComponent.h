@@ -11,6 +11,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class APlayerController;
 class AKCPlayerState;
+class UKCCustomizationAssetSet;
 struct FKCCustomizationDescriptor;
 
 /**
@@ -100,6 +101,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	bool ResolveCustomizationAssets();
 	bool CreateRuntimeVisuals();
 	bool CreateRuntimeAppearance();
 	bool CompactLocalPaintHistory();
@@ -137,6 +139,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<URuntimeMeshPaintTargetComponent> RuntimePaintTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UKCCustomizationAssetSet> LoadedAssetSet;
 
 	bool bLocalSaveApplied = false;
 	bool bLocalCustomizationEditing = false;
