@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/Audio/KCSoundSettings.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "ProjectKC/GameSystem/Enum/KCLevelType.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -25,10 +26,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Audio")
 	void StopCurrentBGM();
 
+	UFUNCTION(BlueprintCallable, Category = "KC|Audio")
+	void ApplySoundSettings();
+
+	UFUNCTION(BlueprintCallable, Category = "KC|Audio")
+	void SetSoundCategoryVolume(EKCSoundCategory Category, float Volume);
+
+	UFUNCTION(BlueprintPure, Category = "KC|Audio")
+	float GetSoundCategoryVolume(EKCSoundCategory Category) const;
+
 private:
 	void HandleLevelChanged(FGameplayTag Channel, const FKCLevelChangedStruct& Message);
 	bool ShouldPlayAudio() const;
 	bool IsSameBGM(const USoundBase* NewBGM) const;
+	const FKCSoundClassSetting* GetSoundClassSetting(EKCSoundCategory Category) const;
+	void ApplySoundClassVolume(EKCSoundCategory Category, float Volume);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAudioComponent> ActiveBGMComponent;
@@ -43,6 +55,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Audio")
 	float FadeOutDuration = 0.5f;
+
+	UPROPERTY(Transient)
+	TMap<EKCSoundCategory, float> RuntimeVolumes;
 
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;
 };

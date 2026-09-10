@@ -346,6 +346,8 @@ void AKCGameMode::EndGame(int32 WinningTeamId)
 	
 	if (KCGameState)
 	{
+		KCGameState->SetWinningTeamId(WinningTeamId);
+		KCGameState->SetResultScreenEndServerTime(GetWorld()->GetTimeSeconds() + ResultScreenDuration);
 		KCGameState->SetGamePhase(EKCGamePhaseType::Ending);
 	}
 
@@ -501,12 +503,6 @@ void AKCGameMode::RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer)
 
 	SkippedResultScreenPlayers.Add(RequestingPlayer); // 누른 플레이어를 배열에 추가
 	
-	// 스킵을 누른 그 사람한테만 즉시 로딩화면 표시
-	if (AKCPlayerController* RequestingPC = Cast<AKCPlayerController>(RequestingPlayer->GetOwningController()))
-	{
-		RequestingPC->Client_ShowResultToLobbyLoadingScreen();
-	}
-
 	// 지금 접속해있는 전원(스펙테이터 제외하고 싶으면 조건 추가 가능)이 다 스킵했는지 확인
 	const int32 ConnectedPlayerCount = GetNumPlayers(); // 현재 서버에 접속한 인원 수
 	if (SkippedResultScreenPlayers.Num() >= ConnectedPlayerCount) // 스킵 누른 사람 수 == 접속 인원 수
