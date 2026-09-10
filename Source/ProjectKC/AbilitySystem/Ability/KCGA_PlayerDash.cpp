@@ -142,9 +142,9 @@ void UKCGA_PlayerDash::ActivateAbility(
 			DashDuration,
 			false,
 			nullptr,
-			ERootMotionFinishVelocityMode::SetVelocity,
+			ERootMotionFinishVelocityMode::ClampVelocity,
 			FVector::ZeroVector,
-			0.0f,
+			Character->GetCharacterMovement()->GetMaxSpeed(),
 			true);
 	if (!ActiveDashTask)
 	{

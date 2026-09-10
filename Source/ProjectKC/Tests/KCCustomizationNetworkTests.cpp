@@ -10,6 +10,7 @@
 #include "Player/Component/KCPlayerCustomizationComponent.h"
 #include "Player/KCPlayerController.h"
 #include "Painting/PaintingModeControllerComponent.h"
+#include "UI/Common/Core/KCUISettings.h"
 
 namespace
 {
@@ -222,6 +223,7 @@ bool FKCCustomizationNetworkControllerComponentsTest::RunTest(const FString& Par
 	const AKCPlayerController* InGameControllerDefaults = GetDefault<AKCPlayerController>();
 	const AKCLobbyPlayerController* LobbyControllerDefaults =
 		GetDefault<AKCLobbyPlayerController>();
+	const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
 
 	const UKCCustomizationNetworkComponent* InGameNetworkComponent =
 		InGameControllerDefaults
@@ -245,6 +247,15 @@ bool FKCCustomizationNetworkControllerComponentsTest::RunTest(const FString& Par
 	TestNotNull(
 		TEXT("로비 Controller에 로컬 외형 편집 컴포넌트가 생성된다."),
 		LobbyPaintingController);
+	TestNotNull(
+		TEXT("커스터마이징 UI 설정을 찾을 수 있다."),
+		UISettings);
+	if (UISettings)
+	{
+		TestFalse(
+			TEXT("커스터마이징 UI 클래스가 프로젝트 설정에 등록된다."),
+			UISettings->CustomizationWidgetClass.IsNull());
+	}
 	if (InGameNetworkComponent)
 	{
 		TestTrue(

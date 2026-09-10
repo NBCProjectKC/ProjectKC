@@ -7,6 +7,7 @@
 #include "ProjectKC/ProjectKC.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
+#include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "Online/OnlineSessionNames.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "GameFramework/GameStateBase.h"
@@ -16,6 +17,7 @@
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Lobby/UI/KCLobbyToastWidget.h"
 #include "ProjectKC/Lobby/KCLobbyStringTable.h"
+#include "UI/Common/Core/KCUISettings.h"
 #include "Engine/Engine.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
@@ -148,7 +150,7 @@ void UKCSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLANM
 
 void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResult)
 {
-	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession requested"));
+	UE_LOG(LogKCGameSystem, Log, TEXT("[Session] JoinSession requested"));
 
 	bSessionTerminationNotified = false;
 	bIsJoiningSession = true;
@@ -159,7 +161,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: SessionInterface is invalid"));
+		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession Failed: SessionInterface is invalid"));
 		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 		return;
@@ -168,7 +170,7 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 	ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer();
 	if (!LocalPlayer)
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: LocalPlayer is null"));
+		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession Failed: LocalPlayer is null"));
 		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 		return;
@@ -185,16 +187,21 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 		return;
 	}
 
+	if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LoadingScreenSubsystem->BeginPreload(EKCLevelType::LobbyLevel);
+	}
+	
 	const bool bSuccess = SessionInterface->JoinSession(LocalPlayer->GetControllerId(), NAME_GameSession, SessionResult.OnlineResult);
 	if (!bSuccess)
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession returned false immediately!"));
+		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession returned false immediately!"));
 		bIsJoiningSession = false;
 		OnJoinSessionComplete.Broadcast(false, FString());
 	}
 	else
 	{
-		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession request dispatched to OnlineSubsystem"));
+		UE_LOG(LogKCGameSystem, Log, TEXT("[Session] JoinSession request dispatched to OnlineSubsystem"));
 	}
 }
 
@@ -460,6 +467,13 @@ void UKCSessionSubsystem::HandleCreateSessionComplete(FName SessionName, bool bW
 
 	if (bWasSuccessful)
 	{
+		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] BeginPreload 호출 - Session: %s, Success: %s"),
+		*SessionName.ToString(), bWasSuccessful ? TEXT("TRUE") : TEXT("FALSE"));
+			LoadingScreenSubsystem->BeginPreload(EKCLevelType::LobbyLevel);
+		}
+		
 		if (UWorld* World = GetWorld())
 		{
 			const FString LobbyURL = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString() + TEXT("?listen");
@@ -500,7 +514,7 @@ void UKCSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 	}
 	else if (!bSuccess)
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession failed on OnlineSubsystem (Result: %d)"), static_cast<int32>(Result));
+		UE_LOG(LogKCGameSystem, Error, TEXT("[Session] JoinSession failed on OnlineSubsystem (Result: %d)"), static_cast<int32>(Result));
 		bIsJoiningSession = false;
 
 		EKCLobbyMessageType FailType = EKCLobbyMessageType::SessionNotFound;
@@ -674,15 +688,15 @@ void UKCSessionSubsystem::ShowToastNotification(const FText& InMessage, float Du
 
 	if (!LobbyToastWidgetClass)
 	{
-		LobbyToastWidgetClass = StaticLoadClass(
-			UKCLobbyToastWidget::StaticClass(),
-			nullptr,
-			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyToast.WBP_LobbyToast_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			LobbyToastWidgetClass = UISettings->LobbyToastWidgetClass.LoadSynchronous();
+		}
 	}
 
 	if (!LobbyToastWidgetClass)
 	{
-		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] LobbyToastWidgetClass was not found (/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyToast)."));
+		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] LobbyToastWidgetClass is not configured in KCUISettings or could not be loaded."));
 		return;
 	}
 

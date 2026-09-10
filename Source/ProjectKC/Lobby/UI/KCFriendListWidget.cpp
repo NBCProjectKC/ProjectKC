@@ -24,7 +24,7 @@ void UKCFriendListWidget::NativeConstruct()
 
 	if (!FriendEntryWidgetClass.Get())
 	{
-		FriendEntryWidgetClass = LoadClass<UKCFriendWidget>(nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
+		UE_LOG(LogKCLobby, Warning, TEXT("[UKCFriendListWidget] FriendEntryWidgetClass is not configured in WBP_FriendList!"));
 	}
 
 	// 1. 즉시 1회 친구 목록 갱신
@@ -133,12 +133,6 @@ void UKCFriendListWidget::HandleReadFriendsListComplete(int32 LocalUserNum, bool
 	});
 
 	UClass* EntryClass = FriendEntryWidgetClass.Get();
-	if (!EntryClass)
-	{
-		EntryClass = LoadClass<UKCFriendWidget>(nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Friend.WBP_Friend_C"));
-		FriendEntryWidgetClass = EntryClass;
-	}
-
 	if (!EntryClass)
 	{
 		UE_LOG(LogKCSession, Error, TEXT("[KCFriendListWidget] FriendEntryWidgetClass is null!"));

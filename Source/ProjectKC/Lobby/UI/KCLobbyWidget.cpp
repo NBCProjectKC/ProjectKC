@@ -11,6 +11,7 @@
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
+#include "UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -236,16 +237,17 @@ void UKCLobbyWidget::OnCustomizationClicked()
 
 	if (!CustomizationWidgetClass)
 	{
-		CustomizationWidgetClass = StaticLoadClass(
-			UKCCustomizationWidget::StaticClass(),
-			nullptr,
-			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_Customization.WBP_Customization_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			CustomizationWidgetClass =
+				UISettings->CustomizationWidgetClass.LoadSynchronous();
+		}
 	}
 	if (!CustomizationWidgetClass)
 	{
 		LobbyPlayerController->CancelCustomizationEditing();
 		UE_LOG(LogKCLobby, Error,
-			TEXT("[KCLobbyWidget] WBP_Customization was not found. Create it at the default path or set CustomizationWidgetClass."));
+			TEXT("[KCLobbyWidget] CustomizationWidgetClass is not set in WBP_LobbyUI or KCUISettings."));
 		return;
 	}
 
@@ -281,21 +283,21 @@ void UKCLobbyWidget::OnGameSettingsClicked()
 		return;
 	}
 
-	if (!GameSettingsWidgetClass)
+	if (!LobbyGameSettingsWidgetClass)
 	{
-		GameSettingsWidgetClass = StaticLoadClass(
-			UKCLobbyGameSettingsWidget::StaticClass(),
-			nullptr,
-			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_GameSettings.WBP_GameSettings_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			LobbyGameSettingsWidgetClass = UISettings->LobbyGameSettingsWidgetClass.LoadSynchronous();
+		}
 	}
 
-	if (!GameSettingsWidgetClass)
+	if (!LobbyGameSettingsWidgetClass)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyWidget] WBP_GameSettings class was not found. Please create it or set GameSettingsWidgetClass."));
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyWidget] LobbyGameSettingsWidgetClass is not set in WBP_LobbyUI or KCUISettings."));
 		return;
 	}
 
-	GameSettingsWidgetInstance = CreateWidget<UKCLobbyGameSettingsWidget>(LobbyPC, GameSettingsWidgetClass);
+	GameSettingsWidgetInstance = CreateWidget<UKCLobbyGameSettingsWidget>(LobbyPC, LobbyGameSettingsWidgetClass);
 	if (!GameSettingsWidgetInstance)
 	{
 		UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyWidget] Failed to create WBP_GameSettings instance."));
