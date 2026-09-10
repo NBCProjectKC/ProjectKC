@@ -148,7 +148,7 @@ void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] BeginPlay 진입 -> RunAfterLoadingScreenHidden에 SetupLobbyUI 전달"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] BeginPlay 진입 -> RunAfterLoadingScreenHidden에 SetupLobbyUI 전달"));
 
 	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
 	{
@@ -769,13 +769,13 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 		return;
 	}
 
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] SetupLobbyUI 진입 (콜백 실행됨)"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] SetupLobbyUI 진입 (콜백 실행됨)"));
 
 	// L_LobbyLevel 레벨에 있을 때만 로비 UI 생성
 	const FString MapName = World->GetMapName();
 	if (UKCLevelTypeLibrary::GetLevelTypeFromWorld(World) != EKCLevelType::LobbyLevel)
 	{
-		UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] SetupLobbyUI 건너뜀: L_LobbyLevel이 아님 (현재: %s)"), *MapName);
+		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerController] SetupLobbyUI skipped: Not in L_LobbyLevel (Current: %s)"), *MapName);
 		return;
 	}
 
@@ -794,7 +794,7 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 
 		if (!LobbyWidgetClass)
 		{
-			UE_LOG(LogKCGameSystem, Error, TEXT("[LobbyUI] SetupLobbyUI 실패: LobbyWidgetClass가 설정되지 않음"));
+			UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyPlayerController] SetupLobbyUI Failed: LobbyWidgetClass is not set in BP_PC_Lobby or KCUISettings."));
 			return;
 		}
 	}
@@ -805,11 +805,11 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 		if (LobbyWidgetInstance)
 		{
 			LobbyWidgetInstance->AddToViewport();
-			UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] SetupLobbyUI 성공: WBP_LobbyUI 생성 및 뷰포트 추가 완료"));
+			UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerController] SetupLobbyUI: Created and added WBP_LobbyUI to viewport"));
 		}
 		else
 		{
-			UE_LOG(LogKCGameSystem, Error, TEXT("[LobbyUI] SetupLobbyUI 실패: Failed to create LobbyWidgetInstance"));
+			UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyPlayerController] SetupLobbyUI Failed: Failed to create LobbyWidgetInstance"));
 		}
 	}
 }
@@ -1030,7 +1030,7 @@ void AKCLobbyPlayerController::EndSession()
 
 void AKCLobbyPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
 {
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] HandleLoadingScreenHidden 수신 - 이제 로비 UI 표시"));
+	UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyPlayerController] HandleLoadingScreenHidden 수신 - 이제 로비 UI 표시"));
 	SetupLobbyUI();
 }
 
