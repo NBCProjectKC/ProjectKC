@@ -56,6 +56,8 @@ void UKCResultScreen::HandleBackToLobbyButtonClicked()
 		BackToLobbyButton->SetIsEnabled(false);
 	}
 
+	ApplyWaitingOtherPlayersText();
+
 	if (AKCPlayerController* PlayerController = Cast<AKCPlayerController>(GetOwningPlayer()))
 	{
 		PlayerController->RequestSkipResultScreen();
@@ -120,6 +122,24 @@ void UKCResultScreen::ApplySecondCountText()
 	if (SecondCountText && ResultViewModel)
 	{
 		SecondCountText->SetText(ResultViewModel->GetRemainingBackToLobbySecondText());
+	}
+}
+
+void UKCResultScreen::ApplyWaitingOtherPlayersText()
+{
+	if (BackToLobbyText)
+	{
+		BackToLobbyText->SetText(NSLOCTEXT("KCResultScreen", "WaitOtherPlayers", "Wait Other Players"));
+	}
+
+	if (SecondCountText)
+	{
+		SecondCountText->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	if (SecondText)
+	{
+		SecondText->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
 

@@ -34,7 +34,13 @@ protected:
 	virtual void NativeApplyColorStyle(const UKCColorStyle* InColorStyle) override;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
+	TObjectPtr<UTextBlock> BackToLobbyText;
+
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
 	TObjectPtr<UTextBlock> SecondCountText;
+
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
+	TObjectPtr<UTextBlock> SecondText;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "KC|UI")
 	TObjectPtr<UTextBlock> TeamText;
@@ -56,6 +62,7 @@ private:
 	void StopBackToLobbyTimer();
 	void UpdateBackToLobbyTimer();
 	void ApplySecondCountText();
+	void ApplyWaitingOtherPlayersText();
 	void UpdateWinningTeam();
 	void ApplyWinningTeamText();
 	void ApplyWinningTeamColor();
