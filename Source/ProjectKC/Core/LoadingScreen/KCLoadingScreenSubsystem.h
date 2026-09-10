@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
  
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -27,10 +27,13 @@ public:
 	 * @param TargetLevel   타겟 레벨 타입 (예: EKCLevelType::PortableGasStove).
 	 *                      나중에 "GasRange → 결과화면" 같은 다른 전환에도 이 함수를
 	 *                      재사용할 수 있도록 함
-	 * @param AssetTypes    pre-load할 PrimaryAssetType 목록 (예: {"Item"})
 	 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Loading")
 	void BeginPreload(EKCLevelType TargetLevel);
+	
+	/** 세션 참가 실패나 네트워크 에러 발생 시 로딩 화면을 즉시 정리 */
+	UFUNCTION(BlueprintCallable, Category = "KC|Loading")
+	void CancelPreload();
  
 	UPROPERTY(Transient)
 	TObjectPtr<UKCUserWidget> ActiveLoadingWidget;
@@ -42,6 +45,13 @@ public:
 	/** 로딩화면에 항상 쓰이는 기본 팁 데이터 애셋 (에디터에서 지정, 없으면 nullptr) */
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Loading")
 	TObjectPtr<UKCLoadingTipDataAsset> DefaultTipsAsset;
+	
+	/**
+	* 로딩화면이 이미 끝나있으면 즉시 Callback을 실행하고,
+	* 아직 떠있으면 로딩화면이 끝나는 시점에 Callback을 실행하도록 예약한다.
+	* 호스트/클라이언트의 BeginPlay 타이밍 차이까지 커버
+	*/
+	void RunAfterLoadingScreenHidden(UObject* WorldContextObject, FSimpleDelegate Callback);
 private:
 	//Message_Level_Changed 받는 콜백
 	void OnLevelChangedMessage(FGameplayTag Channel, const FKCLevelChangedStruct& Message);
@@ -58,6 +68,12 @@ private:
  
 	// 목표 레벨에 진입여부 (OnLevelChangedMessage->true)
 	bool bLevelReady = false;
+
+	// 플레이어 컨트롤러가 스폰되어 BeginPlay를 탔는지 여부 (네트워크 복제 지연 방어 락)
+	bool bControllerReady = false;
+
+	// 로딩화면이 내려간 후 실행 대기 중인 콜백 목록
+	TArray<FSimpleDelegate> PendingHiddenCallbacks;
  
 	/**
 	 * 로딩 진행률(0.0~1.0)과 텍스트를 화면에 뿌리기 위한 뷰모델.
@@ -79,6 +95,10 @@ private:
 	// 100% 노출을 위한 파괴 지연 티커
 	FTSTicker::FDelegateHandle HideDelayTickerHandle;
 	bool HideWidgetDelayed(float DeltaTime);
+
+	// 컨트롤러 미도착 시 무한 로딩 방지용 비상 탈출 티커 (1.5초)
+	FTSTicker::FDelegateHandle ControllerTimeoutTickerHandle;
+	bool OnControllerTimeout(float DeltaTime);
 	
 	// GMS 핸들
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;
@@ -90,5 +110,11 @@ private:
 	*/
     void UpdateLoadingText();
 	void RefreshActiveLoadingWidget();
+	
+	// 클라이언트의 세션 Join 실패 델리게이트 핸들러
+	UFUNCTION()
+	void HandleSessionJoinComplete(bool bWasSuccessful, const FString& ConnectString);
+	UFUNCTION()
+	void HandleSessionCreateComplete(bool bWasSuccessful);
 };
  

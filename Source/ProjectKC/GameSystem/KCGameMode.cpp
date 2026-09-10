@@ -492,7 +492,7 @@ void AKCGameMode::RestoreSlotDataForController(AController* Controller)
 	AKCPlayerState* KCPS = Controller ? Controller->GetPlayerState<AKCPlayerState>() : nullptr;
 	if (!KCPS)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 중단 - KCPS가 null. Controller=%s"),
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - KCPS가 null. Controller=%s"),
 			Controller ? *Controller->GetName() : TEXT("null"));
 		return;
 	}
@@ -500,19 +500,19 @@ void AKCGameMode::RestoreSlotDataForController(AController* Controller)
 	UKCSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<UKCSessionSubsystem>();
 	if (!SessionSub)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 중단 - SessionSub가 null."));
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - SessionSub가 null."));
 		return;
 	}
 
 	const FString NetIdStr = KCPS->GetUniquePlayerIdString();
 	const FString QueryKey = !NetIdStr.IsEmpty() ? NetIdStr : KCPS->GetPlayerName();
 
-	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 진행 중 - NetIdStr='%s', PlayerName='%s', QueryKey='%s'"),
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 진행 중 - NetIdStr='%s', PlayerName='%s', QueryKey='%s'"),
 		*NetIdStr, *KCPS->GetPlayerName(), *QueryKey);
 
 	if (QueryKey.IsEmpty())
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG7] RestoreSlotDataForController 중단 - QueryKey가 비어있음."));
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] RestoreSlotDataForController 중단 - QueryKey가 비어있음."));
 		return;
 	}
 
@@ -536,11 +536,11 @@ void AKCGameMode::RestoreSlotDataForController(AController* Controller)
 
 bool AKCGameMode::UpdatePlayerStartSpot(AController* Player, const FString& Portal, FString& OutErrorMessage)
 {
-	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG4] UpdatePlayerStartSpot 진입, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] UpdatePlayerStartSpot 진입, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
 
 	RestoreSlotDataForController(Player);
 
-	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG4] UpdatePlayerStartSpot 완료, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Spawn] UpdatePlayerStartSpot 완료, Player=%s"), Player ? *Player->GetName() : TEXT("null"));
 
 	return Super::UpdatePlayerStartSpot(Player, Portal, OutErrorMessage);
 }

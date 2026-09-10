@@ -27,6 +27,8 @@
 #include "Engine/GameInstance.h"
 #include "InputAction.h"
 #include "InputCoreTypes.h"
+#include "Messages/KCGameplayTags.h"
+#include "Messages/Struct/KCEmptyMessageStruct.h"
 #include "Painting/PaintingModeControllerComponent.h"
 #include "Painting/RuntimeMeshPaintTargetComponent.h"
 #include "Widgets/ColorPickerPanelWidget.h"
@@ -145,7 +147,38 @@ bool AKCLobbyPlayerController::ValidateCustomizationPaintingSetup() const
 void AKCLobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	SetupLobbyUI();
+	
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] BeginPlay 진입 -> RunAfterLoadingScreenHidden에 SetupLobbyUI 전달"));
+
+	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate::CreateUObject(this, &AKCLobbyPlayerController::SetupLobbyUI));
+	}
+	
+	/*
+	// 리스너 등록 - 로딩화면이 아직 안 끝났으면 이 경로로 로비 UI 표시
+	UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
+		KCGameplayTags::Message_LoadingScreen_Hidden, this, &AKCLobbyPlayerController::HandleLoadingScreenHidden);
+
+	// 메시지가 이미 지나갔을 수 있으니, 로딩화면이 이미 없으면 즉시 로비 UI 표시
+	bool bShowedImmediately = false;
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			if (!LoadingScreenSubsystem->ActiveLoadingWidget)
+			{
+				SetupLobbyUI();
+				bShowedImmediately = true;
+			}
+		}
+	}
+*/
+	
+//	UE_LOG(LogKCLobby, Warning, TEXT("[KC_DEBUG12] BeginPlay - 즉시 표시 여부: %s (false면 로딩화면 종료 대기 중)"),
+//		bShowedImmediately ? TEXT("TRUE") : TEXT("FALSE"));
+
+	RefreshLobbyCustomizationPresentations();
 	RefreshLobbyCustomizationPresentations();
 }
 
@@ -736,11 +769,13 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 		return;
 	}
 
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] SetupLobbyUI 진입 (콜백 실행됨)"));
+
 	// L_LobbyLevel 레벨에 있을 때만 로비 UI 생성
 	const FString MapName = World->GetMapName();
 	if (UKCLevelTypeLibrary::GetLevelTypeFromWorld(World) != EKCLevelType::LobbyLevel)
 	{
-		UE_LOG(LogKCLobby, Verbose, TEXT("[KCLobbyPlayerController] SetupLobbyUI skipped: Not in L_LobbyLevel (Current: %s)"), *MapName);
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] SetupLobbyUI 건너뜀: L_LobbyLevel이 아님 (현재: %s)"), *MapName);
 		return;
 	}
 
@@ -759,7 +794,7 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 
 		if (!LobbyWidgetClass)
 		{
-			UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyPlayerController] SetupLobbyUI Failed: LobbyWidgetClass is not set in BP_PC_Lobby or KCUISettings."));
+			UE_LOG(LogKCGameSystem, Error, TEXT("[LobbyUI] SetupLobbyUI 실패: LobbyWidgetClass가 설정되지 않음"));
 			return;
 		}
 	}
@@ -770,11 +805,11 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 		if (LobbyWidgetInstance)
 		{
 			LobbyWidgetInstance->AddToViewport();
-			UE_LOG(LogKCLobby, Log, TEXT("[KCLobbyPlayerController] SetupLobbyUI: Created and added WBP_LobbyUI to viewport"));
+			UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] SetupLobbyUI 성공: WBP_LobbyUI 생성 및 뷰포트 추가 완료"));
 		}
 		else
 		{
-			UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyPlayerController] SetupLobbyUI Failed: Failed to create LobbyWidgetInstance"));
+			UE_LOG(LogKCGameSystem, Error, TEXT("[LobbyUI] SetupLobbyUI 실패: Failed to create LobbyWidgetInstance"));
 		}
 	}
 }
@@ -993,6 +1028,12 @@ void AKCLobbyPlayerController::EndSession()
 	}
 }
 
+void AKCLobbyPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
+{
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[LobbyUI] HandleLoadingScreenHidden 수신 - 이제 로비 UI 표시"));
+	SetupLobbyUI();
+}
+
 void AKCLobbyPlayerController::LeaveLobby()
 {
 	if (!IsLocalController())
@@ -1015,4 +1056,3 @@ void AKCLobbyPlayerController::LeaveLobby()
 		}
 	}
 }
-
