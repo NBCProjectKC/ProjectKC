@@ -12,6 +12,7 @@
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
+#include "UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -751,10 +752,14 @@ void AKCLobbyPlayerController::SetupLobbyUI()
 
 	if (!LobbyWidgetClass)
 	{
-		LobbyWidgetClass = StaticLoadClass(UKCLobbyWidget::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyUI.WBP_LobbyUI_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			LobbyWidgetClass = UISettings->LobbyWidgetClass.LoadSynchronous();
+		}
+
 		if (!LobbyWidgetClass)
 		{
-			UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyPlayerController] SetupLobbyUI Failed: Could not load WBP_LobbyUI"));
+			UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyPlayerController] SetupLobbyUI Failed: LobbyWidgetClass is not set in BP_PC_Lobby or KCUISettings."));
 			return;
 		}
 	}
