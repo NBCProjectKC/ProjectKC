@@ -51,6 +51,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
 	void ResetFocusToGame();
 
+	/** @brief 로비 나가기 요청 (방장이면 세션 종료, 클라이언트면 본인만 퇴장) */
+	UFUNCTION(BlueprintCallable, Category = "KC|Lobby|UI")
+	void LeaveLobby();
+
 protected:
 	//~UUserWidget interface
 	virtual void NativeConstruct() override;
@@ -106,7 +110,7 @@ protected:
 
 	/** @brief 비워두면 기본 경로의 WBP_GameSettings를 자동 탐색합니다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Settings")
-	TSubclassOf<UKCLobbyGameSettingsWidget> GameSettingsWidgetClass;
+	TSubclassOf<UKCLobbyGameSettingsWidget> LobbyGameSettingsWidgetClass;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Lobby|Settings")
 	TObjectPtr<UKCLobbyGameSettingsWidget> GameSettingsWidgetInstance;

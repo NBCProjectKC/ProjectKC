@@ -17,6 +17,7 @@
 #include "ProjectKC/Lobby/KCLobbyPlayerController.h"
 #include "ProjectKC/Lobby/UI/KCLobbyToastWidget.h"
 #include "ProjectKC/Lobby/KCLobbyStringTable.h"
+#include "UI/Common/Core/KCUISettings.h"
 #include "Engine/Engine.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
@@ -687,15 +688,15 @@ void UKCSessionSubsystem::ShowToastNotification(const FText& InMessage, float Du
 
 	if (!LobbyToastWidgetClass)
 	{
-		LobbyToastWidgetClass = StaticLoadClass(
-			UKCLobbyToastWidget::StaticClass(),
-			nullptr,
-			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyToast.WBP_LobbyToast_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			LobbyToastWidgetClass = UISettings->LobbyToastWidgetClass.LoadSynchronous();
+		}
 	}
 
 	if (!LobbyToastWidgetClass)
 	{
-		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] LobbyToastWidgetClass was not found (/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_LobbyToast)."));
+		UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] LobbyToastWidgetClass is not configured in KCUISettings or could not be loaded."));
 		return;
 	}
 

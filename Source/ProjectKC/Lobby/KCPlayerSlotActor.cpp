@@ -84,12 +84,8 @@ void AKCPlayerSlotActor::AssignPlayer(const FKCPlayerInfoStruct& InPlayerInfo, A
 
 	if (!CharacterClass)
 	{
-		static UClass* LoadedClass = StaticLoadClass(AKCLobbyCharacter::StaticClass(), nullptr, TEXT("/Game/KC/SteamLobbySystem/Blueprints/Lobby/BP_Lobby_PlayerCharacter.BP_Lobby_PlayerCharacter_C"));
-		CharacterClass = LoadedClass;
-		if (!CharacterClass)
-		{
-			UE_LOG(LogKCLobby, Error, TEXT("[KCPlayerSlotActor] Slot %d Failed to load BP_Lobby_PlayerCharacter class!"), SlotIndex);
-		}
+		UE_LOG(LogKCLobby, Error, TEXT("[KCPlayerSlotActor] Slot %d: CharacterClass is not configured! Please set CharacterClass in BP_PlayerSlot."), SlotIndex);
+		return;
 	}
 
 	if (CharacterClass)

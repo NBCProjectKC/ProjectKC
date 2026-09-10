@@ -11,6 +11,7 @@
 #include "ProjectKC/Player/KCPlayerState.h"
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
+#include "UI/Common/Core/KCUISettings.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -281,21 +282,21 @@ void UKCLobbyWidget::OnGameSettingsClicked()
 		return;
 	}
 
-	if (!GameSettingsWidgetClass)
+	if (!LobbyGameSettingsWidgetClass)
 	{
-		GameSettingsWidgetClass = StaticLoadClass(
-			UKCLobbyGameSettingsWidget::StaticClass(),
-			nullptr,
-			TEXT("/Game/KC/SteamLobbySystem/Blueprints/UI/WBP_GameSettings.WBP_GameSettings_C"));
+		if (const UKCUISettings* UISettings = GetDefault<UKCUISettings>())
+		{
+			LobbyGameSettingsWidgetClass = UISettings->LobbyGameSettingsWidgetClass.LoadSynchronous();
+		}
 	}
 
-	if (!GameSettingsWidgetClass)
+	if (!LobbyGameSettingsWidgetClass)
 	{
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyWidget] WBP_GameSettings class was not found. Please create it or set GameSettingsWidgetClass."));
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyWidget] LobbyGameSettingsWidgetClass is not set in WBP_LobbyUI or KCUISettings."));
 		return;
 	}
 
-	GameSettingsWidgetInstance = CreateWidget<UKCLobbyGameSettingsWidget>(LobbyPC, GameSettingsWidgetClass);
+	GameSettingsWidgetInstance = CreateWidget<UKCLobbyGameSettingsWidget>(LobbyPC, LobbyGameSettingsWidgetClass);
 	if (!GameSettingsWidgetInstance)
 	{
 		UE_LOG(LogKCLobby, Error, TEXT("[KCLobbyWidget] Failed to create WBP_GameSettings instance."));
@@ -398,6 +399,14 @@ void UKCLobbyWidget::ResetFocusToGame()
 	if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(GetOwningPlayer()))
 	{
 		LobbyPC->ResetFocusToGame();
+	}
+}
+
+void UKCLobbyWidget::LeaveLobby()
+{
+	if (AKCLobbyPlayerController* LobbyPC = Cast<AKCLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LobbyPC->LeaveLobby();
 	}
 }
 
