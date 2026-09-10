@@ -110,7 +110,7 @@ protected:
 
 	/** @brief 비워두면 기본 경로의 WBP_GameSettings를 자동 탐색합니다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Lobby|Settings")
-	TSubclassOf<UKCLobbyGameSettingsWidget> GameSettingsWidgetClass;
+	TSubclassOf<UKCLobbyGameSettingsWidget> LobbyGameSettingsWidgetClass;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "KC|Lobby|Settings")
 	TObjectPtr<UKCLobbyGameSettingsWidget> GameSettingsWidgetInstance;
