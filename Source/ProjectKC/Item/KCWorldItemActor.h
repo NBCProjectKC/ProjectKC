@@ -152,6 +152,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	UStaticMeshComponent* GetItemMesh() const;
 
+	void ApplyDefaultOutline();
+	void ApplyInteractionOutlineForTeam(int32 TeamId);
+	void DisableOutline();
+
 	UPROPERTY(BlueprintAssignable, Category = "KC|Item")
 	FKCWorldItemStateChangedSignature OnItemStateChanged;
 
@@ -196,6 +200,18 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item|Use")
 	TObjectPtr<UKCAbilitySourceComponent> AbilitySourceComponent;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item|Outline")
+	bool bUseOutline = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item|Outline", meta = (ClampMin = "0", ClampMax = "255"))
+	int32 DefaultOutlineStencilValue = 250;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item|Outline", meta = (ClampMin = "0", ClampMax = "255"))
+	int32 Team0OutlineStencilValue = 252;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Item|Outline", meta = (ClampMin = "0", ClampMax = "255"))
+	int32 Team1OutlineStencilValue = 251;
+
 private:
 	friend class UKCHeldItemComponent;
 
@@ -213,6 +229,7 @@ private:
 	void AlignGripToAttachmentSocket();
 	void RefreshReplicatedAttachment();
 	void ApplyStatePresentation();
+	int32 ResolveTeamOutlineStencilValue(int32 TeamId) const;
 	void BroadcastStateChanged();
 	void ResetDurability();
 	void SetCurrentDurability(float NewDurability);

@@ -1,12 +1,16 @@
 #include "Player/Interaction/KCPlayerInteractionComponent.h"
 
+#include "Camera/CameraComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
+#include "Materials/MaterialInterface.h"
 #include "Interaction/Interface/KCInteractableInterface.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
+#include "ProjectKC/Player/KCPlayerState.h"
 
 UKCPlayerInteractionComponent::UKCPlayerInteractionComponent()
 {
@@ -38,6 +42,7 @@ void UKCPlayerInteractionComponent::TickComponent(
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (OwnerPawn && OwnerPawn->IsLocallyControlled())
 	{
+		ApplyItemHighlightPostProcess();
 		RefreshBestInteractable();
 	}
 }
@@ -102,10 +107,17 @@ void UKCPlayerInteractionComponent::RefreshBestInteractable()
 	AActor* NewBestInteractable = GetBestInteractable();
 	if (CurrentBestInteractable.Get() == NewBestInteractable)
 	{
+		if (AKCWorldItemActor* CurrentItem =
+			Cast<AKCWorldItemActor>(NewBestInteractable))
+		{
+			CurrentItem->ApplyInteractionOutlineForTeam(GetOwnerTeamId());
+		}
 		return;
 	}
 
+	AActor* PreviousBestInteractable = CurrentBestInteractable.Get();
 	CurrentBestInteractable = NewBestInteractable;
+	ApplyInteractableOutline(PreviousBestInteractable, NewBestInteractable);
 	OnBestInteractableChanged.Broadcast(NewBestInteractable);
 }
 
@@ -151,6 +163,61 @@ UPrimitiveComponent* UKCPlayerInteractionComponent::FindInteractionComponent(
 	}
 
 	return BestTargetComponent;
+}
+
+void UKCPlayerInteractionComponent::ApplyInteractableOutline(
+	AActor* PreviousTarget,
+	AActor* NewTarget) const
+{
+	if (AKCWorldItemActor* PreviousItem = Cast<AKCWorldItemActor>(PreviousTarget))
+	{
+		PreviousItem->ApplyDefaultOutline();
+	}
+
+	if (AKCWorldItemActor* NewItem = Cast<AKCWorldItemActor>(NewTarget))
+	{
+		NewItem->ApplyInteractionOutlineForTeam(GetOwnerTeamId());
+	}
+}
+
+void UKCPlayerInteractionComponent::ApplyItemHighlightPostProcess()
+{
+	if (bItemHighlightPostProcessApplied || ItemHighlightPostProcessMaterial.IsNull())
+	{
+		return;
+	}
+
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn || !OwnerPawn->IsLocallyControlled())
+	{
+		return;
+	}
+
+	UCameraComponent* CameraComponent = OwnerPawn->FindComponentByClass<UCameraComponent>();
+	if (!CameraComponent)
+	{
+		return;
+	}
+
+	UMaterialInterface* HighlightMaterial = ItemHighlightPostProcessMaterial.LoadSynchronous();
+	if (!HighlightMaterial)
+	{
+		return;
+	}
+
+	CameraComponent->AddOrUpdateBlendable(
+		HighlightMaterial,
+		ItemHighlightPostProcessWeight);
+	bItemHighlightPostProcessApplied = true;
+}
+
+int32 UKCPlayerInteractionComponent::GetOwnerTeamId() const
+{
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	const AKCPlayerState* KCPlayerState = OwnerPawn
+		? OwnerPawn->GetPlayerState<AKCPlayerState>()
+		: nullptr;
+	return KCPlayerState ? KCPlayerState->GetTeamId() : INDEX_NONE;
 }
 
 bool UKCPlayerInteractionComponent::IsValidInteractionComponent(

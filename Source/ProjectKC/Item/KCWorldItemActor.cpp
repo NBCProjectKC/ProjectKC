@@ -264,7 +264,11 @@ bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
 bool AKCWorldItemActor::CanBePickedUp() const
 {
 	return RuntimeState.State == EKCWorldItemState::World &&
-		bDefinitionValid && !bUseConsumptionPending;
+		bDefinitionValid &&
+		!IsBroken() &&
+		!bBreakDestructionScheduled &&
+		!bUseConsumptionPending &&
+		!bUseConsumptionDestructionScheduled;
 }
 
 bool AKCWorldItemActor::IsUsable() const
@@ -378,6 +382,39 @@ UKCItemDefinition* AKCWorldItemActor::GetItemDefinition() const
 UStaticMeshComponent* AKCWorldItemActor::GetItemMesh() const
 {
 	return ItemMesh;
+}
+
+void AKCWorldItemActor::ApplyDefaultOutline()
+{
+	if (!ItemMesh || !bUseOutline)
+	{
+		return;
+	}
+
+	ItemMesh->SetRenderCustomDepth(true);
+	ItemMesh->SetCustomDepthStencilValue(DefaultOutlineStencilValue);
+}
+
+void AKCWorldItemActor::ApplyInteractionOutlineForTeam(int32 TeamId)
+{
+	if (!ItemMesh || !bUseOutline || !CanBePickedUp())
+	{
+		ApplyDefaultOutline();
+		return;
+	}
+
+	ItemMesh->SetRenderCustomDepth(true);
+	ItemMesh->SetCustomDepthStencilValue(ResolveTeamOutlineStencilValue(TeamId));
+}
+
+void AKCWorldItemActor::DisableOutline()
+{
+	if (!ItemMesh)
+	{
+		return;
+	}
+
+	ItemMesh->SetRenderCustomDepth(false);
 }
 
 void AKCWorldItemActor::GetLifetimeReplicatedProps(
@@ -597,14 +634,23 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 
 void AKCWorldItemActor::ApplyStatePresentation()
 {
+	const bool bUnavailableInWorld =
+		bUseConsumptionPending ||
+		bUseConsumptionDestructionScheduled ||
+		IsBroken() ||
+		bBreakDestructionScheduled;
+
 	ItemMesh->SetVisibility(!bUseConsumptionPending, true);
 
-	if (!bDefinitionValid || bUseConsumptionPending)
+	if (!bDefinitionValid || bUnavailableInWorld)
 	{
+		DisableOutline();
 		ItemMesh->SetSimulatePhysics(false);
 		ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		return;
 	}
+
+	ApplyDefaultOutline();
 
 	if (RuntimeState.State == EKCWorldItemState::Held)
 	{
@@ -618,6 +664,21 @@ void AKCWorldItemActor::ApplyStatePresentation()
 	ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	ItemMesh->SetSimulatePhysics(
 		ItemDefinition->Presentation.bSimulatePhysicsInWorld);
+}
+
+int32 AKCWorldItemActor::ResolveTeamOutlineStencilValue(int32 TeamId) const
+{
+	if (TeamId == 0)
+	{
+		return Team0OutlineStencilValue;
+	}
+
+	if (TeamId == 1)
+	{
+		return Team1OutlineStencilValue;
+	}
+
+	return DefaultOutlineStencilValue;
 }
 
 void AKCWorldItemActor::BroadcastStateChanged()
