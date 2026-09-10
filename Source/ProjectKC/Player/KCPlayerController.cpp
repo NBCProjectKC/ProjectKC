@@ -50,13 +50,7 @@ void AKCPlayerController::BeginPlay()
 	{
 		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate::CreateUObject(this, &AKCPlayerController::InitializeInGameHUD));
 	}
-	/*
-	// 로딩화면 내려가고 안전하게 HUD 세팅 이벤트 : Host 전용 로직
-	LoadingScreenHiddenListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
-		KCGameplayTags::Message_LoadingScreen_Hidden, this, &AKCPlayerController::HandleLoadingScreenHidden);
-	GamePhaseChangedListenerHandle = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCGamePhaseChangedStruct>(
-		KCGameplayTags::Message_Game_PhaseChanged, this, &AKCPlayerController::HandleGamePhaseChanged);
-
+	
 	if (const UWorld* World = GetWorld())
 	{
 		if (const AKCGameState* GameState = World->GetGameState<AKCGameState>())
@@ -67,19 +61,6 @@ void AKCPlayerController::BeginPlay()
 			}
 		}
 	}
-	
-	// BeginPlay() 호출 시점 고려하여 로딩화면 직접 조회 후 실행
-	if (UGameInstance* GI = GetGameInstance())
-	{
-		if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GI->GetSubsystem<UKCLoadingScreenSubsystem>())
-		{
-			if (!LoadingScreenSubsystem->ActiveLoadingWidget)
-			{
-				InitializeInGameHUD();
-			}
-		}
-	}
-	*/
 }
 
 void AKCPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)

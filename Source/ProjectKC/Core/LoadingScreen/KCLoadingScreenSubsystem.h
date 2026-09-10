@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
  
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -68,6 +68,12 @@ private:
  
 	// 목표 레벨에 진입여부 (OnLevelChangedMessage->true)
 	bool bLevelReady = false;
+
+	// 플레이어 컨트롤러가 스폰되어 BeginPlay를 탔는지 여부 (네트워크 복제 지연 방어 락)
+	bool bControllerReady = false;
+
+	// 로딩화면이 내려간 후 실행 대기 중인 콜백 목록
+	TArray<FSimpleDelegate> PendingHiddenCallbacks;
  
 	/**
 	 * 로딩 진행률(0.0~1.0)과 텍스트를 화면에 뿌리기 위한 뷰모델.
@@ -89,6 +95,10 @@ private:
 	// 100% 노출을 위한 파괴 지연 티커
 	FTSTicker::FDelegateHandle HideDelayTickerHandle;
 	bool HideWidgetDelayed(float DeltaTime);
+
+	// 컨트롤러 미도착 시 무한 로딩 방지용 비상 탈출 티커 (1.5초)
+	FTSTicker::FDelegateHandle ControllerTimeoutTickerHandle;
+	bool OnControllerTimeout(float DeltaTime);
 	
 	// GMS 핸들
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;
