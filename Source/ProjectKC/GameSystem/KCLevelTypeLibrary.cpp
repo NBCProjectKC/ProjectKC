@@ -65,3 +65,18 @@ const FKCLevelInfoRow* UKCLevelTypeLibrary::GetLevelInfoRow(EKCLevelType LevelTy
 	const FName RowName = GetLevelName(LevelType);
 	return Table->FindRow<FKCLevelInfoRow>(RowName, TEXT("GetLevelInfoRow"));
 }
+
+bool UKCLevelTypeLibrary::IsPlayableLevel(EKCLevelType LevelType)
+{
+	return LevelType == EKCLevelType::LobbyLevel ||
+		   LevelType == EKCLevelType::PortableGasStove ||
+		   LevelType == EKCLevelType::MicroWaveOven ||
+		   LevelType == EKCLevelType::FryingPan;
+}
+
+bool UKCLevelTypeLibrary::IsInGameLevel(EKCLevelType LevelType)
+{
+	return LevelType == EKCLevelType::PortableGasStove ||
+		   LevelType == EKCLevelType::MicroWaveOven ||
+		   LevelType == EKCLevelType::FryingPan;
+}
