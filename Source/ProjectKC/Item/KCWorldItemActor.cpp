@@ -11,6 +11,7 @@
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
+#include "ProjectKC/Item/Component/KCItemOutlineComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "TimerManager.h"
@@ -28,6 +29,10 @@ AKCWorldItemActor::AKCWorldItemActor()
 	ItemMesh->SetGenerateOverlapEvents(true);
 	ItemMesh->SetSimulatePhysics(false);
 	ItemMesh->ComponentTags.AddUnique(TEXT("Interactable"));
+
+	ItemOutlineComponent =
+		CreateDefaultSubobject<UKCItemOutlineComponent>(TEXT("ItemOutline"));
+	ItemOutlineComponent->SetOutlineMesh(ItemMesh);
 
 	AbilitySourceComponent =
 		CreateDefaultSubobject<UKCAbilitySourceComponent>(TEXT("AbilitySource"));
@@ -386,35 +391,37 @@ UStaticMeshComponent* AKCWorldItemActor::GetItemMesh() const
 
 void AKCWorldItemActor::ApplyDefaultOutline()
 {
-	if (!ItemMesh || !bUseOutline)
+	if (ItemOutlineComponent)
 	{
-		return;
+		ItemOutlineComponent->ApplyDefaultOutline();
 	}
-
-	ItemMesh->SetRenderCustomDepth(true);
-	ItemMesh->SetCustomDepthStencilValue(DefaultOutlineStencilValue);
 }
 
 void AKCWorldItemActor::ApplyInteractionOutlineForTeam(int32 TeamId)
 {
-	if (!ItemMesh || !bUseOutline || !CanBePickedUp())
+	if (!CanBePickedUp())
 	{
 		ApplyDefaultOutline();
 		return;
 	}
 
-	ItemMesh->SetRenderCustomDepth(true);
-	ItemMesh->SetCustomDepthStencilValue(ResolveTeamOutlineStencilValue(TeamId));
+	if (ItemOutlineComponent)
+	{
+		ItemOutlineComponent->ApplyInteractionOutlineForTeam(TeamId);
+	}
 }
 
 void AKCWorldItemActor::DisableOutline()
 {
-	if (!ItemMesh)
+	if (ItemOutlineComponent)
 	{
-		return;
+		ItemOutlineComponent->DisableOutline();
 	}
+}
 
-	ItemMesh->SetRenderCustomDepth(false);
+UKCItemOutlineComponent* AKCWorldItemActor::GetItemOutlineComponent() const
+{
+	return ItemOutlineComponent;
 }
 
 void AKCWorldItemActor::GetLifetimeReplicatedProps(
@@ -664,21 +671,6 @@ void AKCWorldItemActor::ApplyStatePresentation()
 	ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	ItemMesh->SetSimulatePhysics(
 		ItemDefinition->Presentation.bSimulatePhysicsInWorld);
-}
-
-int32 AKCWorldItemActor::ResolveTeamOutlineStencilValue(int32 TeamId) const
-{
-	if (TeamId == 0)
-	{
-		return Team0OutlineStencilValue;
-	}
-
-	if (TeamId == 1)
-	{
-		return Team1OutlineStencilValue;
-	}
-
-	return DefaultOutlineStencilValue;
 }
 
 void AKCWorldItemActor::BroadcastStateChanged()
