@@ -9,6 +9,7 @@ struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
 class UKCCustomizationNetworkComponent;
+class UKCTeamFeedbackAudioComponent;
 struct FGameplayTag;
 struct FKCEmptyMessageStruct;
 struct FKCGamePhaseChangedStruct;
@@ -71,6 +72,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "KC|Customization|Network")
 	TObjectPtr<UKCCustomizationNetworkComponent> CustomizationNetworkComponent;
+
+	UPROPERTY(VisibleAnywhere, Category = "KC|Audio")
+	TObjectPtr<UKCTeamFeedbackAudioComponent> TeamFeedbackAudioComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> PlayerMappingContext;

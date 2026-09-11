@@ -18,6 +18,7 @@
 #include "ProjectKC/UI/HUD/Widget/KCHUDWidget.h"
 #include "ProjectKC/UI/Result/Screen/KCResultScreen.h"
 #include "ProjectKC/Player/KCPlayerState.h"
+#include "ProjectKC/Player/Component/KCTeamFeedbackAudioComponent.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
 #include "Messages/Struct/KCGamePhaseChangedStruct.h"
@@ -26,6 +27,8 @@ AKCPlayerController::AKCPlayerController()
 {
 	CustomizationNetworkComponent = CreateDefaultSubobject<UKCCustomizationNetworkComponent>(
 		TEXT("CustomizationNetwork"));
+	TeamFeedbackAudioComponent = CreateDefaultSubobject<UKCTeamFeedbackAudioComponent>(
+		TEXT("TeamFeedbackAudio"));
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::Crosshairs;
 }

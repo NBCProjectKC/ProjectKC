@@ -4,6 +4,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "KCSoundSettings.generated.h"
 
+class USoundBase;
 class USoundClass;
 class USoundMix;
 
@@ -48,4 +49,7 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Audio|Class")
 	FKCSoundClassSetting UI;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Audio|SFX")
+	TSoftObjectPtr<USoundBase> RecipeFailedSound;
 };
