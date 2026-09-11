@@ -13,6 +13,5 @@ enum class EKCLobbyMessageType : uint8
 	LobbyFull       UMETA(DisplayName = "로비 정원 초과"),
 	HostClosed      UMETA(DisplayName = "방장 로비 종료"),
 	HostLost        UMETA(DisplayName = "방장 연결 끊김"),
-	SessionNotFound UMETA(DisplayName = "세션 찾을 수 없음"),
-	NotAllReady     UMETA(DisplayName = "전원 준비 미완료")
+	SessionNotFound UMETA(DisplayName = "세션 찾을 수 없음")
 };

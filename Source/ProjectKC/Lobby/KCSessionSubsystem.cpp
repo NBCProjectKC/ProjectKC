@@ -19,6 +19,7 @@
 #include "ProjectKC/Lobby/KCLobbyStringTable.h"
 #include "UI/Common/Core/KCUISettings.h"
 #include "Engine/Engine.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 
 UKCSessionSubsystem::UKCSessionSubsystem()
 {
@@ -148,31 +149,65 @@ void UKCSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLANM
 	}
 }
 
+void UKCSessionSubsystem::NotifyJoinFailure(EKCLobbyMessageType FailType, const FString& DebugReason)
+{
+	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] Join Failed: %s"), *DebugReason);
+
+	bIsJoiningSession = false;
+
+	if (UKCLoadingScreenSubsystem* LoadingScreen = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LoadingScreen->CancelPreload();
+	}
+
+	const FText FailMessage = UKCLobbyStringTable::GetMessage(FailType);
+
+	ShowToastNotification(FailMessage);
+	// UE 엔진 내부적으로 세션 참가 실패 시 L_MainMeun?closed 레벨 재로드가 일어날 수 있으므로,
+	// 재로드된 메인 메뉴 Controller의 BeginPlay(CheckPendingSessionNotification)에서 토스트를 복원할 수 있도록 유지
+	PendingJoinFailureMessage = FailMessage;
+
+	OnJoinFailed.Broadcast(FailMessage);
+	OnJoinSessionComplete.Broadcast(false, FString());
+}
+
 void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResult)
 {
 	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] JoinSession requested"));
 
 	bSessionTerminationNotified = false;
-	bIsJoiningSession = true;
 	PendingJoinFailureMessage = FText::GetEmpty();
+
+	// 1. 유효하지 않은 세션 결과 사전 검증 (프리로딩 차단)
+	if (!SessionResult.OnlineResult.IsValid())
+	{
+		NotifyJoinFailure(EKCLobbyMessageType::SessionNotFound, TEXT("SessionResult is invalid"));
+		return;
+	}
+
+	// 2. 세션 정원 사전 검증 (만석인 경우 프리로딩 화면을 전혀 띄우지 않고 즉시 토스트 표시)
+	if (SessionResult.OnlineResult.Session.NumOpenPublicConnections <= 0)
+	{
+		NotifyJoinFailure(EKCLobbyMessageType::LobbyFull,
+			FString::Printf(TEXT("Session is full (OpenConnections=%d)"), SessionResult.OnlineResult.Session.NumOpenPublicConnections));
+		return;
+	}
+
+	bIsJoiningSession = true;
 
 	// 세션 정보 캐싱 (재접속 지원)
 	CacheSessionResult(SessionResult);
 
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: SessionInterface is invalid"));
-		bIsJoiningSession = false;
-		OnJoinSessionComplete.Broadcast(false, FString());
+		NotifyJoinFailure(EKCLobbyMessageType::SessionNotFound, TEXT("SessionInterface is invalid"));
 		return;
 	}
 
 	ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer();
 	if (!LocalPlayer)
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession Failed: LocalPlayer is null"));
-		bIsJoiningSession = false;
-		OnJoinSessionComplete.Broadcast(false, FString());
+		NotifyJoinFailure(EKCLobbyMessageType::SessionNotFound, TEXT("LocalPlayer is null"));
 		return;
 	}
 
@@ -187,17 +222,10 @@ void UKCSessionSubsystem::JoinSession(const FBlueprintSessionResult& SessionResu
 		return;
 	}
 
-	if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
-	{
-		LoadingScreenSubsystem->BeginPreload(EKCLevelType::LobbyLevel);
-	}
-	
 	const bool bSuccess = SessionInterface->JoinSession(LocalPlayer->GetControllerId(), NAME_GameSession, SessionResult.OnlineResult);
 	if (!bSuccess)
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession returned false immediately!"));
-		bIsJoiningSession = false;
-		OnJoinSessionComplete.Broadcast(false, FString());
+		NotifyJoinFailure(EKCLobbyMessageType::SessionNotFound, TEXT("JoinSession returned false immediately"));
 	}
 	else
 	{
@@ -259,10 +287,25 @@ void UKCSessionSubsystem::PerformReturnToMainMenu()
 	bPendingReturnToMainMenu = false;
 	bSessionTerminationNotified = false;
 	bIsJoiningSession = false;
-	const FName MainMenuLevelName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::MainMenu);
-	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Opening MainMenu level: %s"), *MainMenuLevelName.ToString());
+
+	// 세션 참가 실패 등으로 진행 중이던 프리로딩 로딩 화면이 있다면 즉시 취소
+	if (UKCLoadingScreenSubsystem* LoadingScreenSubsystem = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LoadingScreenSubsystem->CancelPreload();
+	}
 
 	UWorld* World = GetWorld();
+	const FString CurrentMapName = World ? World->GetMapName() : FString();
+	const FName MainMenuLevelName = UKCLevelTypeLibrary::GetLevelName(EKCLevelType::MainMenu);
+
+	// 이미 메인 메뉴 레벨에 있는 상태라면 OpenLevel을 다시 호출하지 않음 (토스트 위젯 파괴 및 스플래시 화면 재출력 방지)
+	if (CurrentMapName.Contains(MainMenuLevelName.ToString()))
+	{
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Already in MainMenu level (%s). Skipping OpenLevel to preserve Toast and UI."), *CurrentMapName);
+		return;
+	}
+
+	UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Opening MainMenu level: %s"), *MainMenuLevelName.ToString());
 	if (World)
 	{
 		UGameplayStatics::OpenLevel(World, MainMenuLevelName);
@@ -350,23 +393,25 @@ void UKCSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] HandleNetworkFailure: Type=%d, Error='%s'"),
 		static_cast<int32>(FailureType), *ErrorString);
 
-	const bool bIsLobbyFull = ErrorString.Contains(TEXT("LOBBY_FULL"));
+	const bool bIsLobbyFull = ErrorString.Contains(TEXT("Lobby.Full"));
 
-	// 세션 참가 진행 중 발생한 네트워크 실패 (정원 초과 등)
-	if (bIsJoiningSession)
+	// 1. 정원 초과(Lobby.Full) 거부이거나 세션 연결 시도 중 발생한 네트워크 실패 (PendingConnectionFailure 등)
+	if (bIsLobbyFull || bIsJoiningSession || FailureType == ENetworkFailure::PendingConnectionFailure)
 	{
-		bIsJoiningSession = false;
-		const EKCLobbyMessageType FailType = bIsLobbyFull ? EKCLobbyMessageType::LobbyFull : EKCLobbyMessageType::SessionNotFound;
-		const FText FailureMessage = UKCLobbyStringTable::GetMessage(FailType);
-		PendingJoinFailureMessage = FailureMessage;
-		OnJoinFailed.Broadcast(FailureMessage);
-		ShowToastNotification(FailureMessage);
-		// 맵 리로드 시 MainMenu의 BeginPlay에서 다시 띄울 수 있도록 유지
-		PendingJoinFailureMessage = FailureMessage;
+		NotifyJoinFailure(bIsLobbyFull ? EKCLobbyMessageType::LobbyFull : EKCLobbyMessageType::SessionNotFound, ErrorString);
+		ReturnToMainMenu();
 		return;
 	}
 
-	// 이미 접속해 있던 로비/인게임에서 방장과의 연결이 끊겼을 때 (방장 종료 또는 네트워크 단절)
+	// 2. 이미 참가 실패 메시지가 설정되어 있다면 HostLost로 덮어쓰지 않음
+	if (!PendingJoinFailureMessage.IsEmpty())
+	{
+		UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] HandleNetworkFailure: Already handled pending failure message '%s'. Skipping HostLost."),
+			*PendingJoinFailureMessage.ToString());
+		return;
+	}
+
+	// 3. 이미 정상 접속해 있던 로비/인게임에서 방장과의 연결이 끊겼을 때만 HostLost 처리
 	const FText HostLostMessage = UKCLobbyStringTable::GetMessage(EKCLobbyMessageType::HostLost);
 	PendingJoinFailureMessage = HostLostMessage;
 	NotifySessionTerminatedByHost(HostLostMessage.ToString());
@@ -396,16 +441,11 @@ void UKCSessionSubsystem::HandleTravelFailure(UWorld* World, ETravelFailure::Typ
 	UE_LOG(LogKCSession, Warning, TEXT("[KCSessionSubsystem] HandleTravelFailure: Type=%d, Error='%s'"),
 		static_cast<int32>(FailureType), *ErrorString);
 
-	const bool bIsLobbyFull = ErrorString.Contains(TEXT("LOBBY_FULL"));
+	const bool bIsLobbyFull = ErrorString.Contains(TEXT("Lobby.Full"));
+
 	if (bIsJoiningSession)
 	{
-		bIsJoiningSession = false;
-		const EKCLobbyMessageType FailType = bIsLobbyFull ? EKCLobbyMessageType::LobbyFull : EKCLobbyMessageType::SessionNotFound;
-		const FText FailureMessage = UKCLobbyStringTable::GetMessage(FailType);
-		PendingJoinFailureMessage = FailureMessage;
-		OnJoinFailed.Broadcast(FailureMessage);
-		ShowToastNotification(FailureMessage);
-		PendingJoinFailureMessage = FailureMessage;
+		NotifyJoinFailure(bIsLobbyFull ? EKCLobbyMessageType::LobbyFull : EKCLobbyMessageType::SessionNotFound, ErrorString);
 	}
 }
 
@@ -506,34 +546,22 @@ void UKCSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 				UE_LOG(LogKCSession, Log, TEXT("[KCSessionSubsystem] Join Session Success! ClientTravel to: %s"), *ConnectString);
 				PC->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
 			}
+			OnJoinSessionComplete.Broadcast(true, ConnectString);
 		}
 		else
 		{
 			UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] GetResolvedConnectString failed for session %s"), *SessionName.ToString());
+			NotifyJoinFailure(EKCLobbyMessageType::SessionNotFound, TEXT("GetResolvedConnectString failed"));
 		}
 	}
-	else if (!bSuccess)
+	else
 	{
-		UE_LOG(LogKCSession, Error, TEXT("[KCSessionSubsystem] JoinSession failed on OnlineSubsystem (Result: %d)"), static_cast<int32>(Result));
-		bIsJoiningSession = false;
+		const EKCLobbyMessageType FailType = (Result == EOnJoinSessionCompleteResult::SessionIsFull)
+			? EKCLobbyMessageType::LobbyFull
+			: EKCLobbyMessageType::SessionNotFound;
 
-		EKCLobbyMessageType FailType = EKCLobbyMessageType::SessionNotFound;
-		if (Result == EOnJoinSessionCompleteResult::SessionIsFull)
-		{
-			FailType = EKCLobbyMessageType::LobbyFull;
-		}
-		else if (Result == EOnJoinSessionCompleteResult::SessionDoesNotExist)
-		{
-			FailType = EKCLobbyMessageType::SessionNotFound;
-		}
-
-		const FText FailMsg = UKCLobbyStringTable::GetMessage(FailType);
-		PendingJoinFailureMessage = FailMsg;
-		OnJoinFailed.Broadcast(FailMsg);
-		ShowToastNotification(FailMsg);
+		NotifyJoinFailure(FailType, FString::Printf(TEXT("OnlineSubsystem Join failed: %d"), static_cast<int32>(Result)));
 	}
-
-	OnJoinSessionComplete.Broadcast(bSuccess, ConnectString);
 }
 
 void UKCSessionSubsystem::HandleDestroySessionComplete(FName SessionName, bool bWasSuccessful)
@@ -721,6 +749,27 @@ void UKCSessionSubsystem::CheckAndShowPendingJoinFailure(APlayerController* PC)
 {
 	if (!PendingJoinFailureMessage.IsEmpty())
 	{
+		// 세션 참가 실패/연결 끊김으로 인해 메인 메뉴로 복귀한 경우,
+		// 직전에 생성된 스플래시 화면(WBP_SplashScreen)이 있다면 제거하여 토스트와 겹치지 않도록 처리
+		UWorld* World = PC ? PC->GetWorld() : GetWorld();
+		if (World)
+		{
+			const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
+			const TSubclassOf<UUserWidget> SplashScreenClass = UISettings ? UISettings->SplashScreenClass.LoadSynchronous() : nullptr;
+			if (SplashScreenClass)
+			{
+				TArray<UUserWidget*> FoundWidgets;
+				UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, FoundWidgets, SplashScreenClass);
+				for (UUserWidget* Widget : FoundWidgets)
+				{
+					if (IsValid(Widget))
+					{
+						Widget->RemoveFromParent();
+					}
+				}
+			}
+		}
+
 		const FText MsgToShow = PendingJoinFailureMessage;
 		PendingJoinFailureMessage = FText::GetEmpty();
 		ShowToastNotification(MsgToShow, 3.0f, PC);
