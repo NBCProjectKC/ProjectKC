@@ -30,6 +30,9 @@ public:
 	void ApplySoundSettings();
 
 	UFUNCTION(BlueprintCallable, Category = "KC|Audio")
+	void PlayLocalSFX2D(USoundBase* Sound);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|Audio")
 	void SetSoundCategoryVolume(EKCSoundCategory Category, float Volume);
 
 	UFUNCTION(BlueprintPure, Category = "KC|Audio")

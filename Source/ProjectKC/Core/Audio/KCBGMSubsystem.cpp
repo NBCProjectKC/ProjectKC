@@ -112,6 +112,19 @@ void UKCBGMSubsystem::ApplySoundSettings()
 	ApplySoundClassVolume(EKCSoundCategory::UI, GetSoundCategoryVolume(EKCSoundCategory::UI));
 }
 
+void UKCBGMSubsystem::PlayLocalSFX2D(USoundBase* Sound)
+{
+	if (!ShouldPlayAudio() || !Sound)
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySound2D(
+		this,
+		Sound,
+		GetSoundCategoryVolume(EKCSoundCategory::SFX));
+}
+
 void UKCBGMSubsystem::SetSoundCategoryVolume(EKCSoundCategory Category, float Volume)
 {
 	const float ClampedVolume = FMath::Clamp(Volume, 0.0f, 1.0f);
