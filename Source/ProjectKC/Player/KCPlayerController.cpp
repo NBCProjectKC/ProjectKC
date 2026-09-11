@@ -50,6 +50,12 @@ void AKCPlayerController::BeginPlay()
 	{
 		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate::CreateUObject(this, &AKCPlayerController::InitializeInGameHUD));
 	}
+
+	GamePhaseChangedListenerHandle =
+		UGameplayMessageSubsystem::Get(this).RegisterListener<FKCGamePhaseChangedStruct>(
+			KCGameplayTags::Message_Game_PhaseChanged,
+			this,
+			&ThisClass::HandleGamePhaseChanged);
 	
 	if (const UWorld* World = GetWorld())
 	{

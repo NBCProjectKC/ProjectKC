@@ -6,6 +6,9 @@
 #include "KCPlayerInteractionComponent.generated.h"
 
 class AActor;
+class UKCColorStyle;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UPrimitiveComponent;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FKCBestInteractableChangedNativeDelegate, AActor*);
@@ -44,6 +47,11 @@ private:
 	UPrimitiveComponent* FindInteractionComponent(
 		AActor* TargetActor,
 		bool bCheckLineOfSight) const;
+	void ApplyInteractableOutline(AActor* PreviousTarget, AActor* NewTarget) const;
+	void ApplyItemHighlightPostProcess();
+	void RefreshItemHighlightTeamColor();
+	FLinearColor ResolveOwnerTeamColor();
+	int32 GetOwnerTeamId() const;
 	bool IsValidInteractionComponent(
 		UPrimitiveComponent* TargetComponent,
 		bool bCheckLineOfSight,
@@ -62,6 +70,24 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	TEnumAsByte<ECollisionChannel> InteractionTraceChannel = ECC_Visibility;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Interaction|Outline", meta = (AllowPrivateAccess = "true"))
+	TSoftObjectPtr<UMaterialInterface> ItemHighlightPostProcessMaterial;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KC|Interaction|Outline", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ItemHighlightPostProcessWeight = 1.0f;
+
+	UPROPERTY(Transient)
+	bool bItemHighlightPostProcessApplied = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ItemHighlightPostProcessMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UKCColorStyle> CachedColorStyle;
+
+	UPROPERTY(Transient)
+	int32 LastAppliedHighlightTeamId = INDEX_NONE;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> CurrentBestInteractable;

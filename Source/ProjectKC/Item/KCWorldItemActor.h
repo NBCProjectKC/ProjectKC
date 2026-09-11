@@ -13,6 +13,7 @@ class USceneComponent;
 class UStaticMeshComponent;
 class UKCAbilitySourceComponent;
 class UKCHeldItemComponent;
+class UKCItemOutlineComponent;
 class UKCItemDefinition;
 
 UENUM(BlueprintType)
@@ -152,6 +153,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "KC|Item")
 	UStaticMeshComponent* GetItemMesh() const;
 
+	void ApplyDefaultOutline();
+	void ApplyInteractionOutlineForTeam(int32 TeamId);
+	void DisableOutline();
+
+	UFUNCTION(BlueprintPure, Category = "KC|Item|Outline")
+	UKCItemOutlineComponent* GetItemOutlineComponent() const;
+
 	UPROPERTY(BlueprintAssignable, Category = "KC|Item")
 	FKCWorldItemStateChangedSignature OnItemStateChanged;
 
@@ -195,6 +203,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item|Use")
 	TObjectPtr<UKCAbilitySourceComponent> AbilitySourceComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "KC|Item|Outline")
+	TObjectPtr<UKCItemOutlineComponent> ItemOutlineComponent;
 
 private:
 	friend class UKCHeldItemComponent;
