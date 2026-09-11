@@ -1,6 +1,7 @@
-﻿#include "KCAssetManager.h"
+#include "KCAssetManager.h"
 
 #include "Item/Definition/KCItemDefinition.h"
+#include "ProjectKC/ProjectKC.h"
 
 UKCAssetManager& UKCAssetManager::Get()
 {
@@ -22,6 +23,9 @@ TSharedPtr<FStreamableHandle> UKCAssetManager::PreloadAssetsByType(
 	// 1. 카탈로그 조회 (동기, 즉시 반환 - 실제 로드 아님)
 	TArray<FPrimaryAssetId> AssetIds;
 	GetPrimaryAssetIdList(AssetType, AssetIds);
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[AssetManager] PreloadAssetsByType - Type=%s, 발견된 에셋: %d개"),
+		*AssetType.ToString(), AssetIds.Num());
 
 	if (AssetIds.Num() == 0)
 	{
@@ -74,6 +78,8 @@ TSharedPtr<FStreamableHandle> UKCAssetManager::PreloadAssetsByTypes(
 	{
 		TArray<FPrimaryAssetId> AssetIds;
 		GetPrimaryAssetIdList(AssetType, AssetIds);
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[AssetManager] 프리로드 대상 감지: Type=%s, 개수=%d개 (누적 %d개)"),
+			*AssetType.ToString(), AssetIds.Num(), AllAssetIds.Num() + AssetIds.Num());
 		AllAssetIds.Append(AssetIds);
 	}
 
