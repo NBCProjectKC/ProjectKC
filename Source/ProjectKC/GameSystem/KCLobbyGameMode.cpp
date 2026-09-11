@@ -64,8 +64,8 @@ void AKCLobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 	const int32 CurrentPlayerCount = GetNumPlayers();
 	if (CurrentPlayerCount >= RequiredPlayerCount)
 	{
-		ErrorMessage = TEXT("LOBBY_FULL: Maximum player capacity reached for this lobby session.");
-		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] PreLogin Rejected: Lobby is full! (Current: %d / %d, Address: %s)"),
+		ErrorMessage = TEXT("Lobby.Full: Maximum player capacity reached for this lobby session.");
+		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] PreLogin Rejected: Lobby is full (Lobby.Full)! (Current: %d / %d, Address: %s)"),
 			CurrentPlayerCount, RequiredPlayerCount, *Address);
 		return;
 	}
@@ -743,13 +743,6 @@ void AKCLobbyGameMode::StartGame()
 	if (!CheckAllPlayersReady())
 	{
 		UE_LOG(LogKCLobby, Warning, TEXT("[KCLobbyGameMode] StartGame Rejected: Not all players are ready!"));
-		if (UGameInstance* GI = GetGameInstance())
-		{
-			if (UKCSessionSubsystem* Subsystem = GI->GetSubsystem<UKCSessionSubsystem>())
-			{
-				Subsystem->ShowLobbyMessageToast(EKCLobbyMessageType::NotAllReady);
-			}
-		}
 		return;
 	}
 
