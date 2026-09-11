@@ -7,8 +7,8 @@
 #include "Internationalization/StringTableRegistry.h"
 #include "UObject/Package.h"
 
-const FName UKCLobbyStringTable::TableId = TEXT("ST_LobbyMessage");
-const FName UKCLobbyStringTable::StringTablePath = TEXT("/Game/KC/SteamLobbySystem/Data/ST_LobbyMessage");
+const FName UKCLobbyStringTable::TableId = TEXT("ST_LocalizationTable");
+const FName UKCLobbyStringTable::StringTablePath = TEXT("/Game/KC/UI/Localization/ST_LocalizationTable");
 
 void UKCLobbyStringTable::EnsureStringTableLoaded()
 {
@@ -26,15 +26,13 @@ FName UKCLobbyStringTable::GetKeyName(EKCLobbyMessageType MessageType)
 	switch (MessageType)
 	{
 	case EKCLobbyMessageType::LobbyFull:
-		return TEXT("Lobby_Full");
+		return TEXT("Lobby.Full");
 	case EKCLobbyMessageType::HostClosed:
-		return TEXT("Host_Closed");
+		return TEXT("Lobby.HostClosed");
 	case EKCLobbyMessageType::HostLost:
-		return TEXT("Host_Lost");
+		return TEXT("Lobby.HostLost");
 	case EKCLobbyMessageType::SessionNotFound:
-		return TEXT("Session_NotFound");
-	case EKCLobbyMessageType::NotAllReady:
-		return TEXT("Not_All_Ready");
+		return TEXT("Lobby.SessionNotFound");
 	default:
 		return NAME_None;
 	}
@@ -55,14 +53,14 @@ FText UKCLobbyStringTable::GetMessageByKey(FName Key)
 {
 	EnsureStringTableLoaded();
 
-	// 에셋 전체 경로(/Game/KC/SteamLobbySystem/Data/ST_LobbyMessage)로 조회
+	// 에셋 전체 경로(/Game/KC/UI/Localization/ST_LocalizationTable)로 조회
 	FText Message = FText::FromStringTable(StringTablePath, Key.ToString());
 	if (!Message.IsEmpty())
 	{
 		return Message;
 	}
 
-	// TableId(ST_LobbyMessage)로 조회
+	// TableId(ST_LocalizationTable)로 조회
 	Message = FText::FromStringTable(TableId, Key.ToString());
 	return Message;
 }
