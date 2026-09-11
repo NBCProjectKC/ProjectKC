@@ -6,6 +6,8 @@
 #include "KCPlayerInteractionComponent.generated.h"
 
 class AActor;
+class UKCColorStyle;
+class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UPrimitiveComponent;
 
@@ -47,6 +49,8 @@ private:
 		bool bCheckLineOfSight) const;
 	void ApplyInteractableOutline(AActor* PreviousTarget, AActor* NewTarget) const;
 	void ApplyItemHighlightPostProcess();
+	void RefreshItemHighlightTeamColor();
+	FLinearColor ResolveOwnerTeamColor();
 	int32 GetOwnerTeamId() const;
 	bool IsValidInteractionComponent(
 		UPrimitiveComponent* TargetComponent,
@@ -75,6 +79,15 @@ private:
 
 	UPROPERTY(Transient)
 	bool bItemHighlightPostProcessApplied = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ItemHighlightPostProcessMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UKCColorStyle> CachedColorStyle;
+
+	UPROPERTY(Transient)
+	int32 LastAppliedHighlightTeamId = INDEX_NONE;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> CurrentBestInteractable;

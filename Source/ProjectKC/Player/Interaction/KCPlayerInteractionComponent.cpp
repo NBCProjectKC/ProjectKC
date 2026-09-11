@@ -6,11 +6,15 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Interaction/Interface/KCInteractableInterface.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
+#include "ProjectKC/Item/Component/KCItemOutlineComponent.h"
 #include "ProjectKC/Item/KCWorldItemActor.h"
 #include "ProjectKC/Player/KCPlayerState.h"
+#include "ProjectKC/UI/Common/Core/KCUISettings.h"
+#include "ProjectKC/UI/Common/Style/KCColorStyle.h"
 
 UKCPlayerInteractionComponent::UKCPlayerInteractionComponent()
 {
@@ -43,6 +47,7 @@ void UKCPlayerInteractionComponent::TickComponent(
 	if (OwnerPawn && OwnerPawn->IsLocallyControlled())
 	{
 		ApplyItemHighlightPostProcess();
+		RefreshItemHighlightTeamColor();
 		RefreshBestInteractable();
 	}
 }
@@ -107,10 +112,12 @@ void UKCPlayerInteractionComponent::RefreshBestInteractable()
 	AActor* NewBestInteractable = GetBestInteractable();
 	if (CurrentBestInteractable.Get() == NewBestInteractable)
 	{
-		if (AKCWorldItemActor* CurrentItem =
-			Cast<AKCWorldItemActor>(NewBestInteractable))
+		if (UKCItemOutlineComponent* CurrentOutlineComponent =
+			NewBestInteractable
+				? NewBestInteractable->FindComponentByClass<UKCItemOutlineComponent>()
+				: nullptr)
 		{
-			CurrentItem->ApplyInteractionOutlineForTeam(GetOwnerTeamId());
+			CurrentOutlineComponent->ApplyInteractionOutlineForTeam(GetOwnerTeamId());
 		}
 		return;
 	}
@@ -169,14 +176,18 @@ void UKCPlayerInteractionComponent::ApplyInteractableOutline(
 	AActor* PreviousTarget,
 	AActor* NewTarget) const
 {
-	if (AKCWorldItemActor* PreviousItem = Cast<AKCWorldItemActor>(PreviousTarget))
+	if (UKCItemOutlineComponent* PreviousOutlineComponent = PreviousTarget
+		? PreviousTarget->FindComponentByClass<UKCItemOutlineComponent>()
+		: nullptr)
 	{
-		PreviousItem->ApplyDefaultOutline();
+		PreviousOutlineComponent->ApplyDefaultOutline();
 	}
 
-	if (AKCWorldItemActor* NewItem = Cast<AKCWorldItemActor>(NewTarget))
+	if (UKCItemOutlineComponent* NewOutlineComponent = NewTarget
+		? NewTarget->FindComponentByClass<UKCItemOutlineComponent>()
+		: nullptr)
 	{
-		NewItem->ApplyInteractionOutlineForTeam(GetOwnerTeamId());
+		NewOutlineComponent->ApplyInteractionOutlineForTeam(GetOwnerTeamId());
 	}
 }
 
@@ -205,10 +216,65 @@ void UKCPlayerInteractionComponent::ApplyItemHighlightPostProcess()
 		return;
 	}
 
-	CameraComponent->AddOrUpdateBlendable(
+	ItemHighlightPostProcessMID = UMaterialInstanceDynamic::Create(
 		HighlightMaterial,
+		this);
+	if (!ItemHighlightPostProcessMID)
+	{
+		return;
+	}
+
+	LastAppliedHighlightTeamId = INDEX_NONE;
+	RefreshItemHighlightTeamColor();
+
+	CameraComponent->AddOrUpdateBlendable(
+		ItemHighlightPostProcessMID,
 		ItemHighlightPostProcessWeight);
 	bItemHighlightPostProcessApplied = true;
+}
+
+void UKCPlayerInteractionComponent::RefreshItemHighlightTeamColor()
+{
+	if (!ItemHighlightPostProcessMID)
+	{
+		return;
+	}
+
+	const int32 OwnerTeamId = GetOwnerTeamId();
+	if (LastAppliedHighlightTeamId == OwnerTeamId)
+	{
+		return;
+	}
+
+	static const FName TeamColorParameterName(TEXT("TeamColor"));
+	ItemHighlightPostProcessMID->SetVectorParameterValue(
+		TeamColorParameterName,
+		ResolveOwnerTeamColor());
+	LastAppliedHighlightTeamId = OwnerTeamId;
+}
+
+FLinearColor UKCPlayerInteractionComponent::ResolveOwnerTeamColor()
+{
+	const int32 OwnerTeamId = GetOwnerTeamId();
+	if (OwnerTeamId == INDEX_NONE)
+	{
+		return FLinearColor::White;
+	}
+
+	if (!CachedColorStyle)
+	{
+		const UKCUISettings* UISettings = GetDefault<UKCUISettings>();
+		CachedColorStyle = UISettings
+			? UISettings->DefaultColorStyle.LoadSynchronous()
+			: nullptr;
+	}
+
+	if (CachedColorStyle && CachedColorStyle->TeamColors.IsValidIndex(OwnerTeamId))
+	{
+		return CachedColorStyle->TeamColors[OwnerTeamId];
+	}
+
+	return FLinearColor::White;
 }
 
 int32 UKCPlayerInteractionComponent::GetOwnerTeamId() const
