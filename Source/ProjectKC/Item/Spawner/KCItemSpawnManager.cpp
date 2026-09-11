@@ -38,6 +38,9 @@ bool AKCItemSpawnManager::ValidateSettings(FString& OutError) const
 {
 	if (!ItemActorClass || ItemActorClass->HasAnyClassFlags(CLASS_Abstract) ||
 		MaxItemCount < 0 ||
+		MaxItemCountFor2Players < 0 ||
+		MaxItemCountFor4Players < 0 ||
+		MaxItemCountFor6Players < 0 ||
 		!FMath::IsFinite(IngredientRespawnDelayMin) ||
 		!FMath::IsFinite(IngredientRespawnDelayMax) ||
 		IngredientRespawnDelayMin < 0.f ||
@@ -97,7 +100,11 @@ bool AKCItemSpawnManager::ValidateSettings(FString& OutError) const
 		}
 		TotalWeight += Entry.Weight;
 	}
-	if (!Items.IsEmpty() && MaxItemCount > 0 && TotalWeight <= 0.0)
+	const bool bCanSpawnItems = MaxItemCount > 0 ||
+		MaxItemCountFor2Players > 0 ||
+		MaxItemCountFor4Players > 0 ||
+		MaxItemCountFor6Players > 0;
+	if (!Items.IsEmpty() && bCanSpawnItems && TotalWeight <= 0.0)
 	{
 		OutError = TEXT("일반 아이템의 양수 가중치가 필요합니다.");
 		return false;
@@ -112,13 +119,30 @@ bool AKCItemSpawnManager::ValidateSettings(FString& OutError) const
 	const bool bNeedsIngredientPoints = bNeedsIngredients &&
 		IngredientPlacementMode == EKCIngredientPlacementMode::SpawnPoints;
 	if (!IsTemplate() && ((bNeedsIngredientPoints && !HasPoint(IngredientSpawnPoints)) ||
-		(!Items.IsEmpty() && MaxItemCount > 0 && !HasPoint(ItemSpawnPoints))))
+		(!Items.IsEmpty() && bCanSpawnItems && !HasPoint(ItemSpawnPoints))))
 	{
 		OutError = TEXT("생성할 재료/일반 아이템에 사용할 스폰 포인트를 지정하세요.");
 		return false;
 	}
 	OutError.Reset();
 	return true;
+}
+
+int32 AKCItemSpawnManager::ResolveMaxItemCount() const
+{
+	const TCHAR* PlayerCountOption = GetWorld()->URL.GetOption(TEXT("Players="), nullptr);
+	const int32 LobbyPlayerCount = PlayerCountOption ? FCString::Atoi(PlayerCountOption) : 0;
+	switch (LobbyPlayerCount)
+	{
+	case 2:
+		return MaxItemCountFor2Players;
+	case 4:
+		return MaxItemCountFor4Players;
+	case 6:
+		return MaxItemCountFor6Players;
+	default:
+		return MaxItemCount;
+	}
 }
 
 #if WITH_EDITOR
@@ -162,6 +186,7 @@ void AKCItemSpawnManager::BeginPlay()
 	bRunning = true;
 	SetActorTickEnabled(
 		IngredientPlacementMode == EKCIngredientPlacementMode::Orbit);
+	MaxItemCount = ResolveMaxItemCount();
 	if (!Items.IsEmpty()) { Slots.SetNum(MaxItemCount); }
 	RecipeListener = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCActiveRecipesChangedStruct>(
 		KCGameplayTags::Message_Game_ActiveRecipesChanged, this, &ThisClass::HandleRecipesChanged);

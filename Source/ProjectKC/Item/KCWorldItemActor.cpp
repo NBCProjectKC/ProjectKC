@@ -11,6 +11,7 @@
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySourceComponent.h"
 #include "ProjectKC/AbilitySystem/Component/KCAbilitySystemComponent.h"
 #include "ProjectKC/Item/Component/KCHeldItemComponent.h"
+#include "ProjectKC/Item/Component/KCItemOutlineComponent.h"
 #include "ProjectKC/Item/Definition/KCItemDefinition.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "TimerManager.h"
@@ -28,6 +29,10 @@ AKCWorldItemActor::AKCWorldItemActor()
 	ItemMesh->SetGenerateOverlapEvents(true);
 	ItemMesh->SetSimulatePhysics(false);
 	ItemMesh->ComponentTags.AddUnique(TEXT("Interactable"));
+
+	ItemOutlineComponent =
+		CreateDefaultSubobject<UKCItemOutlineComponent>(TEXT("ItemOutline"));
+	ItemOutlineComponent->SetOutlineMesh(ItemMesh);
 
 	AbilitySourceComponent =
 		CreateDefaultSubobject<UKCAbilitySourceComponent>(TEXT("AbilitySource"));
@@ -264,7 +269,11 @@ bool AKCWorldItemActor::ActivateUseWithTarget(AActor* TargetActor)
 bool AKCWorldItemActor::CanBePickedUp() const
 {
 	return RuntimeState.State == EKCWorldItemState::World &&
-		bDefinitionValid && !bUseConsumptionPending;
+		bDefinitionValid &&
+		!IsBroken() &&
+		!bBreakDestructionScheduled &&
+		!bUseConsumptionPending &&
+		!bUseConsumptionDestructionScheduled;
 }
 
 bool AKCWorldItemActor::IsUsable() const
@@ -378,6 +387,41 @@ UKCItemDefinition* AKCWorldItemActor::GetItemDefinition() const
 UStaticMeshComponent* AKCWorldItemActor::GetItemMesh() const
 {
 	return ItemMesh;
+}
+
+void AKCWorldItemActor::ApplyDefaultOutline()
+{
+	if (ItemOutlineComponent)
+	{
+		ItemOutlineComponent->ApplyDefaultOutline();
+	}
+}
+
+void AKCWorldItemActor::ApplyInteractionOutlineForTeam(int32 TeamId)
+{
+	if (!CanBePickedUp())
+	{
+		ApplyDefaultOutline();
+		return;
+	}
+
+	if (ItemOutlineComponent)
+	{
+		ItemOutlineComponent->ApplyInteractionOutlineForTeam(TeamId);
+	}
+}
+
+void AKCWorldItemActor::DisableOutline()
+{
+	if (ItemOutlineComponent)
+	{
+		ItemOutlineComponent->DisableOutline();
+	}
+}
+
+UKCItemOutlineComponent* AKCWorldItemActor::GetItemOutlineComponent() const
+{
+	return ItemOutlineComponent;
 }
 
 void AKCWorldItemActor::GetLifetimeReplicatedProps(
@@ -597,14 +641,23 @@ void AKCWorldItemActor::RefreshReplicatedAttachment()
 
 void AKCWorldItemActor::ApplyStatePresentation()
 {
+	const bool bUnavailableInWorld =
+		bUseConsumptionPending ||
+		bUseConsumptionDestructionScheduled ||
+		IsBroken() ||
+		bBreakDestructionScheduled;
+
 	ItemMesh->SetVisibility(!bUseConsumptionPending, true);
 
-	if (!bDefinitionValid || bUseConsumptionPending)
+	if (!bDefinitionValid || bUnavailableInWorld)
 	{
+		DisableOutline();
 		ItemMesh->SetSimulatePhysics(false);
 		ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		return;
 	}
+
+	ApplyDefaultOutline();
 
 	if (RuntimeState.State == EKCWorldItemState::Held)
 	{

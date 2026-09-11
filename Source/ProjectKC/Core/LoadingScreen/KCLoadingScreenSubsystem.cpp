@@ -182,10 +182,26 @@ void UKCLoadingScreenSubsystem::OnLevelChangedMessage(FGameplayTag Channel, cons
 	UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] Message_Level_Changed 수신: NewLevelType=%d, WaitingForLevel=%d"),
 		static_cast<int32>(Message.NewLevelType), static_cast<int32>(WaitingForLevel));
 
-	if (WaitingForLevel == EKCLevelType::None || Message.NewLevelType != WaitingForLevel)
+	if (WaitingForLevel == EKCLevelType::None)
 	{
-		UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] 대기 중인 레벨과 불일치하여 무시됨"));
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] 대기 중인 레벨이 없어 무시됨"));
 		return;
+	}
+
+	if (Message.NewLevelType != WaitingForLevel)
+	{
+		// 재접속/난입 시: 대기 레벨(예: 로비)과 다르더라도 유효한 플레이 레벨이면 동적으로 수용
+		if (UKCLevelTypeLibrary::IsPlayableLevel(Message.NewLevelType))
+		{
+			UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] 재접속/난입 감지: 대기 레벨(%d) -> 실제 수신 레벨(%d)로 자동 동기화"),
+				static_cast<int32>(WaitingForLevel), static_cast<int32>(Message.NewLevelType));
+			WaitingForLevel = Message.NewLevelType;
+		}
+		else
+		{
+			UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] 대기 중인 레벨과 불일치하여 무시됨"));
+			return;
+		}
 	}
 
 	UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] 목표 레벨 도착 확인 완료 (bLevelReady = true)"));
@@ -428,6 +444,26 @@ void UKCLoadingScreenSubsystem::RunAfterLoadingScreenHidden(UObject* WorldContex
 	UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] RunAfterLoadingScreenHidden - 컨트롤러 도착, 대기열 등록 및 락(Lock) 해제"));
 	PendingHiddenCallbacks.Add(Callback);
 	bControllerReady = true;
+
+	// 컨트롤러가 유효한 플레이 월드에서 호출한 경우, 레벨 로드 완료 보장 (재접속/난입 상황 자동 치유)
+	if (WorldContextObject)
+	{
+		if (const UWorld* World = WorldContextObject->GetWorld())
+		{
+			const EKCLevelType CurrentLevelType = UKCLevelTypeLibrary::GetLevelTypeFromWorld(World);
+			if (UKCLevelTypeLibrary::IsPlayableLevel(CurrentLevelType))
+			{
+				if (!bLevelReady || WaitingForLevel != CurrentLevelType)
+				{
+					UE_LOG(LogKCGameSystem, Warning, TEXT("[LoadingScreen] RunAfterLoadingScreenHidden - 컨트롤러 월드 감지: %d (기존 대기: %d) -> 레벨 준비 완료 처리"),
+						static_cast<int32>(CurrentLevelType), static_cast<int32>(WaitingForLevel));
+					WaitingForLevel = CurrentLevelType;
+					bLevelReady = true;
+				}
+				bAssetsReady = true;
+			}
+		}
+	}
 
 	if (ControllerTimeoutTickerHandle.IsValid())
 	{

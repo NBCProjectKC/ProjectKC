@@ -43,6 +43,8 @@ public:
 	void SetResultScreenEndServerTime(float InTime) { ResultScreenEndServerTime = InTime; }
 	float GetResultScreenEndServerTime() const { return ResultScreenEndServerTime; }
 	int32 GetRemainingResultScreenSeconds(float CurrentServerTime) const;
+	void SetWinningTeamId(int32 InWinningTeamId);
+	int32 GetWinningTeamId() const { return WinningTeamId; }
 	
 	// setter
 	void SetGamePhase(EKCGamePhaseType NewPhase);
@@ -98,6 +100,9 @@ protected:
 	// 이번 매치의 레시피 3종 (DataTable RowName)
 	UPROPERTY(ReplicatedUsing = OnRep_ActiveRecipes)
 	TArray<FName> ActiveRecipeRowNames;
+
+	UPROPERTY(Replicated)
+	int32 WinningTeamId = INDEX_NONE;
 	
 	// 덮개 오픈 여부
 	UPROPERTY(Replicated)

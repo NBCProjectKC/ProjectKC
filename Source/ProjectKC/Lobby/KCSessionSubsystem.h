@@ -12,7 +12,6 @@
 #include "ProjectKC/Lobby/Struct/KCLobbySavedPlayerDataStruct.h"
 #include "GameSystem/Enum/KCLevelType.h"
 #include "ProjectKC/Lobby/Enum/KCLobbyMessageType.h"
-#include "ProjectKC/Lobby/KCLobbyStringTable.h"
 #include "KCSessionSubsystem.generated.h"
 
 class UKCLobbyToastWidget;
@@ -169,6 +168,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|Session|UI")
 	void CheckAndShowPendingJoinFailure(APlayerController* PC);
 
+	/** 보류 중인 세션 알림(참가 실패, 방장 퇴장 등)이 있는지 확인 */
+	UFUNCTION(BlueprintPure, Category = "KC|Session|UI")
+	bool HasPendingJoinFailure() const { return !PendingJoinFailureMessage.IsEmpty(); }
+
 private:
 	UPROPERTY()
 	TMap<FString, FKCLobbySavedPlayerDataStruct> SavedLobbyPlayers;
@@ -207,6 +210,9 @@ private:
 	void BroadcastSessionTerminatedToClients(const FString& Reason);
 	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
 	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
+
+	/** 세션 참가 실패 시 공통 처리 (프리로딩 취소, 상태 리셋, 토스트 출력, 실패 델리게이트 브로드캐스트) */
+	void NotifyJoinFailure(EKCLobbyMessageType FailType, const FString& DebugReason);
 
 	// Pending Join State (이전 세션 정리 후 자동 참가를 위한 상태값)
 	FBlueprintSessionResult PendingSessionToJoin;

@@ -78,6 +78,7 @@ private:
 
 	void SetTargetActor(AActor* NewTargetActor);
 	void ClearTargetActor();
+	void RefreshBestInteractableTarget();
 	void RefreshPrompt();
 	void ApplyViewModelToWidget();
 	void UpdateWidgetLocation();
