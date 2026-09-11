@@ -6,6 +6,8 @@
 
 class UStaticMeshComponent;
 
+DECLARE_MULTICAST_DELEGATE(FKCClocheOpeningFinishedSignature);
+
 /** 게임 시작 후 열리며 재료 파밍을 허용하는 냄비 클로슈다. */
 UCLASS(Blueprintable)
 class PROJECTKC_API AKCPotClocheActor : public AActor
@@ -14,6 +16,8 @@ class PROJECTKC_API AKCPotClocheActor : public AActor
 
 public:
 	AKCPotClocheActor();
+	bool IsOpeningFinished() const { return bOpeningFinished; }
+	FKCClocheOpeningFinishedSignature OnOpeningFinished;
 
 protected:
 	virtual void BeginPlay() override;

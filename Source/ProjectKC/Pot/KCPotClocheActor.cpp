@@ -129,7 +129,8 @@ void AKCPotClocheActor::ApplyOpeningState()
 
 void AKCPotClocheActor::FinishOpening()
 {
-	if (HasAuthority() && !bOpeningFinished)
+	const bool bShouldBroadcast = HasAuthority() && !bOpeningFinished;
+	if (bShouldBroadcast)
 	{
 		bOpeningFinished = true;
 		ForceNetUpdate();
@@ -140,4 +141,9 @@ void AKCPotClocheActor::FinishOpening()
 	SetActorHiddenInGame(true);
 	SetActorEnableCollision(false);
 	SetActorTickEnabled(false);
+
+	if (bShouldBroadcast)
+	{
+		OnOpeningFinished.Broadcast();
+	}
 }

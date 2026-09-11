@@ -7,6 +7,7 @@
 #include "KCItemSpawnManager.generated.h"
 
 class AKCItemSpawnPoint;
+class AKCPotClocheActor;
 class UKCItemDefinition;
 struct FKCActiveRecipesChangedStruct;
 
@@ -66,6 +67,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Ingredients")
 	EKCIngredientPlacementMode IngredientPlacementMode =
 		EKCIngredientPlacementMode::SpawnPoints;
+
+	/** 지정하면 클로슈가 완전히 열린 뒤 최초 재료를 생성한다. */
+	UPROPERTY(EditInstanceOnly, Category = "KC|Spawn|Ingredients")
+	TObjectPtr<AKCPotClocheActor> IngredientSpawnCloche;
 
 	UPROPERTY(EditAnywhere, Category = "KC|Spawn|Ingredients", meta = (ClampMin = "0.0", Units = "s"))
 	float IngredientRespawnDelayMin = 5.f;
@@ -138,7 +143,9 @@ private:
 
 	bool ValidateSettings(FString& OutError) const;
 	int32 ResolveMaxItemCount() const;
+	void ScheduleSlots(bool bIngredient, int32 ImmediateCount, float DelayMin, float DelayMax);
 	void ScheduleInitialSpawns();
+	void ScheduleInitialIngredientSpawns();
 	int32 CountUniqueSpawnPoints(
 		const TArray<TObjectPtr<AKCItemSpawnPoint>>& Points) const;
 	void RefreshRecipes();
@@ -152,6 +159,7 @@ private:
 	FTransform BuildOrbitTransform(const FSpawnSlot& TargetSlot) const;
 	void UpdateIngredientOrbit(float DeltaSeconds);
 	void DisableReplicatedOrbitPhysics();
+	void HandleIngredientClocheOpened();
 
 	UFUNCTION()
 	void HandleItemDestroyed(AActor* DestroyedActor);
@@ -170,5 +178,6 @@ private:
 	FTimerHandle ServiceTimer;
 	bool bRunning = false;
 	bool bRecipesRead = false;
+	bool bWaitingForIngredientCloche = false;
 	float IngredientOrbitAngle = 0.f;
 };

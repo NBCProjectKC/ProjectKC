@@ -12,6 +12,7 @@
 #include "ProjectKC/Item/Spawner/KCItemSpawnPoint.h"
 #include "ProjectKC/Messages/KCGameplayTags.h"
 #include "ProjectKC/Messages/Struct/KCActiveRecipesChangedStruct.h"
+#include "ProjectKC/Pot/KCPotClocheActor.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 
@@ -191,6 +192,14 @@ void AKCItemSpawnManager::BeginPlay()
 	RecipeListener = UGameplayMessageSubsystem::Get(this).RegisterListener<FKCActiveRecipesChangedStruct>(
 		KCGameplayTags::Message_Game_ActiveRecipesChanged, this, &ThisClass::HandleRecipesChanged);
 	RefreshRecipes();
+	bWaitingForIngredientCloche = IsValid(IngredientSpawnCloche) &&
+		!IngredientSpawnCloche->IsOpeningFinished();
+	if (bWaitingForIngredientCloche)
+	{
+		IngredientSpawnCloche->OnOpeningFinished.AddUObject(
+			this,
+			&ThisClass::HandleIngredientClocheOpened);
+	}
 	ScheduleInitialSpawns();
 	ServiceSpawns();
 }
@@ -200,6 +209,10 @@ void AKCItemSpawnManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	bRunning = false;
 	GetWorldTimerManager().ClearTimer(ServiceTimer);
 	RecipeListener.Unregister();
+	if (IsValid(IngredientSpawnCloche))
+	{
+		IngredientSpawnCloche->OnOpeningFinished.RemoveAll(this);
+	}
 	for (const FSpawnSlot& Slot : Slots)
 	{
 		if (AKCWorldItemActor* Item = Slot.Item.Get())
@@ -252,37 +265,48 @@ int32 AKCItemSpawnManager::CountUniqueSpawnPoints(
 	return UniquePoints.Num();
 }
 
-void AKCItemSpawnManager::ScheduleInitialSpawns()
+void AKCItemSpawnManager::ScheduleSlots(
+	bool bIngredient,
+	int32 ImmediateCount,
+	float DelayMin,
+	float DelayMax)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
-	const auto ScheduleCategory =
-		[this, Now](bool bIngredient, int32 ImmediateCount, float DelayMin, float DelayMax)
+	int32 ScheduledCount = 0;
+	double ReadyTime = Now;
+	for (FSpawnSlot& Slot : Slots)
 	{
-		int32 ScheduledCount = 0;
-		double ReadyTime = Now;
-		for (FSpawnSlot& Slot : Slots)
+		if (Slot.bIngredient != bIngredient)
 		{
-			if (Slot.bIngredient != bIngredient)
-			{
-				continue;
-			}
-			if (ScheduledCount >= ImmediateCount)
-			{
-				ReadyTime += FMath::FRandRange(DelayMin, DelayMax);
-			}
-			Slot.ReadyTime = ReadyTime;
-			++ScheduledCount;
+			continue;
 		}
-	};
+		if (ScheduledCount >= ImmediateCount)
+		{
+			ReadyTime += FMath::FRandRange(DelayMin, DelayMax);
+		}
+		Slot.ReadyTime = ReadyTime;
+		++ScheduledCount;
+	}
+}
 
-	ScheduleCategory(
+void AKCItemSpawnManager::ScheduleInitialSpawns()
+{
+	ScheduleSlots(
 		false,
 		CountUniqueSpawnPoints(ItemSpawnPoints),
 		ItemRespawnDelayMin,
 		ItemRespawnDelayMax);
+	if (!bWaitingForIngredientCloche)
+	{
+		ScheduleInitialIngredientSpawns();
+	}
+}
+
+void AKCItemSpawnManager::ScheduleInitialIngredientSpawns()
+{
 	if (IngredientPlacementMode == EKCIngredientPlacementMode::SpawnPoints)
 	{
-		ScheduleCategory(
+		ScheduleSlots(
 			true,
 			CountUniqueSpawnPoints(IngredientSpawnPoints),
 			IngredientRespawnDelayMin,
@@ -290,12 +314,25 @@ void AKCItemSpawnManager::ScheduleInitialSpawns()
 	}
 	else
 	{
-		ScheduleCategory(
+		ScheduleSlots(
 			true,
 			MAX_int32,
 			IngredientRespawnDelayMin,
 			IngredientRespawnDelayMax);
 	}
+}
+
+void AKCItemSpawnManager::HandleIngredientClocheOpened()
+{
+	if (!bRunning || !HasAuthority() || !bWaitingForIngredientCloche)
+	{
+		return;
+	}
+
+	bWaitingForIngredientCloche = false;
+	IngredientSpawnCloche->OnOpeningFinished.RemoveAll(this);
+	ScheduleInitialIngredientSpawns();
+	ServiceSpawns();
 }
 
 void AKCItemSpawnManager::RefreshRecipes()
@@ -495,6 +532,7 @@ void AKCItemSpawnManager::ServiceSpawns()
 	for (FSpawnSlot& Slot : Slots)
 	{
 		if (Slot.Item.IsValid()) { continue; }
+		if (Slot.bIngredient && bWaitingForIngredientCloche) { continue; }
 		if (Slot.ReadyTime > Now)
 		{
 			NextDelay = FMath::Min(NextDelay, static_cast<float>(Slot.ReadyTime - Now));
