@@ -8,6 +8,7 @@
 #include "Messages/Struct/KCScoreChangedStruct.h"
 #include "Recipe/KCRecipeStruct.h"
 #include "Engine/DataTable.h"
+#include "ProjectKC/ProjectKC.h"
 
 AKCGameState::AKCGameState()
 {
@@ -24,6 +25,7 @@ void AKCGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AKCGameState, bIsFarmingOpen);
 	DOREPLIFETIME(AKCGameState, MatchStartServerTime);
 	DOREPLIFETIME(AKCGameState, MatchEndServerTime);
+	DOREPLIFETIME(AKCGameState, CountdownEndServerTime);
 	DOREPLIFETIME(AKCGameState, ResultScreenEndServerTime);
 	DOREPLIFETIME(AKCGameState, WinningTeamId);
 }
@@ -52,7 +54,10 @@ void AKCGameState::SetGamePhase(EKCGamePhaseType NewPhase)
 		return;
 	}
 
+	const EKCGamePhaseType OldPhase = CurrentPhase;
 	CurrentPhase = NewPhase;
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [GameState] 게임 페이즈 전환: %d -> %d"),
+		static_cast<int32>(OldPhase), static_cast<int32>(NewPhase));
 	OnRep_CurrentPhase();
 }
 
@@ -122,6 +127,16 @@ int32 AKCGameState::GetRemainingMatchSeconds(float CurrentServerTime) const
 	}
 
 	return FMath::Max(0, FMath::CeilToInt(MatchEndServerTime - CurrentServerTime));
+}
+
+int32 AKCGameState::GetRemainingCountdownSeconds(float CurrentServerTime) const
+{
+	if (CountdownEndServerTime <= 0.0f)
+	{
+		return 0;
+	}
+
+	return FMath::Max(0, FMath::CeilToInt(CountdownEndServerTime - CurrentServerTime));
 }
 
 int32 AKCGameState::GetRemainingResultScreenSeconds(float CurrentServerTime) const

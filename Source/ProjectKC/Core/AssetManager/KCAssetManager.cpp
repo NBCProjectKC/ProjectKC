@@ -59,10 +59,15 @@ TSharedPtr<FStreamableHandle> UKCAssetManager::PreloadAssetsByType(
 				}));
 		}
 	}
-	else if (OnProgress)
+	else
 	{
-		// 요청한 에셋이 이미 전부 메모리에 있는 등의 이유로 Handle이 nullptr로 오는 경우 방어
-		OnProgress(1.0f);
+		// 요청한 에셋이 이미 전부 메모리에 있는 등의 이유로 Handle이 nullptr로 오는 경우,
+		// 스트리밍할 게 없어 완료 델리게이트가 실행되지 않으므로 여기서 직접 완료 처리해야 한다.
+		if (OnProgress)
+		{
+			OnProgress(1.0f);
+		}
+		OnComplete();
 	}
 
 	return Handle;
@@ -113,9 +118,15 @@ TSharedPtr<FStreamableHandle> UKCAssetManager::PreloadAssetsByTypes(
 				}));
 		}
 	}
-	else if (OnProgress)
+	else
 	{
-		OnProgress(1.0f);
+		// 요청한 에셋이 이미 전부 메모리에 있는 등의 이유로 Handle이 nullptr로 오는 경우,
+		// 스트리밍할 게 없어 완료 델리게이트가 실행되지 않으므로 여기서 직접 완료 처리해야 한다.
+		if (OnProgress)
+		{
+			OnProgress(1.0f);
+		}
+		OnComplete();
 	}
 
 	return Handle;

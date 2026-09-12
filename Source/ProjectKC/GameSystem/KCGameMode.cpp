@@ -66,7 +66,7 @@ void AKCGameMode::HandleMatchHasStarted()
 		PlayersPerTeam = FMath::Max(1, GetRequiredPlayerCount() / TeamCount);
 	}
 
-	UE_LOG(LogKCGameSystem, Warning, TEXT("[Match] HandleMatchHasStarted 진입 - 접속 인원: %d, 요구 인원: %d, 팀당 인원: %d"),
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] HandleMatchHasStarted 진입 - 접속 인원: %d, 요구 인원: %d, 팀당 인원: %d"),
 		GetNumPlayers(), GetRequiredPlayerCount(), PlayersPerTeam);
 
 	KCGameState = GetGameState<AKCGameState>();
@@ -81,41 +81,166 @@ void AKCGameMode::HandleMatchHasStarted()
 	{
 		KCGameState->InitializeTeamCount(TeamCount);
 		KCGameState->SetActiveRecipes(SelectActiveRecipes()); // 그 판의 레시피 룰렛
-		KCGameState->SetGamePhase(EKCGamePhaseType::Playing); // phase 변경
-		
-		// KCSessionSubsystem에서 로비 설정 매치 시간 복원
-		if (UGameInstance* GI = GetGameInstance())
-		{
-			if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
-			{
-				if (SessionSub->GetMatchDurationSeconds() > 0.0f)
-				{
-					MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
-				}
-			}
-		}
-			
-		// TODO 임시 코드
-		// GameState의 서버시간 설정
-		const float ServerNow = GetWorld()->GetTimeSeconds();
-		const float SafeMatchDuration = FMath::Max(1.0f, MatchDurationSeconds);
-		KCGameState->SetMatchStartServerTime(ServerNow); // 매치 시작 후 타이머 세팅
-		KCGameState->SetMatchEndServerTime(ServerNow + SafeMatchDuration);
+		KCGameState->SetGamePhase(EKCGamePhaseType::Waiting); // phase: 대기중 (전원 3프레임 웜업 대기)
 	}
 
-	// TODO 임시 코드
-	// Timer 끝날 때 게임 종료 처리 
+	// ReadyPlayers는 매치(레벨)마다 새로 스폰되는 GameMode 인스턴스의 멤버라 항상 빈 상태로 시작한다.
+	// 여기서 Empty()를 호출하면, 시임리스 트래블 컨트롤러 재초기화가 빨라서 이 함수보다 먼저 도착한
+	// 플레이어의 정상적인 준비 완료 보고를 지워버리는 레이스가 발생하므로 제거함.
+	GetWorldTimerManager().SetTimer(
+		LoadingTimeoutTimerHandle,
+		this,
+		&AKCGameMode::HandleLoadingTimeout,
+		LoadingTimeoutSeconds,
+		false);
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] 전원 3프레임 웜업 완료 대기 시작 (비상 타임아웃: %.1f초)"), LoadingTimeoutSeconds);
+}
+
+void AKCGameMode::ReportPlayerLoadingComplete(APlayerController* Player)
+{
+	if (!Player)
+	{
+		return;
+	}
+
+	ReadyPlayers.Add(Player);
+	const int32 Required = GetRequiredPlayerCount();
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] 플레이어 로딩 및 3프레임 웜업 완료 보고 접수: %s (현재 완료: %d / 필요: %d)"),
+		*Player->GetName(), ReadyPlayers.Num(), Required);
+
+	// 만약 이미 Countdown 또는 Playing 단계라면 무시
+	if (KCGameState && KCGameState->GetGamePhase() != EKCGamePhaseType::Waiting)
+	{
+		return;
+	}
+
+	if (ReadyPlayers.Num() >= Required && !ReadyDisplayTimerHandle.IsValid())
+	{
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] 참여 인원 전원(%d명) 3프레임 웜업 완료 확인! 모든 클라이언트에 '준비 완료!' 지시 (노출: %.2f초 후 카운트다운 시작)"),
+			ReadyPlayers.Num(), ReadyDisplayDurationSeconds);
+
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (AKCPlayerController* KCPC = Cast<AKCPlayerController>(It->Get()))
+			{
+				KCPC->Client_NotifyAllPlayersReady(ReadyDisplayDurationSeconds);
+			}
+		}
+
+		// 클라이언트의 로딩화면 '준비 완료!' 노출 시간(ReadyDisplayDurationSeconds)과 1:1로 일치시켜 카운트다운 시작
+		GetWorldTimerManager().SetTimer(
+			ReadyDisplayTimerHandle,
+			this,
+			&AKCGameMode::StartCountdownPhase,
+			ReadyDisplayDurationSeconds,
+			false);
+	}
+}
+
+void AKCGameMode::StartCountdownPhase()
+{
+	GetWorldTimerManager().ClearTimer(LoadingTimeoutTimerHandle);
+	GetWorldTimerManager().ClearTimer(ReadyDisplayTimerHandle);
+
+	if (!KCGameState)
+	{
+		return;
+	}
+
+	if (KCGameState->GetGamePhase() == EKCGamePhaseType::Countdown || KCGameState->GetGamePhase() == EKCGamePhaseType::Playing)
+	{
+		return;
+	}
+
+	const float ServerNow = GetWorld()->GetTimeSeconds();
+	KCGameState->SetCountdownEndServerTime(ServerNow + CountdownDurationSeconds);
+	KCGameState->SetGamePhase(EKCGamePhaseType::Countdown);
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] 겟앰프드 스타일 카운트다운 페이즈 시작 (지속: %.1f초, 종료시각: %.2f)"),
+		CountdownDurationSeconds, ServerNow + CountdownDurationSeconds);
+
+	GetWorldTimerManager().SetTimer(
+		CountdownTimerHandle,
+		this,
+		&AKCGameMode::StartPlayingPhase,
+		CountdownDurationSeconds,
+		false);
+}
+
+void AKCGameMode::StartPlayingPhase()
+{
+	GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
+
+	if (!KCGameState || KCGameState->GetGamePhase() == EKCGamePhaseType::Playing)
+	{
+		return;
+	}
+
+	// KCSessionSubsystem에서 로비 설정 매치 시간 복원
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UKCSessionSubsystem* SessionSub = GI->GetSubsystem<UKCSessionSubsystem>())
+		{
+			if (SessionSub->GetMatchDurationSeconds() > 0.0f)
+			{
+				MatchDurationSeconds = SessionSub->GetMatchDurationSeconds();
+			}
+		}
+	}
+
+	const float ServerNow = GetWorld()->GetTimeSeconds();
+	const float SafeMatchDuration = FMath::Max(1.0f, MatchDurationSeconds);
+	KCGameState->SetMatchStartServerTime(ServerNow);
+	KCGameState->SetMatchEndServerTime(ServerNow + SafeMatchDuration);
+	KCGameState->SetGamePhase(EKCGamePhaseType::Playing);
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] Game Start! 본 게임(Playing) 페이즈 진입 및 300초 매치 타이머 가동"));
+
 	GetWorldTimerManager().SetTimer(
 		MatchTimerHandle,
 		this,
 		&AKCGameMode::HandleMatchTimeExpired,
-		FMath::Max(1.0f, MatchDurationSeconds),
+		SafeMatchDuration,
+		false);
+}
+
+void AKCGameMode::HandleLoadingTimeout()
+{
+	// 정상 경로가 이미 카운트다운 예약을 마친 상태라면(레이스 윈도우), 중복 재예약하지 않고 그대로 맡긴다.
+	if (ReadyDisplayTimerHandle.IsValid())
+	{
+		UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] LoadingTimeout 발화했으나 이미 ReadyDisplayTimer가 예약되어 있어 무시함"));
+		return;
+	}
+
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [Match] 플레이어 로딩 비상 대기시간(%.1f초) 만료! 현재 준비 인원(%d / %d)으로 카운트다운 진행"),
+		LoadingTimeoutSeconds, ReadyPlayers.Num(), GetRequiredPlayerCount());
+
+	// 1. 모든 클라이언트에 '준비 완료!' 지시 브로드캐스트
+	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	{
+		if (AKCPlayerController* KCPC = Cast<AKCPlayerController>(Iterator->Get()))
+		{
+			KCPC->Client_NotifyAllPlayersReady(ReadyDisplayDurationSeconds);
+		}
+	}
+
+	// 2. 0.3초 시각 인지 시간 보장 후 Countdown 전환 (정상 경로와 100% 동일한 UX)
+	GetWorldTimerManager().SetTimer(
+		ReadyDisplayTimerHandle,
+		this,
+		&AKCGameMode::StartCountdownPhase,
+		ReadyDisplayDurationSeconds,
 		false);
 }
 
 void AKCGameMode::HandleMatchHasEnded()
 {
 	GetWorldTimerManager().ClearTimer(MatchTimerHandle);
+	GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
+	GetWorldTimerManager().ClearTimer(LoadingTimeoutTimerHandle);
+	GetWorldTimerManager().ClearTimer(ReadyDisplayTimerHandle);
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(IngredientSubmittedListenerHandle);
 	UGameplayMessageSubsystem::Get(this).UnregisterListener(DishFinishedListenerHandle);
 
@@ -442,6 +567,11 @@ void AKCGameMode::Logout(AController* Exiting)
 {
 	if (Exiting)
 	{
+		if (APlayerController* PC = Cast<APlayerController>(Exiting))
+		{
+			ReadyPlayers.Remove(PC);
+		}
+
 		if (AKCPlayerState* KCPS = Exiting->GetPlayerState<AKCPlayerState>())
 		{
 			// 세션 서브시스템에 팀/슬롯 영구 백업 (UniqueNetId 키 기반)

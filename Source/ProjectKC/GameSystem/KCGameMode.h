@@ -49,6 +49,9 @@ public:
 	// 이탈 시 슬롯 정보 저장
 	virtual void Logout(AController* Exiting) override;
 	
+	// 클라이언트가 3프레임 웜업 완료 후 서버에 로딩 완료를 보고할 때 호출
+	void ReportPlayerLoadingComplete(APlayerController* Player);
+
 	// 결과화면 조기 스킵 요청 (클라이언트 RPC가 호출함)
 	void RequestEarlyTravelToLobby(AKCPlayerState* RequestingPlayer);
 	
@@ -57,6 +60,10 @@ protected:
 	virtual bool ReadyToStartMatch_Implementation() override;
 	virtual void HandleMatchHasStarted() override;
 	virtual void HandleMatchHasEnded() override;
+	
+	void StartCountdownPhase();
+	void StartPlayingPhase();
+	void HandleLoadingTimeout();
 	
 	// 로비 슬롯 번호에 대응하는 인게임 시작점을 선택합니다.
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -86,6 +93,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
 	float MatchDurationSeconds = 300.f;
 	
+	// 카운트다운(3, 2, 1) 지속 시간
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
+	float CountdownDurationSeconds = 3.0f;
+
+	// 로딩 완료 후 "준비 완료!" 시각 노출 시간 (이 시간이 끝나면 화면을 내리고 카운트다운 시작)
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
+	float ReadyDisplayDurationSeconds = 0.3f;
+
+	// 플레이어 로딩 최대 대기 시간 (비상 타임아웃)
+	UPROPERTY(EditDefaultsOnly, Category = "KC|Rule")
+	float LoadingTimeoutSeconds = 10.0f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "KC|Recipe|Debug")
 	bool bUseFixedRecipeList = true;
 	
@@ -122,12 +141,18 @@ private:
 	void TravelBackToLobby();
 	FTimerHandle ResultScreenTimerHandle;
 	FTimerHandle MatchTimerHandle;
+	FTimerHandle CountdownTimerHandle;
+	FTimerHandle LoadingTimeoutTimerHandle;
+	FTimerHandle ReadyDisplayTimerHandle;
 	
 	FGameplayMessageListenerHandle IngredientSubmittedListenerHandle;
 	FGameplayMessageListenerHandle DishFinishedListenerHandle;
 
 	UPROPERTY()
 	TObjectPtr<AKCGameState> KCGameState;
+
+	UPROPERTY()
+	TSet<TWeakObjectPtr<APlayerController>> ReadyPlayers;
 	
 	/** 결과화면에서 스킵을 누른 플레이어 목록 (UniqueNetId 또는 PlayerState 포인터로 추적) */
 	UPROPERTY()

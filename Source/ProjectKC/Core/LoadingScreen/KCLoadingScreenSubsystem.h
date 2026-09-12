@@ -9,8 +9,10 @@
 class UKCLoadingScreen;
 class UKCLoadingViewModel;
 struct FKCLevelChangedStruct;
+struct FKCGamePhaseChangedStruct;
 class UKCLoadingTipDataAsset;
 class UKCUserWidget;
+class APlayerController;
 
 UCLASS(Blueprintable)
 class PROJECTKC_API UKCLoadingScreenSubsystem : public UGameInstanceSubsystem
@@ -34,6 +36,18 @@ public:
 	/** 세션 참가 실패나 네트워크 에러 발생 시 로딩 화면을 즉시 정리 */
 	UFUNCTION(BlueprintCallable, Category = "KC|Loading")
 	void CancelPreload();
+
+	/**
+	 * 로컬 컨트롤러가 폰 빙의 및 외형 세팅 완료 후 호출 (인게임 전투 레벨 전용).
+	 * 로딩 화면 뒤에서 3프레임 렌더링 웜업을 수행하고, 완료 시 서버에 보고하도록 합니다.
+	 */
+	void NotifyPlayerReady(APlayerController* Controller);
+
+	/**
+	 * 서버에서 전원 웜업 완료 신호를 수신했을 때 호출.
+	 * 문구를 "준비 완료!"로 변경하고 서버가 지정한 DisplayDuration 초 후 로딩 화면을 내리도록 지시합니다.
+	 */
+	void NotifyAllPlayersReady(float DisplayDuration = 0.3f);
  
 	UPROPERTY(Transient)
 	TObjectPtr<UKCUserWidget> ActiveLoadingWidget;
@@ -72,6 +86,28 @@ private:
 	// 플레이어 컨트롤러가 스폰되어 BeginPlay를 탔는지 여부 (네트워크 복제 지연 방어 락)
 	bool bControllerReady = false;
 
+	// 인게임 전투 레벨: 로컬 폰 시점 안착 및 3프레임 렌더링 웜업 완료 여부
+	bool bWarmupComplete = false;
+
+	// 인게임 전투 레벨: 서버로부터 전원 준비 완료(All Players Ready) 수신 여부
+	bool bAllPlayersReadyReceived = false;
+
+	// 3프레임 렌더링 웜업 티커
+	bool TickRenderWarmup(float DeltaTime);
+	FTSTicker::FDelegateHandle WarmupTickerHandle;
+	int32 RemainingWarmupFrames = 0;
+	TWeakObjectPtr<APlayerController> RegisteredController;
+
+	// 인게임 전투 레벨: 서버에 로딩 완료를 이미 보고했는지 여부 (중복 보고 방지)
+	bool bReadyReportSent = false;
+
+	/**
+	 * 렌더 웜업과 에셋 프리로드는 서로 다른 타이밍에 끝나는 별개의 비동기 작업이다.
+	 * 둘 중 어느 쪽이 나중에 끝나든, 이 함수가 호출된 시점에 둘 다 완료됐는지 확인해서
+	 * 그때 딱 한 번만 서버에 로딩 완료를 보고한다 (웜업만 끝났다고 조기 보고하지 않도록 방지).
+	 */
+	void TryReportPlayerReadyIfFullyPrepared();
+
 	// 로딩화면이 내려간 후 실행 대기 중인 콜백 목록
 	TArray<FSimpleDelegate> PendingHiddenCallbacks;
  
@@ -94,14 +130,20 @@ private:
 	
 	// 100% 노출을 위한 파괴 지연 티커
 	FTSTicker::FDelegateHandle HideDelayTickerHandle;
+	float PendingHideDelayDuration = 0.3f;
 	bool HideWidgetDelayed(float DeltaTime);
 
-	// 컨트롤러 미도착 시 무한 로딩 방지용 비상 탈출 티커 (1.5초)
+	/** 로딩화면 정상 종료 및 비상 안전장치 공용 완전 정리 함수 */
+	void FinishAndHideLoadingScreen();
+
+	// 컨트롤러 미도착 시 무한 로딩 방지용 비상 탈출 티커
 	FTSTicker::FDelegateHandle ControllerTimeoutTickerHandle;
 	bool OnControllerTimeout(float DeltaTime);
 	
 	// GMS 핸들
 	FGameplayMessageListenerHandle LevelChangedListenerHandle;
+	FGameplayMessageListenerHandle GamePhaseChangedListenerHandle;
+	void OnGamePhaseChangedMessage(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message);
 	
 	/** bAssetsReady/bLevelReady 상태에 맞춰 LoadingText를 갱신 
 	* 97% 미만 : 아이템, 사운드 효과 준비 중... 문구
