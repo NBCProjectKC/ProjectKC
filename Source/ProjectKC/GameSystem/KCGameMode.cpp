@@ -4,9 +4,7 @@
 #include "KCGameState.h"
 #include "KCGamePhaseType.h"
 #include "Recipe/KCRecipeStruct.h"
-#include "Recipe/KCRecipeCompletedStruct.h"
 #include "Recipe/KCDishFinishedStruct.h"
-#include "Recipe/KCDishRuinedStruct.h"
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCIngredientSubmittedStruct.h"
 #include "ProjectKC/ProjectKC.h"
@@ -193,7 +191,7 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 
 		// TODO: 페널티(점수 차감 등) 확장 시 여기서
 
-		Multicast_NotifyDishRuined(TeamId);
+		KCGameState->Multicast_NotifyDishRuined(TeamId);
 
 		UE_LOG(LogTemp, Log, TEXT("Team %d: 요리 실패 (유효한 레시피 없음)"), TeamId);
 		return;
@@ -205,7 +203,7 @@ void AKCGameMode::ProcessIngredientSubmission(int32 TeamId, const FGameplayTag& 
 	{
 		KCGameState->SetPotIngredients(TeamId, FGameplayTagContainer());
 
-		Multicast_NotifyRecipeCompleted(TeamId, CompletedRecipeRowName);
+		KCGameState->Multicast_NotifyRecipeCompleted(TeamId, CompletedRecipeRowName);
 
 		UE_LOG(LogTemp, Log, TEXT("Team %d: 레시피 '%s' 완성, 조리 시작"), TeamId, *CompletedRecipeRowName.ToString());
 		return;
@@ -420,21 +418,6 @@ void AKCGameMode::TravelBackToLobby()
 		}
 	}
 	GetWorld()->ServerTravel(UKCLevelTypeLibrary::GetLevelName(EKCLevelType::LobbyLevel).ToString());
-}
-
-void AKCGameMode::Multicast_NotifyDishRuined_Implementation(int32 TeamId)
-{
-	FKCDishRuinedStruct Message;
-	Message.TeamId = TeamId;
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, Message);
-}
-
-void AKCGameMode::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, FName RecipeRowName)
-{
-	FKCRecipeCompletedStruct Message;
-	Message.TeamId = TeamId;
-	Message.RecipeRowName = RecipeRowName;
-	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, Message);
 }
 
 // 플레이어 이탈 시 팀 및 슬롯 정보 백업

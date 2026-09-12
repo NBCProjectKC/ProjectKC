@@ -6,6 +6,8 @@
 #include "Messages/Struct/KCGamePhaseChangedStruct.h"
 #include "Messages/Struct/KCPotIngredientsChangedStruct.h"
 #include "Messages/Struct/KCScoreChangedStruct.h"
+#include "Recipe/KCDishRuinedStruct.h"
+#include "Recipe/KCRecipeCompletedStruct.h"
 #include "Recipe/KCRecipeStruct.h"
 #include "Engine/DataTable.h"
 
@@ -195,6 +197,21 @@ void AKCGameState::OnRep_ActiveRecipes()
 	Message.RecipeRowNames = ActiveRecipeRowNames;
 
 	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Game_ActiveRecipesChanged, Message);
+}
+
+void AKCGameState::Multicast_NotifyDishRuined_Implementation(int32 TeamId)
+{
+	FKCDishRuinedStruct Message;
+	Message.TeamId = TeamId;
+	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Dish_Ruined, Message);
+}
+
+void AKCGameState::Multicast_NotifyRecipeCompleted_Implementation(int32 TeamId, FName RecipeRowName)
+{
+	FKCRecipeCompletedStruct Message;
+	Message.TeamId = TeamId;
+	Message.RecipeRowName = RecipeRowName;
+	UGameplayMessageSubsystem::Get(this).BroadcastMessage(KCGameplayTags::Message_Recipe_Completed, Message);
 }
 
 void AKCGameState::SetFarmingOpen(bool bOpen)

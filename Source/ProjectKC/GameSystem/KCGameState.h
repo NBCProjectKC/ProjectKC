@@ -74,6 +74,12 @@ public:
 
 	// GameMode : 레시피 랜덤 선정용 
 	TArray<FName> GetAllRecipeRowNames() const;
+	// 클라이언트 알림: 요리가 망할 때, 요리가 시작될 때
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_NotifyDishRuined(int32 TeamId);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_NotifyRecipeCompleted(int32 TeamId, FName RecipeRowName);
 	
 	// 접시 덮개 오픈 전 재료 습득 방어
 	void SetFarmingOpen(bool bOpen);
