@@ -22,6 +22,25 @@
 #include "Messages/KCGameplayTags.h"
 #include "Messages/Struct/KCEmptyMessageStruct.h"
 #include "Messages/Struct/KCGamePhaseChangedStruct.h"
+#include "Engine/Engine.h"
+#include "ProjectKC/ProjectKC.h"
+
+static FString GetControllerNetPrefix(const APlayerController* PC)
+{
+	if (!PC) return TEXT("[Unknown]");
+	if (PC->IsLocalController())
+	{
+		const FWorldContext* Context = (GEngine && PC->GetWorld()) ? GEngine->GetWorldContextFromWorld(PC->GetWorld()) : nullptr;
+		// PIE에서 세션 연결 전(NM_Standalone) 구간도 PIEInstance로 클라이언트를 정확히 식별한다.
+		if (PC->GetNetMode() == NM_Client || (Context && Context->PIEInstance > 0))
+		{
+			const int32 PieInstance = Context ? Context->PIEInstance : 1;
+			return FString::Printf(TEXT("[Client PIE_%d]"), PieInstance);
+		}
+		return TEXT("[Server (Host)]");
+	}
+	return TEXT("[Remote Client on Server]");
+}
 
 AKCPlayerController::AKCPlayerController()
 {
@@ -49,10 +68,21 @@ void AKCPlayerController::BeginPlay()
 		}
 	}
 	
+	// 카운트다운/대기 중에는 이동 및 시점 조작 잠금 (Playing 페이즈 진입 시 해제)
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+
 	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
 	{
-		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate::CreateUObject(this, &AKCPlayerController::InitializeInGameHUD));
+		// 월드 감지 및 프리로드 완료 보장을 위해 등록 (HUD 생성은 Playing 페이즈로 이관)
+		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate());
 	}
+
+	LoadingScreenHiddenListenerHandle =
+		UGameplayMessageSubsystem::Get(this).RegisterListener<FKCEmptyMessageStruct>(
+			KCGameplayTags::Message_LoadingScreen_Hidden,
+			this,
+			&ThisClass::HandleLoadingScreenHidden);
 
 	GamePhaseChangedListenerHandle =
 		UGameplayMessageSubsystem::Get(this).RegisterListener<FKCGamePhaseChangedStruct>(
@@ -64,7 +94,13 @@ void AKCPlayerController::BeginPlay()
 	{
 		if (const AKCGameState* GameState = World->GetGameState<AKCGameState>())
 		{
-			if (GameState->GetGamePhase() == EKCGamePhaseType::Ending)
+			if (GameState->GetGamePhase() == EKCGamePhaseType::Playing)
+			{
+				InitializeInGameHUD();
+				SetIgnoreMoveInput(false);
+				SetIgnoreLookInput(false);
+			}
+			else if (GameState->GetGamePhase() == EKCGamePhaseType::Ending)
 			{
 				ShowResultScreen();
 			}
@@ -405,6 +441,41 @@ void AKCPlayerController::ReceivedPlayer()
 	}
 }
 
+void AKCPlayerController::AcknowledgePossession(APawn* P)
+{
+	Super::AcknowledgePossession(P);
+
+	if (IsLocalController())
+	{
+		// 카운트다운 전까지는 이동 및 시점 조작 잠금 유지
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		UE_LOG(LogKCGameSystem, Warning, TEXT("%s [PlayerController] AcknowledgePossession 완료 (Pawn: %s) -> 로딩화면에 3프레임 렌더링 웜업 요청"),
+			*GetControllerNetPrefix(this), *GetNameSafe(P));
+		if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+		{
+			LSS->NotifyPlayerReady(this);
+		}
+	}
+}
+
+void AKCPlayerController::NotifyLocalLoadingAndWarmupComplete()
+{
+	UE_LOG(LogKCGameSystem, Warning, TEXT("%s [PlayerController] 3프레임 렌더링 웜업 완료 수신 -> Server_ReportLoadingComplete() 전송"),
+		*GetControllerNetPrefix(this));
+	Server_ReportLoadingComplete();
+}
+
+void AKCPlayerController::Server_ReportLoadingComplete_Implementation()
+{
+	UE_LOG(LogKCGameSystem, Warning, TEXT("[Server] [PlayerController] Server_ReportLoadingComplete RPC 수신됨 (From: %s)"), *GetName());
+	if (AKCGameMode* GM = GetWorld()->GetAuthGameMode<AKCGameMode>())
+	{
+		GM->ReportPlayerLoadingComplete(this);
+	}
+}
+
 void AKCPlayerController::ServerRequestServerTime_Implementation(float TimeOfClientRequest)
 {
 	const float ServerTimeOfReceipt = GetWorld()->GetTimeSeconds();
@@ -423,14 +494,36 @@ float AKCPlayerController::GetServerTime() const
 	return HasAuthority() ? GetWorld()->GetTimeSeconds() : GetWorld()->GetTimeSeconds() + ClientServerDelta;
 }
 
+void AKCPlayerController::Client_NotifyAllPlayersReady_Implementation(float DisplayDuration)
+{
+	UE_LOG(LogKCGameSystem, Warning, TEXT("%s [PlayerController] Client_NotifyAllPlayersReady 수신 (노출 시간: %.2f초) -> 로딩화면에 '준비 완료!' 및 화면 닫기 지시"),
+		*GetControllerNetPrefix(this), DisplayDuration);
+	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LSS->NotifyAllPlayersReady(DisplayDuration);
+	}
+}
+
 void AKCPlayerController::HandleLoadingScreenHidden(FGameplayTag Channel, const FKCEmptyMessageStruct& Message)
 {
-	InitializeInGameHUD();
+	UE_LOG(LogKCGameSystem, Warning, TEXT("%s [PlayerController] 로딩 화면 완전히 닫힘 (Message_LoadingScreen_Hidden 수신)"),
+		*GetControllerNetPrefix(this));
 }
 
 void AKCPlayerController::HandleGamePhaseChanged(FGameplayTag Channel, const FKCGamePhaseChangedStruct& Message)
 {
-	if (Message.NewPhase == EKCGamePhaseType::Ending)
+	UE_LOG(LogKCGameSystem, Warning, TEXT("%s [PlayerController] HandleGamePhaseChanged 수신: %d"),
+		*GetControllerNetPrefix(this), static_cast<int32>(Message.NewPhase));
+
+	if (Message.NewPhase == EKCGamePhaseType::Playing)
+	{
+		InitializeInGameHUD();
+		SetIgnoreMoveInput(false);
+		SetIgnoreLookInput(false);
+		UE_LOG(LogKCGameSystem, Warning, TEXT("%s [PlayerController] Game Start! (Playing 페이즈) -> HUD 활성화 및 이동 조작 잠금 해제"),
+			*GetControllerNetPrefix(this));
+	}
+	else if (Message.NewPhase == EKCGamePhaseType::Ending)
 	{
 		ShowResultScreen();
 	}
