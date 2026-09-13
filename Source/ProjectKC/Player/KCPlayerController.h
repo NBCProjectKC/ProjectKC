@@ -23,6 +23,15 @@ public:
 	AKCPlayerController();
 
 	virtual void ReceivedPlayer() override;
+	virtual void AcknowledgePossession(APawn* P) override;
+
+	/** UKCLoadingScreenSubsystem에서 3프레임 렌더링 웜업이 끝난 후 호출 */
+	void NotifyLocalLoadingAndWarmupComplete();
+
+	/** 서버에 로컬 로딩 및 3프레임 렌더링 웜업 완료를 보고 */
+	UFUNCTION(Server, Reliable)
+	void Server_ReportLoadingComplete();
+
 	UFUNCTION(BlueprintPure, Category = "KC|Network")
 	float GetServerTime() const; 
 
@@ -38,6 +47,10 @@ public:
 	
 	UFUNCTION(Client, Reliable)
 	void Client_ShowResultToLobbyLoadingScreen();
+	
+	/** 서버가 전원 웜업 완료 확인 후 클라이언트에 로딩화면 닫기(지정된 시간 동안 '준비 완료!' 노출 후 종료)를 지시 */
+	UFUNCTION(Client, Reliable)
+	void Client_NotifyAllPlayersReady(float DisplayDuration);
 	
 protected:
 	virtual void BeginPlay() override;

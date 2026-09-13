@@ -39,6 +39,14 @@ public:
 	int32 GetRemainingMatchSeconds(float CurrentServerTime) const;
 
 	UPROPERTY(Replicated)
+	float CountdownEndServerTime = 0.0f;
+	void SetCountdownEndServerTime(float InTime) { CountdownEndServerTime = InTime; }
+	UFUNCTION(BlueprintPure, Category = "KC|GameState")
+	float GetCountdownEndServerTime() const { return CountdownEndServerTime; }
+	UFUNCTION(BlueprintPure, Category = "KC|GameState")
+	int32 GetRemainingCountdownSeconds(float CurrentServerTime) const;
+
+	UPROPERTY(Replicated)
 	float ResultScreenEndServerTime = 0.0f;
 	void SetResultScreenEndServerTime(float InTime) { ResultScreenEndServerTime = InTime; }
 	float GetResultScreenEndServerTime() const { return ResultScreenEndServerTime; }

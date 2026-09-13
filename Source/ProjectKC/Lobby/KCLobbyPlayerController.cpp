@@ -286,7 +286,12 @@ void AKCLobbyPlayerController::PostSeamlessTravel()
 		CustomizationNetworkComponent->ResetTransientCustomizationData();
 	}
 	Super::PostSeamlessTravel();
-	SetupLobbyUI();
+
+	if (UKCLoadingScreenSubsystem* LSS = GetGameInstance()->GetSubsystem<UKCLoadingScreenSubsystem>())
+	{
+		LSS->RunAfterLoadingScreenHidden(this, FSimpleDelegate::CreateUObject(this, &AKCLobbyPlayerController::SetupLobbyUI));
+	}
+
 	RefreshLobbyCustomizationPresentations();
 }
 
