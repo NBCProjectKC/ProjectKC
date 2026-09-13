@@ -7,6 +7,7 @@
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
+#include "InputCoreTypes.h"
 #include "Core/LoadingScreen/KCLoadingScreenSubsystem.h"
 #include "Customization/KCCustomizationNetworkComponent.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
@@ -315,8 +316,28 @@ void AKCPlayerController::SetupInputComponent()
 			this,
 			&AKCPlayerController::DropHeldItem);
 	}
+
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AKCPlayerController::ToggleEscMenu);
+	}
 }
 
+void AKCPlayerController::ToggleEscMenu()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>())
+		{
+			UISubsystem->ToggleEscMenu(true);
+		}
+	}
+}
 void AKCPlayerController::PlayerTick(const float DeltaSeconds)
 {
 	Super::PlayerTick(DeltaSeconds);

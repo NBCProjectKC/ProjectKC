@@ -9,11 +9,13 @@ class UKCColorStyle;
 class UKCUIFontStyle;
 class UKCHUDWidget;
 class UKCToastWidget;
+class UKCToastButtonWidget;
 class UKCModalWidget;
 class UKCWorldIndicatorWidget;
 class UKCInteractionPromptWidget;
 class UKCInteractionPromptRegistry;
 class UKCUserWidget;
+class UKCEscMenuWidget;
 class UKCLobbyWidget;
 class UKCLobbyToastWidget;
 class UKCLobbyGameSettingsWidget;
@@ -52,6 +54,9 @@ public:
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
 	TSoftClassPtr<UKCUserWidget> ResultScreenClass;
 
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Screens")
+	TSoftClassPtr<UKCEscMenuWidget> EscMenuWidgetClass;
+
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|HUD")
 	TSoftClassPtr<UKCHUDWidget> HUDWidgetClass;
 
@@ -60,6 +65,9 @@ public:
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Toast")
 	TSoftClassPtr<UKCToastWidget> ToastWidgetClass;
+
+	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Toast")
+	TSoftClassPtr<UKCToastButtonWidget> ToastButtonWidgetClass;
 
 	UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Indicator")
 	TSoftClassPtr<UKCWorldIndicatorWidget> WorldIndicatorWidgetClass;

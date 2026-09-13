@@ -59,6 +59,7 @@ private:
 	void EndUseHeldItem(const FInputActionValue& InputValue);
 	void Interact(const FInputActionValue& InputValue);
 	void DropHeldItem(const FInputActionValue& InputValue);
+	void ToggleEscMenu();
 	void UpdateCharacterFacing(float DeltaSeconds);
 	
 	// 서버 시간 동기화

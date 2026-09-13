@@ -187,6 +187,9 @@ protected:
 	/** @brief Enter 키 입력 처리 (채팅창 포커스 활성화/토글) */
 	void HandleEnterKey();
 
+	/** @brief ESC 메뉴 표시/숨김 처리 */
+	void ToggleEscMenu();
+
 	/** @brief 로컬 플레이어 대상 로비 UI 위젯 생성 및 마우스/입력 모드 설정 */
 	void SetupLobbyUI();
 

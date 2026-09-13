@@ -13,6 +13,7 @@
 #include "ProjectKC/GameSystem/KCLobbyGameMode.h"
 #include "ProjectKC/Lobby/KCSessionSubsystem.h"
 #include "UI/Common/Core/KCUISettings.h"
+#include "ProjectKC/UI/Common/Core/KCLocalPlayerUISubsystem.h"
 #include "ProjectKC/ProjectKC.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -189,9 +190,25 @@ void AKCLobbyPlayerController::SetupInputComponent()
 	if (InputComponent)
 	{
 		InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AKCLobbyPlayerController::HandleEnterKey);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AKCLobbyPlayerController::ToggleEscMenu);
 	}
 }
 
+void AKCLobbyPlayerController::ToggleEscMenu()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (UKCLocalPlayerUISubsystem* UISubsystem = LocalPlayer->GetSubsystem<UKCLocalPlayerUISubsystem>())
+		{
+			UISubsystem->ToggleEscMenu(false);
+		}
+	}
+}
 void AKCLobbyPlayerController::HandleEnterKey()
 {
 	if (!IsLocalController())

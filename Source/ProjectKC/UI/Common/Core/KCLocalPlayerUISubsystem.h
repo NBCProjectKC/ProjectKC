@@ -6,6 +6,7 @@
 
 class APlayerController;
 class UKCUserWidget;
+class UKCEscMenuWidget;
 
 UCLASS()
 class PROJECTKC_API UKCLocalPlayerUISubsystem : public ULocalPlayerSubsystem
@@ -28,6 +29,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "KC|UI")
 	void QueueToast(const FText& Message);
 
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	UKCEscMenuWidget* ShowEscMenu(bool bRestoreGameOnlyWhenHidden = true);
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void HideEscMenu();
+
+	UFUNCTION(BlueprintCallable, Category = "KC|UI")
+	void ToggleEscMenu(bool bRestoreGameOnlyWhenHidden = true);
+
 protected:
 	virtual void Deinitialize() override;
 
@@ -38,5 +48,10 @@ private:
 	TObjectPtr<UKCUserWidget> ActiveScreenWidget;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UKCEscMenuWidget> ActiveEscMenuWidget;
+
+	UPROPERTY(Transient)
 	TArray<FText> PendingToastMessages;
+
+	bool bRestoreGameOnlyOnEscMenuHidden = true;
 };
